@@ -1,10 +1,8 @@
-"""Componentes gráficos reutilizables."""
 import math
 
 import pygame
 
 from .tema import TEMA
-
 
 def texto(sup, s, pos, tam=16, color=None, negrita=False, centro=False, derecha=False):
     f = TEMA.fuente(tam, negrita)
@@ -18,7 +16,6 @@ def texto(sup, s, pos, tam=16, color=None, negrita=False, centro=False, derecha=
         r.topleft = pos
     sup.blit(img, r)
     return r
-
 
 def envolver(s, tam, ancho, negrita=False):
     f = TEMA.fuente(tam, negrita)
@@ -35,25 +32,21 @@ def envolver(s, tam, ancho, negrita=False):
         lineas.append(actual)
     return lineas
 
-
 def parrafo(sup, s, x, y, ancho, tam=15, color=None, interlineado=4, negrita=False):
     for l in envolver(s, tam, ancho, negrita):
         texto(sup, l, (x, y), tam, color, negrita)
         y += tam + interlineado
     return y
 
-
 def panel(sup, rect, color=None, radio=10, borde=True):
     pygame.draw.rect(sup, color or TEMA.c["panel"], rect, border_radius=radio)
     if borde:
         pygame.draw.rect(sup, TEMA.c["borde"], rect, 1, border_radius=radio)
 
-
 def poligono_regular(centro, radio, lados, rot=0.0):
     cx, cy = centro
     return [(cx + radio * math.cos(rot + 2 * math.pi * i / lados),
              cy + radio * math.sin(rot + 2 * math.pi * i / lados)) for i in range(lados)]
-
 
 class Boton:
     def __init__(self, rect, etiqueta, clave=None, costo=None, tam=15, color=None):
@@ -88,7 +81,7 @@ class Boton:
         else:
             texto(sup, self.etiqueta, (self.rect.x + 12, self.rect.centery - self.tam // 2 - 2),
                   self.tam, col, True)
-            for i in range(self.costo):   # puntos de atención que cuesta
+            for i in range(self.costo):                                  
                 cx = self.rect.right - 14 - i * 13
                 pygame.draw.circle(sup, c["aviso"] if self.activo else c["tenue"],
                                    (cx, self.rect.centery), 4)
@@ -96,19 +89,16 @@ class Boton:
     def clic(self, pos):
         return self.activo and self.rect.collidepoint(pos)
 
-
 class Toasts:
-    """Avisos flotantes. También son los 'subtítulos' de cada sonido."""
 
     def __init__(self):
-        self.items = []   # [texto, tipo, t_inicio]
+        self.items = []                            
 
     def agregar(self, s, tipo):
         self.items.append([s, tipo, pygame.time.get_ticks()])
         self.items = self.items[-4:]
 
     def dibujar(self, sup, x, y, ancho, abajo=False):
-        """Si abajo=True, `y` es el borde inferior y los avisos crecen hacia arriba."""
         ahora = pygame.time.get_ticks()
         self.items = [it for it in self.items if ahora - it[2] <= 4200][-2:]
         vivos = self.items

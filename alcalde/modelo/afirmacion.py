@@ -1,11 +1,8 @@
-"""Una afirmación es el CONTENIDO de una publicación, descompuesto en partes
-para que cada reenvío pueda torcer una sola de ellas (y el juego sepa cuál)."""
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
 from typing import Optional
 
-# Tipos de distorsión que puede sufrir un reenvío -------------------------
 DISTORSIONES = {
     "exageracion":    "Cifra inflada",
     "sin_contexto":   "Contexto eliminado",
@@ -18,7 +15,6 @@ FUENTES_DUDOSAS = [
     "Me llegó por cadena", "Dicen en el barrio", "Un primo que trabaja allá dice",
     "Audio anónimo", "Lo vi en un grupo", "Pásenlo antes de que lo borren",
 ]
-
 
 @dataclass(frozen=True)
 class Afirmacion:
@@ -41,7 +37,6 @@ class Afirmacion:
         return t + "."
 
     def posibles_distorsiones(self, hecho) -> list[str]:
-        """Distorsiones que todavía se le pueden aplicar."""
         op = []
         if self.cifra is not None and "exageracion" not in self.distorsiones:
             op.append("exageracion")
@@ -56,7 +51,6 @@ class Afirmacion:
         return op
 
     def mutar(self, tipo: str, hecho, rng) -> "Afirmacion":
-        """Devuelve una NUEVA afirmación con la distorsión `tipo` aplicada."""
         d = self.distorsiones + (tipo,)
         if tipo == "exageracion":
             return replace(self, cifra=self.cifra * rng.choice([5, 10, 20]), distorsiones=d)
@@ -71,7 +65,6 @@ class Afirmacion:
         raise ValueError(tipo)
 
     def comparar_con(self, hecho) -> list[str]:
-        """Verificación: qué partes NO coinciden con el hecho oficial."""
         dif = []
         if self.cifra != hecho.cifra:
             dif.append("exageracion")

@@ -1,13 +1,9 @@
-"""Efectos de sonido sintetizados (no se necesitan archivos de audio).
-Cada sonido tiene además un aviso visual (toast), para jugadores sordos o
-con el sonido apagado."""
 import math
 from array import array
 
 import pygame
 
 _RATE = 22050
-
 
 def _tono(frecs, dur=0.12, vol=0.35, onda="sin"):
     muestras = array("h")
@@ -23,7 +19,6 @@ def _tono(frecs, dur=0.12, vol=0.35, onda="sin"):
                 v = math.sin(2 * math.pi * f * t)
             muestras.append(int(v * env * vol * 32767))
     return muestras
-
 
 class Sonidos:
     def __init__(self):
@@ -58,9 +53,7 @@ class Sonidos:
         if self.activo and nombre in self.s:
             self.s[nombre].play()
 
-
 SONIDOS = None
-
 
 def sonidos() -> Sonidos:
     global SONIDOS

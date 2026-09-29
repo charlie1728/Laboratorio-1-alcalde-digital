@@ -1,10 +1,3 @@
-"""Colores, fuentes y modo de alto contraste.
-
-Componente inclusivo: los estados de las publicaciones NO dependen solo del
-color. Cada estado tiene una FORMA distinta (círculo, cuadrado, triángulo,
-rombo) y la paleta es Okabe-Ito (distinguible con daltonismo). Además existe
-un modo de ALTO CONTRASTE (tecla C) para baja visión.
-"""
 import pygame
 
 NORMAL = dict(
@@ -29,7 +22,6 @@ ALTO_CONTRASTE = dict(
     sombra=(0, 0, 0, 200),
 )
 
-
 class Tema:
     def __init__(self):
         self.alto_contraste = False
@@ -49,6 +41,5 @@ class Tema:
                 f.set_bold(negrita)
             self._fuentes[clave] = f
         return self._fuentes[clave]
-
 
 TEMA = Tema()

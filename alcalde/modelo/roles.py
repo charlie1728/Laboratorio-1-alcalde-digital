@@ -1,6 +1,3 @@
-"""Roles jugables: todos comparten las 4 acciones básicas del PDF
-(Compartir, Verificar, Reportar, Ignorar) pero cada uno tiene una
-habilidad propia y un pasivo, para que las estrategias no sean iguales."""
 
 ROLES = {
     "ciudadano": dict(

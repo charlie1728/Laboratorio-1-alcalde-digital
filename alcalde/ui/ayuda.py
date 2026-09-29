@@ -1,4 +1,3 @@
-"""Sección AYUDA (tecla H o botón Ayuda)."""
 import pygame
 
 from .tema import TEMA
@@ -69,7 +68,6 @@ SECCIONES = [
         "punto naranja en una arista = ahí mutó.",
     ]),
 ]
-
 
 class Ayuda:
     def __init__(self, rect):

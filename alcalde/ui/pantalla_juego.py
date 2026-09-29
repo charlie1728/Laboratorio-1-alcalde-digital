@@ -1,4 +1,3 @@
-"""Pantalla principal de la partida."""
 import math
 
 import pygame
@@ -12,13 +11,12 @@ from .widgets import Boton, panel, parrafo, texto, envolver
 
 SONIDO_POR_TIPO = {"bueno": "bueno", "malo": "malo", "logro": "logro", "evento": "evento"}
 
-
 class PantallaJuego:
     def __init__(self, app, partida):
         self.app = app
         self.p = partida
         self.caso_idx = 0
-        self.sel = None                     # nodo seleccionado
+        self.sel = None                                        
         self.vista = VistaArbol((274, 106, 690, 440))
         self.leidos = 0
         self.ronda_vista = partida.ronda
@@ -28,6 +26,9 @@ class PantallaJuego:
         self.viral_t0 = None
         self.ultimo_tick = -1
         self.ind_prev = dict(partida.ciudad.v)
+        self.modo_profesor = False
+        self._casos_turno = set()
+        self._turno_actual_id = None
 
         self.botones_acc = []
         self.btn_fin = Boton((988, 700, 268, 40), "Terminar turno  (Enter)", tam=15)
@@ -44,7 +45,6 @@ class PantallaJuego:
         self.tabs = []
         self._procesar_mensajes()
 
-    # ------------------------------------------------------------ helpers
     @property
     def caso(self):
         abiertos = self.p.casos_abiertos()
@@ -86,9 +86,22 @@ class PantallaJuego:
     def _accion(self, clave):
         if self.sel is None or self.caso is None or self.sel.id not in self.arbol:
             return
+            
+        caso_id_actual = self.caso.id
+        
         self.p.ejecutar(clave, self.caso, self.sel)
         self._aplicar_resaltado()
+        
         if self.arbol is None or self.sel.id not in self.arbol:
+            self._casos_turno.add(caso_id_actual)
+            self.sel = None
+            self.vista.seleccionado = None
+                                                                                    
+        elif clave == "verificar":
+            pass                                                         
+                                                                            
+        elif not self.modo_profesor:
+            self._casos_turno.add(caso_id_actual)
             self.sel = None
             self.vista.seleccionado = None
         self._procesar_mensajes()
@@ -106,7 +119,7 @@ class PantallaJuego:
         if self.p.evento_viral:
             self.viral_t0 = pygame.time.get_ticks()
             self.app.snd.play("viral")
-            # el caso del evento pasa a primer plano
+                                                    
             abiertos = self.p.casos_abiertos()
             if self.p.evento_viral.caso in abiertos:
                 self._cambiar_caso(abiertos.index(self.p.evento_viral.caso))
@@ -133,7 +146,6 @@ class PantallaJuego:
             self.vista.animar_recorrido("Camino a raíz", [n.id for n in a.camino_a_raiz(self.sel.id)])
         self.app.snd.play("click")
 
-    # ------------------------------------------------------------ eventos
     def evento(self, e):
         if self.p.evento_viral:
             return self._evento_viral(e)
@@ -143,26 +155,29 @@ class PantallaJuego:
                 self.mostrar_avl = False
             return
         if e.type == pygame.MOUSEMOTION:
-            self.vista.hover = self.vista.nodo_en(self.arbol, e.pos)
+            if self.modo_profesor:
+                self.vista.hover = self.vista.nodo_en(self.arbol, e.pos)
         elif e.type == pygame.MOUSEBUTTONDOWN and e.button == 1:
-            n = self.vista.nodo_en(self.arbol, e.pos)
-            if n is not None:
-                self.sel = n
-                self.vista.seleccionado = n.id
-                self.app.snd.play("click")
-                return
+            if self.modo_profesor:
+                n = self.vista.nodo_en(self.arbol, e.pos)
+                if n is not None:
+                    self.sel = n
+                    self.vista.seleccionado = n.id
+                    self.app.snd.play("click")
+                    return
             for b in self.botones_acc:
                 if b.clic(e.pos):
                     self._accion(b.clave)
                     return
-            for i, (r, _) in enumerate(self.tabs):
-                if r.collidepoint(e.pos):
-                    self._cambiar_caso(i)
-                    return
-            for b in self.botones_rec:
-                if b.clic(e.pos):
-                    self._recorrido(b.clave)
-                    return
+            if self.modo_profesor:
+                for i, (r, _) in enumerate(self.tabs):
+                    if r.collidepoint(e.pos):
+                        self._cambiar_caso(i)
+                        return
+                for b in self.botones_rec:
+                    if b.clic(e.pos):
+                        self._recorrido(b.clave)
+                        return
             if self.btn_fin.clic(e.pos):
                 self._terminar_turno()
             elif self.btn_ayuda.clic(e.pos):
@@ -172,8 +187,13 @@ class PantallaJuego:
             elif self.btn_sonido.clic(e.pos):
                 self.app.snd.activo = not self.app.snd.activo
         elif e.type == pygame.KEYDOWN:
-            if e.key == pygame.K_TAB and self.p.casos_abiertos():
+            if e.key == pygame.K_TAB:
+                self.modo_profesor = not self.modo_profesor
+                self.app.snd.play("click")
+            elif e.key == pygame.K_RIGHT and self.modo_profesor and self.p.casos_abiertos():
                 self._cambiar_caso((self.caso_idx + 1) % len(self.p.casos_abiertos()))
+            elif e.key == pygame.K_LEFT and self.modo_profesor and self.p.casos_abiertos():
+                self._cambiar_caso((self.caso_idx - 1) % len(self.p.casos_abiertos()))
             elif e.key == pygame.K_RETURN:
                 self._terminar_turno()
             elif pygame.K_1 <= e.key <= pygame.K_6:
@@ -208,8 +228,13 @@ class PantallaJuego:
             self.vista.seleccionado = None
         self._procesar_mensajes()
 
-    # ------------------------------------------------------------ update
     def actualizar(self):
+                                                       
+        turno_id = id(self.p.jugador_actual)
+        if turno_id != self._turno_actual_id:
+            self._turno_actual_id = turno_id
+            self._casos_turno.clear()
+
         if self.p.evento_viral:
             if self.viral_t0 is None:
                 self.viral_t0 = pygame.time.get_ticks()
@@ -223,20 +248,67 @@ class PantallaJuego:
         if cid != getattr(self, "_caso_visto", None):
             self._caso_visto = cid
             self.vista.olvidar()
+
+        if not self.modo_profesor and self.sel is None:
+            abiertos = self.p.casos_abiertos()
+            
+            casos_bloqueados = getattr(self, "_casos_turno", set())
+            disponibles = [c for c in abiertos if c.id not in casos_bloqueados]
+            
+            if not disponibles and self.p.jugador_actual.atencion > 0:
+                self.p._nuevo_caso(falso=self.p.rng.random() < 0.6)
+                self.p._recalcular()
+                abiertos = self.p.casos_abiertos()
+
+            nombre_jugador = self.p.jugador_actual.nombre
+            mejor = None
+            for i in range(len(abiertos)):
+                idx = (self.caso_idx + i) % len(abiertos)
+                caso_temp = abiertos[idx]
+                                                           
+                if caso_temp.id in self._casos_turno:
+                    continue
+                if not caso_temp.arbol or caso_temp.arbol.raiz is None:
+                    continue
+                for nivel in caso_temp.arbol.por_niveles():
+                    for nodo in nivel:
+                        if nodo.inmune or nodo.verificado:
+                            continue
+                        if nodo.autor == nombre_jugador:
+                            continue
+                        mejor = (idx, nodo)
+                        break
+                    if mejor:
+                        break
+                if mejor:
+                    break
+            if mejor:
+                self.caso_idx = mejor[0]
+                self.sel = mejor[1]
+                self.vista.seleccionado = mejor[1].id
+
         self.vista.calcular_layout(self.arbol)
 
-    # ------------------------------------------------------------ dibujo
     def dibujar(self, sup):
         c = TEMA.c
         sup.fill(c["fondo"])
         self._barra_superior(sup)
         self._panel_ciudad(sup)
-        self._tabs(sup)
-        self.vista.dibujar(sup, self.arbol)
-        self._leyenda(sup)
-        self._barra_recorridos(sup)
-        self._registro(sup)
-        self._panel_publicacion(sup)
+        
+        if self.modo_profesor:
+            self._tabs(sup)
+            self.vista.dibujar(sup, self.arbol)
+            self._leyenda(sup)
+            self._barra_recorridos(sup)
+            self._registro(sup, 274, 600, 690, 150)
+            self._panel_publicacion(sup)
+        else:
+            self._dibujar_celular(sup)
+            self._registro(sup, 840, 66, 420, 614)
+            self.btn_fin.rect.topleft = (988, 700)
+            self.btn_fin.seleccionado = self.p.jugador_actual.atencion == 0
+            self.btn_fin.dibujar(sup)
+
         self.app.toasts.dibujar(sup, 574, 506, 382, abajo=True)
         self._banner_ronda(sup)
         if self.mostrar_avl:
@@ -290,7 +362,7 @@ class PantallaJuego:
             pygame.draw.rect(sup, c["panel2"], (26, y + 19, 220, 8), border_radius=4)
             col = c["malo"] if negativo else c["acento"]
             pygame.draw.rect(sup, col, (26, y + 19, int(220 * v / 100), 8), border_radius=4)
-            if negativo:   # marca con rayas: "más bajo es mejor" sin depender del color
+            if negativo:                                                                
                 for xx in range(26, 26 + int(220 * v / 100), 7):
                     pygame.draw.line(sup, c["fondo"], (xx, y + 26), (xx + 5, y + 19), 1)
             y += 42
@@ -361,9 +433,9 @@ class PantallaJuego:
             b.activo = not (b.clave == "camino" and self.sel is None)
             b.dibujar(sup)
 
-    def _registro(self, sup):
+    def _registro(self, sup, x, y_pos, w, h):
         c = TEMA.c
-        r = pygame.Rect(274, 600, 690, 150)
+        r = pygame.Rect(x, y_pos, w, h)
         panel(sup, r)
         y = r.y + 8
         v = self.vista
@@ -426,7 +498,6 @@ class PantallaJuego:
             if n.hijos:
                 texto(sup, f"{len(n.hijos)} reenvíos directos", (990, y + 4), 12, c["tenue"])
 
-        # acciones
         yb = 440
         texto(sup, "ACCIONES", (990, yb - 24), 15, c["acento"], True)
         self.botones_acc = []
@@ -486,3 +557,49 @@ class PantallaJuego:
                          (390, 450, int(500 * restante / ev.segundos), 10), border_radius=5)
         for b in self._botones_viral():
             b.dibujar(sup)
+
+    def _dibujar_celular(self, sup):
+        c = TEMA.c
+        phone_rect = pygame.Rect(350, 66, 450, 684)
+        pygame.draw.rect(sup, c["panel"], phone_rect, border_radius=30)
+        pygame.draw.rect(sup, c["borde"], phone_rect, 4, border_radius=30)
+        
+        texto(sup, "PRESIONA [TAB] PARA VER MODO PROFESOR (ESTRUCTURAS)", (575, 765), 11, c["tenue"], centro=True)
+        
+        if self.sel is None:
+            texto(sup, "No hay nuevas publicaciones", (575, 300), 20, c["tenue"], True, centro=True)
+            return
+
+        n = self.sel
+        texto(sup, "CIVITAS", (575, 100), 24, c["acento"], True, centro=True)
+        pygame.draw.line(sup, c["borde"], (350, 140), (800, 140), 2)
+        
+        pygame.draw.circle(sup, c["texto"], (400, 180), 20)
+        texto(sup, n.autor[:2].upper(), (400, 182), 16, c["fondo"], True, centro=True)
+        texto(sup, "@" + n.autor.replace(" ", "").lower(), (430, 170), 18, c["texto"], True)
+        texto(sup, "Ola " + str(n.profundidad), (770, 170), 14, c["tenue"], derecha=True)
+        
+        y = parrafo(sup, n.afirmacion.texto(), 380, 230, 390, 20, c["texto"]) + 20
+        
+        if n.verificado:
+            if n.es_veraz:
+                pygame.draw.rect(sup, c["n_veraz"], (455, y, 240, 30), border_radius=8)
+                texto(sup, "VERDADERO", (575, y+15), 16, c["fondo"], True, centro=True)
+            elif n.es_correccion:
+                pygame.draw.rect(sup, c["n_correccion"], (455, y, 240, 30), border_radius=8)
+                texto(sup, "DESMENTIDO OFICIAL", (575, y+15), 16, c["fondo"], True, centro=True)
+            else:
+                pygame.draw.rect(sup, c["n_falso"], (455, y, 240, 30), border_radius=8)
+                texto(sup, "FALSO", (575, y+15), 16, c["fondo"], True, centro=True)
+            y += 45
+
+        self.botones_acc = []
+        yb = 480
+        acciones = self.p.acciones_para(n)
+        for i, a in enumerate(acciones):
+            color = c["logro"] if a.get("especial") else c["panel2"]
+            b = Boton((400, yb, 350, 45), f"{a['nombre'].upper()}", a["clave"], a["costo"], tam=16, color=color)
+            b.activo = a["ok"]
+            b.dibujar(sup)
+            self.botones_acc.append(b)
+            yb += 55

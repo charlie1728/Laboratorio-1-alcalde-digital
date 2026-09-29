@@ -1,4 +1,3 @@
-"""Pantalla de inicio: configurar de 2 a 4 jugadores y sus roles."""
 import math
 import random
 
@@ -10,7 +9,6 @@ from .widgets import Boton, panel, parrafo, texto
 
 COLORES_JUGADOR = [(86, 180, 233), (230, 159, 0), (0, 158, 115), (204, 121, 167)]
 NOMBRES = ["Jugador 1", "Jugador 2", "Jugador 3", "Jugador 4"]
-
 
 class PantallaInicio:
     def __init__(self, app):
@@ -66,7 +64,7 @@ class PantallaInicio:
                 s["nombre"] = s["nombre"][:-1]
             elif e.unicode and e.unicode.isprintable() and len(s["nombre"]) < 14:
                 s["nombre"] += e.unicode
-            return True       # consumir teclas mientras se escribe
+            return True                                            
         return False
 
     def _comenzar(self):
@@ -83,7 +81,7 @@ class PantallaInicio:
     def dibujar(self, sup):
         c = TEMA.c
         sup.fill(c["fondo"])
-        # fondo: una "red" viva de publicaciones que se conectan
+                                                                
         for p in self.particulas:
             p[0] = (p[0] + p[2]) % 1280
             p[1] = (p[1] + p[3]) % 760

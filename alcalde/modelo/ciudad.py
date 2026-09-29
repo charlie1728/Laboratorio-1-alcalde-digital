@@ -1,4 +1,3 @@
-"""Indicadores de Ciudad Nova (0..100)."""
 
 POSITIVOS = ["info_verificada", "confianza", "convivencia", "bienestar"]
 NEGATIVOS = ["desinformacion", "conflictos"]
@@ -10,7 +9,6 @@ NOMBRES = {
     "desinformacion": "Desinformación",
     "conflictos": "Conflictos",
 }
-
 
 class Ciudad:
     def __init__(self):
@@ -26,7 +24,6 @@ class Ciudad:
         self.v[clave] = max(0, min(100, round(valor)))
 
     def salud(self) -> int:
-        """Índice global de la ciudad (resultado general)."""
         pos = sum(self.v[k] for k in POSITIVOS) / len(POSITIVOS)
         neg = sum(self.v[k] for k in NEGATIVOS) / len(NEGATIVOS)
         return round((pos + (100 - neg)) / 2)

@@ -1,11 +1,8 @@
-"""Resumen al terminar la campaña (versión preliminar: la elección del
-alcalde se implementa en la entrega final)."""
 import pygame
 
 from ..modelo.ciudad import NEGATIVOS, NOMBRES
 from .tema import TEMA
 from .widgets import Boton, panel, texto
-
 
 class PantallaResumen:
     def __init__(self, app, partida):
@@ -44,7 +41,7 @@ class PantallaResumen:
             pygame.draw.rect(sup, c["panel2"], (80, y + 22, 520, 10), border_radius=5)
             pygame.draw.rect(sup, col, (80, y + 22, int(520 * v / 100), 10), border_radius=5)
             y += 50
-        # evolución de la desinformación
+                                        
         texto(sup, "Desinformación por ronda", (80, y + 6), 14, c["tenue"], True)
         hist = [h["desinformacion"] for h in self.p.ciudad.historial]
         gx, gy, gw, gh = 80, y + 30, 520, 120

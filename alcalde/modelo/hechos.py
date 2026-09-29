@@ -1,5 +1,3 @@
-"""Catálogo de hechos REALES de Ciudad Nova (la verdad del juego) y
-candidatos. Cada hecho sabe cómo se puede torcer."""
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -8,24 +6,21 @@ from typing import Optional
 from .afirmacion import Afirmacion
 
 CANDIDATOS = [
-    # nombre, color RGB (paleta Okabe-Ito: segura para daltonismo)
+                                                                  
     ("Valentina Rondón", (0, 114, 178)),
     ("Tomás Arrieta", (213, 94, 0)),
     ("Luz Marina Pacheco", (0, 158, 115)),
     ("Emilio Sarmiento", (204, 121, 167)),
 ]
 
-
 def _cand(i: int) -> str:
-    """'El candidato Tomás Arrieta' / 'La candidata Valentina Rondón'."""
     return ("El candidato " if i in (1, 3) else "La candidata ") + CANDIDATOS[i][0]
-
 
 @dataclass
 class Hecho:
     id: str
     titulo: str
-    lugar: str                         # zona de la ciudad (grafo, entrega 2)
+    lugar: str                                                               
     fuente: str
     sujeto: str
     accion: str
@@ -35,15 +30,75 @@ class Hecho:
     contexto: Optional[str] = None
     acciones_falsas: list = field(default_factory=list)
     sujetos_falsos: list = field(default_factory=list)
-    en_archivo: bool = True            # ¿está registrado al iniciar?
+    en_archivo: bool = True                                          
 
     def afirmacion_real(self) -> Afirmacion:
         return Afirmacion(self.id, self.fuente, self.sujeto, self.accion,
                           self.objeto, self.cifra, self.cifra_tpl, self.contexto)
 
-
 def catalogo() -> list[Hecho]:
-    return [
+        return [
+        Hecho("transporte-tarifa", "Tarifa de buses", "CALLE",
+              "Secretaría de Transporte", "La Secretaría", "ajustará",
+              "la tarifa del pasaje", 100, "con un incremento de {n} pesos",
+              "por la inflación anual",
+              ["multiplicará por tres", "eliminará"],
+              [_cand(3), _cand(1)]),
+        Hecho("parque-central", "Renovación del Parque Central", "PARQUE",
+              "Alcaldía de Nova", "La Alcaldía", "cerrará",
+              "el Parque Central", 3, "durante {n} meses",
+              "para sembrar nuevos árboles",
+              ["demolerá", "venderá a privados"],
+              [_cand(0), _cand(2)]),
+        Hecho("seguridad-policia", "Patrullaje nocturno", "BARRIO",
+              "Policía Metropolitana", "La Policía", "aumentará",
+              "el patrullaje nocturno", 2, "con {n} nuevas unidades",
+              "en las zonas comerciales",
+              ["multará por salir en", "suspenderá"],
+              [_cand(1), _cand(3)]),
+        Hecho("hospital-camas", "Donación al Hospital", "HOSPITAL",
+              "Ministerio de Salud", "El Ministerio", "entregará",
+              "nuevos equipos al Hospital General", 50, "incluyendo {n} camas",
+              "para urgencias",
+              ["recortará el presupuesto de", "cerrará"],
+              [_cand(0)]),
+        Hecho("candidato-debate", "Ausencia en debate", "PLAZA",
+              "Canal Nova TV", _cand(2), "se ausentó",
+              "del debate televisivo", None, "",
+              "por una laringitis comprobada",
+              ["fue expulsada", "llegó ebria a"],
+              [_cand(1), "El Alcalde actual"]),
+        Hecho("impuestos-predial", "Descuento en predial", "ALCALDÍA",
+              "Secretaría de Hacienda", "La Alcaldía", "ofrecerá",
+              "un descuento en el impuesto predial", 15, "del {n} por ciento",
+              "por pronto pago",
+              ["subirá", "cobrará doble"],
+              [_cand(3)]),
+        Hecho("basuras-horario", "Recolección de basuras", "BARRIO",
+              "Empresa de Aseo", "La Empresa de Aseo", "cambiará",
+              "el horario de recolección", None, "",
+              "para evitar el tráfico de la mañana",
+              ["suspenderá indefinidamente", "dejará de hacer"],
+              [_cand(2)]),
+        Hecho("mascotas-registro", "Censo de mascotas", "PARQUE",
+              "Centro Zoonosis", "Zoonosis", "iniciará",
+              "un censo de mascotas", None, "",
+              "para campañas de vacunación",
+              ["cobrará impuestos por", "sacrificará a"],
+              [_cand(0), "La Policía"]),
+        Hecho("internet-gratis", "Puntos WiFi", "PLAZA",
+              "Ministerio TIC", "El Ministerio", "instalará",
+              "puntos de internet gratis", 20, "en {n} parques",
+              "para uso de los estudiantes",
+              ["espiará a los ciudadanos en", "bloqueará las redes en"],
+              [_cand(3), _cand(1)]),
+        Hecho("deportes-estadio", "Cierre del Estadio", "ESTADIO",
+              "Liga Deportiva", "La Liga", "cerrará",
+              "el estadio municipal", 5, "durante {n} semanas",
+              "para arreglar el techo",
+              ["venderá", "clausurará por ruina"],
+              [_cand(1)]),
+
         Hecho("alcaldia-auditoria", "Auditoría a la Alcaldía", "ALCALDÍA",
               "Contraloría de Nova", "La Contraloría", "revisa",
               "las cuentas de la Alcaldía", None, "",

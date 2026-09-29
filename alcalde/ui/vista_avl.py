@@ -1,11 +1,7 @@
-"""Ventana del Archivo de Hechos (AVL): muestra la forma del árbol, altura y
-factor de balance de cada nodo, la ruta de la última búsqueda y las
-rotaciones realizadas."""
 import pygame
 
 from .tema import TEMA
 from .widgets import texto, panel, parrafo
-
 
 def dibujar_avl(sup, archivo, rect, ruta=(), hechos=None):
     c = TEMA.c
@@ -47,7 +43,7 @@ def dibujar_avl(sup, archivo, rect, ruta=(), hechos=None):
 
     if archivo.raiz:
         _dib(archivo.raiz, area.centerx, area.y + 20, area.w / 4)
-    # panel lateral: inorden + bitácora
+                                       
     lx = rect.right - 270
     texto(sup, "Recorrido INORDEN (A-Z)", (lx, rect.y + 80), 15, c["acento"], True)
     y = rect.y + 104

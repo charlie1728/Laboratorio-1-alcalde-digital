@@ -1,4 +1,3 @@
-"""Bucle principal y cambio de pantallas."""
 import pygame
 
 from ..modelo.partida import Partida
@@ -11,7 +10,6 @@ from .tema import TEMA
 from .widgets import Toasts
 
 ANCHO, ALTO = 1280, 760
-
 
 class App:
     def __init__(self, semilla=None, rondas=8):

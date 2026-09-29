@@ -1,9 +1,3 @@
-"""Lógica de la partida (sin nada de interfaz: se puede probar sola).
-
-Flujo: cada RONDA todos los jugadores juegan un turno (3 puntos de atención).
-Al cerrar la ronda ocurre la OLA DE PROPAGACIÓN (los árboles crecen y mutan)
-y un EVENTO ALEATORIO.
-"""
 from __future__ import annotations
 
 import random
@@ -26,7 +20,6 @@ MAX_NODOS_CASO = 30
 MAX_CASOS = 3
 PROF_MAX = 6
 
-
 @dataclass
 class Jugador:
     nombre: str
@@ -36,7 +29,7 @@ class Jugador:
     reputacion: int = 50
     atencion: int = ATENCION_POR_TURNO
     logros: list = field(default_factory=list)
-    candidato: Optional[str] = None      # nombre si rol == candidato
+    candidato: Optional[str] = None                                  
 
     @property
     def info_rol(self) -> dict:
@@ -48,7 +41,6 @@ class Jugador:
             return True
         return False
 
-
 @dataclass
 class Caso:
     id: int
@@ -56,12 +48,10 @@ class Caso:
     arbol: ArbolMutaciones
     abierto: bool = True
 
-
 @dataclass
 class Mensaje:
     texto: str
-    tipo: str = "info"          # info | bueno | malo | evento | logro
-
+    tipo: str = "info"                                                
 
 @dataclass
 class EventoViral:
@@ -69,7 +59,6 @@ class EventoViral:
     nodo: NodoMutacion
     jugador: Jugador
     segundos: int
-
 
 class Partida:
     def __init__(self, config_jugadores: list[tuple[str, str, tuple]],
@@ -84,7 +73,7 @@ class Partida:
         self.ciudad = Ciudad()
         self.mensajes: list[Mensaje] = []
         self.evento_viral: Optional[EventoViral] = None
-        self.ultimo_resaltado: dict = {}     # la UI lo usa para animar
+        self.ultimo_resaltado: dict = {}                               
         self.apoyo = {c[0]: 25.0 for c in CANDIDATOS}
         self._ajuste_desinfo = 0.0
         self._sig_caso = 1
@@ -97,7 +86,6 @@ class Partida:
                 j.candidato = libres.pop(0)
             self.jugadores.append(j)
 
-        # Archivo de hechos (AVL) con los hechos ya registrados
         self.hechos = {h.id: h for h in catalogo()}
         self.archivo = ArchivoHechosAVL()
         for h in self.hechos.values():
@@ -111,7 +99,6 @@ class Partida:
         self._recalcular()
         self.log("Ronda 1: circulan las primeras publicaciones en Civitas.", "evento")
 
-    # ------------------------------------------------------------ utilidades
     def log(self, texto: str, tipo: str = "info") -> None:
         self.mensajes.append(Mensaje(texto, tipo))
 
@@ -142,7 +129,7 @@ class Partida:
         af = hecho.afirmacion_real()
         dist = None
         if falso:
-            # Fabricado desde el origen: dos distorsiones en la raíz
+                                                                    
             ops = af.posibles_distorsiones(hecho)
             if sobre_candidato and "atribucion" in ops:
                 elegidas = ["atribucion"] + self.rng.sample([o for o in ops if o != "atribucion"], 1)
@@ -160,7 +147,7 @@ class Partida:
         caso = Caso(self._sig_caso, hecho, arbol)
         self._sig_caso += 1
         self.casos.append(caso)
-        # primeros reenvíos
+                           
         for _ in range(self.rng.randint(2, 3)):
             self._reenviar(caso, raiz, prob_mutar=0.4)
         return caso
@@ -168,7 +155,6 @@ class Partida:
     def _reenviar(self, caso: Caso, padre: NodoMutacion, prob_mutar: float = 0.3,
                   autor: Optional[str] = None, alcance: Optional[int] = None,
                   sin_mutar: bool = False) -> Optional[NodoMutacion]:
-        """Crea un reenvío (hijo). Puede introducir UNA distorsión nueva."""
         if len(caso.arbol) >= MAX_NODOS_CASO:
             return None
         af, dist = padre.afirmacion, None
@@ -182,7 +168,6 @@ class Partida:
                             es_correccion=padre.es_correccion)
         return caso.arbol.insertar(padre.id, hijo)
 
-    # --------------------------------------------------- cálculo indicadores
     def _recalcular(self) -> None:
         total = falso = nodos = verif = 0
         for c in self.casos_abiertos():
@@ -196,9 +181,7 @@ class Partida:
         base_info = (verif / nodos * 60) if nodos else 30
         self.ciudad.fijar("info_verificada", 20 + base_info + max(0, -self._ajuste_desinfo) / 2)
 
-    # ================================================================ ACCIONES
     def acciones_para(self, nodo: Optional[NodoMutacion]) -> list[dict]:
-        """Qué puede hacer el jugador actual con el nodo seleccionado."""
         j = self.jugador_actual
         esp_clave, esp_nombre, esp_costo = j.info_rol["especial"]
         acciones = [
@@ -246,7 +229,6 @@ class Partida:
         self._recalcular()
         return self.mensajes[antes:]
 
-    # --- básicas --------------------------------------------------------
     def _a_compartir(self, j: Jugador, caso: Caso, nodo: NodoMutacion) -> None:
         mult = j.info_rol["mult_alcance"]
         nuevo = self._reenviar(caso, nodo, autor=j.nombre, alcance=15 * mult, sin_mutar=True)
@@ -345,7 +327,6 @@ class Partida:
             self.log(f"{j.nombre} dejó pasar la publicación.", "info")
 
     def _a_borrar(self, j: Jugador, caso: Caso, nodo: NodoMutacion) -> None:
-        """eliminar_nodo: los reenvíos NO desaparecen, se re-enganchan al abuelo."""
         hijos = len(nodo.hijos)
         caso.arbol.eliminar_nodo(nodo.id)
         self.ultimo_resaltado = {"podados": [nodo.id]}
@@ -358,7 +339,6 @@ class Partida:
                 j.puntos += 3
                 j.reputacion += 2
 
-    # --- especiales -----------------------------------------------------
     def _a_alertar(self, j: Jugador, caso: Caso, nodo: NodoMutacion) -> None:
         marcados = [nodo] + list(nodo.hijos)
         for n in marcados:
@@ -394,7 +374,7 @@ class Partida:
 
     def _a_amplificar(self, j: Jugador, caso: Caso, nodo: NodoMutacion) -> None:
         puntos = caso.arbol.punto_de_mutacion(nodo.id)
-        # la distorsión más alta (más cerca de la raíz) es la que hay que cortar
+                                                                                
         objetivo = min(puntos.values(), key=lambda n: n.profundidad) if puntos else nodo
         marcados = caso.arbol.inmunizar(objetivo.id)
         corr = NodoMutacion(caso.hecho.afirmacion_real(), j.nombre, self.ronda,
@@ -429,7 +409,6 @@ class Partida:
         extra = " ¡Era un rumor sobre su campaña: apoyo x2!" if sobre_mi else ""
         self.log(f"Desmentido oficial de {j.nombre}: {len(marcados)} reenvíos contenidos.{extra}", "bueno")
 
-    # ================================================================ TURNOS
     def terminar_turno(self) -> None:
         self.turno_idx += 1
         if self.turno_idx >= len(self.jugadores):
@@ -450,8 +429,6 @@ class Partida:
                 self.log(f"Caso '{c.hecho.titulo}' contenido: ya no se propaga.", "evento")
 
     def _ola_de_propagacion(self) -> int:
-        """Recorre cada árbol POR NIVELES: los nodos de la última ola son los
-        más activos (acaban de llegar a gente nueva)."""
         nuevos = 0
         for c in self.casos_abiertos():
             niveles = c.arbol.por_niveles()
@@ -471,14 +448,14 @@ class Partida:
     def _fin_de_ronda(self) -> None:
         nuevos = self._ola_de_propagacion()
         self.log(f"Ola de propagación: {nuevos} reenvíos nuevos en Civitas.", "evento")
-        # los rumores vivos sobre candidatos les quitan apoyo
+                                                             
         for c in self.casos_abiertos():
             for n in c.arbol.frontera():
                 if "atribucion" in n.afirmacion.distorsiones:
                     for nombre in self.apoyo:
                         if nombre in n.afirmacion.sujeto:
                             self.apoyo[nombre] = max(0, self.apoyo[nombre] - 0.5)
-        # deriva natural de la ciudad
+                                     
         d = self.ciudad.v["desinformacion"]
         self.ciudad.ajustar(conflictos=(d - 30) / 12, convivencia=-(d - 30) / 15,
                             bienestar=-(d - 35) / 20)
@@ -545,7 +522,6 @@ class Partida:
                 self.log(f"EVENTO: el hecho '{self.hechos[k].titulo}' venció y salió del Archivo.", "evento")
 
     def resolver_viral(self, clave: Optional[str]) -> list[Mensaje]:
-        """Decisión bajo presión de tiempo. None = se acabó el tiempo."""
         ev, self.evento_viral = self.evento_viral, None
         if ev is None or ev.nodo.id not in ev.caso.arbol:
             return []
@@ -569,7 +545,6 @@ class Partida:
         finally:
             self.turno_idx = actual
 
-    # ================================================================ RESUMEN
     def resumen(self) -> dict:
         return dict(salud=self.ciudad.salud(), indicadores=dict(self.ciudad.v),
                     ranking=sorted(self.jugadores, key=lambda j: -j.puntos),

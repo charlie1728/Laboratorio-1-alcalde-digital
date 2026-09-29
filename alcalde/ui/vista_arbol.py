@@ -1,10 +1,3 @@
-"""Dibujo del Árbol de Mutaciones.
-
-El algoritmo de dibujo también usa recorridos del árbol:
-  * POSTORDEN para ubicar x: cada hoja recibe la siguiente columna libre y
-    cada padre se centra sobre sus hijos (ya ubicados).
-  * La y es la profundidad (= ola de propagación).
-"""
 import math
 
 import pygame
@@ -12,33 +5,31 @@ import pygame
 from .tema import TEMA
 from .widgets import poligono_regular, texto, envolver
 
-R = 15   # radio del nodo
-
+R = 15                   
 
 class VistaArbol:
     def __init__(self, rect):
         self.rect = pygame.Rect(rect)
-        self.pos = {}           # id -> [x, y] actual (animado)
-        self.objetivo = {}      # id -> (x, y) calculado
-        self.nacimiento = {}    # id -> ms
-        self.fantasmas = []     # nodos podados que se desvanecen: (x, y, t0)
+        self.pos = {}                                          
+        self.objetivo = {}                              
+        self.nacimiento = {}              
+        self.fantasmas = []                                                  
         self.seleccionado = None
         self.hover = None
-        # animación de recorridos
-        self.secuencia = []     # ids en orden
+                                 
+        self.secuencia = []                   
         self.sec_nombre = ""
         self.sec_t0 = 0
-        self.resaltes = {}      # 'camino', 'mutacion', 'inmunes' -> set ids, con t0
+        self.resaltes = {}                                                          
         self.resaltes_t0 = 0
 
-    # ------------------------------------------------------------ layout
     def calcular_layout(self, arbol):
         self.objetivo = {}
         if arbol is None or arbol.raiz is None:
             return
         col = [0]
         xs = {}
-        for n in arbol.postorden():                 # <- POSTORDEN
+        for n in arbol.postorden():                               
             if n.es_hoja:
                 xs[n.id] = col[0]
                 col[0] += 1
@@ -74,7 +65,6 @@ class VistaArbol:
         self.secuencia = []
         self.resaltes = {}
 
-    # ------------------------------------------------------------ interacción
     def nodo_en(self, arbol, punto):
         if arbol is None:
             return None
@@ -97,7 +87,6 @@ class VistaArbol:
             return -1
         return min(len(self.secuencia), (pygame.time.get_ticks() - self.sec_t0) // 380)
 
-    # ------------------------------------------------------------ dibujo
     def dibujar(self, sup, arbol):
         c = TEMA.c
         ahora = pygame.time.get_ticks()
@@ -106,7 +95,7 @@ class VistaArbol:
         if arbol is None or arbol.raiz is None:
             texto(sup, "No hay publicaciones en este caso.", self.rect.center, 16, c["tenue"], centro=True)
             return
-        # guías de olas (niveles)
+                                 
         alt = arbol.altura()
         ys = {}
         for n in arbol.preorden():
@@ -115,7 +104,6 @@ class VistaArbol:
             pygame.draw.line(sup, c["panel2"], (self.rect.x + 8, y), (self.rect.right - 8, y), 1)
             texto(sup, "Origen" if d == 0 else f"Ola {d}", (self.rect.x + 10, y - 18), 12, c["tenue"])
 
-        # mover posiciones hacia el objetivo (animación suave)
         for nid, (tx, ty) in self.objetivo.items():
             p = self.pos[nid]
             p[0] += (tx - p[0]) * 0.18
@@ -126,7 +114,6 @@ class VistaArbol:
         vigente = (ahora - self.resaltes_t0) < 9000
         camino = self.resaltes.get("camino", set()) if vigente else set()
 
-        # aristas
         for n in arbol.preorden():
             if n.padre is None or n.id not in self.pos:
                 continue
@@ -142,9 +129,8 @@ class VistaArbol:
             pygame.draw.line(sup, col, a, b, ancho)
             if n.distorsion and n.verificado:
                 mx, my = (a[0] + b[0]) / 2, (a[1] + b[1]) / 2
-                pygame.draw.circle(sup, c["n_falso"], (mx, my), 5)   # "aquí mutó"
+                pygame.draw.circle(sup, c["n_falso"], (mx, my), 5)                
 
-        # fantasmas de nodos podados
         vivos = []
         for x, y, t0 in self.fantasmas:
             e = (ahora - t0) / 600
@@ -153,7 +139,6 @@ class VistaArbol:
                 pygame.draw.circle(sup, c["malo"], (x, y + e * 30), int(R * (1 - e)) + 1, 2)
         self.fantasmas = vivos
 
-        # nodos
         for n in arbol.preorden():
             if n.id not in self.pos:
                 continue
@@ -177,7 +162,6 @@ class VistaArbol:
                 pygame.draw.circle(sup, c["seleccion"], (x, y), r + 5, 2)
                 pygame.draw.circle(sup, c["seleccion"], (x, y), r + 9, 1)
 
-        # tooltip
         if self.hover is not None and self.hover.id in self.pos:
             self._tooltip(sup, self.hover)
 
@@ -199,7 +183,7 @@ class VistaArbol:
             col = c["n_falso"]
             pygame.draw.polygon(sup, col, poligono_regular((x, y + 2), r + 4, 3, -math.pi / 2))
         if n.inmune and not n.es_correccion:
-            for k in range(8):     # anillo punteado = rama contenida
+            for k in range(8):                                       
                 a0 = k * math.pi / 4 + ahora / 1500
                 pygame.draw.arc(sup, c["n_inmune"], (x - r - 5, y - r - 5, 2 * r + 10, 2 * r + 10),
                                 a0, a0 + 0.45, 2)
