@@ -161,3 +161,32 @@ class ArchivoHechosAVL:
             h = 1 + max(hi_, hd)
             return oi and od and abs(hi_ - hd) <= 1 and h == n.altura, h
         return _ok(self.raiz, None, None)[0]
+
+    @classmethod
+    def desde_preorden(cls, claves: list[str], valor_de) -> "ArchivoHechosAVL":
+        """Reconstruye el árbol con la MISMA forma a partir de su preorden, sin rotar.
+
+        Reinsertar las claves en preorden en un AVL dispararía rotaciones (el subárbol
+        izquierdo completo llega antes que el derecho), así que se construye directo:
+        cada clave es raíz de su rango (lo, hi) como en un BST. Lo usa el cliente para
+        reconstruir el Archivo que le envía el servidor.
+        """
+        avl = cls()
+        i = [0]
+
+        def _construir(lo, hi):
+            if i[0] >= len(claves):
+                return None
+            k = claves[i[0]]
+            if (lo is not None and k <= lo) or (hi is not None and k >= hi):
+                return None
+            i[0] += 1
+            n = NodoAVL(k, valor_de(k))
+            n.izq = _construir(lo, k)
+            n.der = _construir(k, hi)
+            _actualizar(n)
+            return n
+
+        avl.raiz = _construir(None, None)
+        avl._n = i[0]
+        return avl

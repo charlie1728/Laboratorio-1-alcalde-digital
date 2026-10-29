@@ -1,30 +1,32 @@
 from __future__ import annotations
 
-import itertools
 from collections import deque
 from typing import Callable, Iterator, Optional
 
 class NodoMutacion:
 
-    _ids = itertools.count(1)
+    _siguiente = 1
 
     def __init__(self, afirmacion, autor: str, turno: int = 0,
                  distorsion: Optional[str] = None, alcance: int = 10,
-                 es_correccion: bool = False):
-        self.id: int = next(NodoMutacion._ids)
-        self.afirmacion = afirmacion                                        
-        self.autor = autor                                                
-        self.turno = turno                                           
-        self.distorsion = distorsion                                         
-        self.alcance = alcance                                        
-        self.es_correccion = es_correccion                        
+                 es_correccion: bool = False, id: Optional[int] = None):
+        if id is None:
+            id = NodoMutacion._siguiente
+        NodoMutacion._siguiente = max(NodoMutacion._siguiente, id + 1)
+        self.id: int = id
+        self.afirmacion = afirmacion
+        self.autor = autor
+        self.turno = turno
+        self.distorsion = distorsion
+        self.alcance = alcance
+        self.es_correccion = es_correccion
         self.padre: Optional[NodoMutacion] = None
         self.hijos: list[NodoMutacion] = []
-                         
-        self.verificado = False                                            
-        self.inmune = False                                             
-        self.viral = False                                              
-        self.creado_ms = 0                                                    
+        self.verificado = False
+        self.inmune = False
+        self.viral = False
+        # True cuando el nodo ya entregó la publicación a sus seguidores (BFS: vértice procesado).
+        self.entregado = False
 
     @property
     def es_raiz(self) -> bool:
@@ -196,7 +198,7 @@ class ArbolMutaciones:
         alcance = self.agregar(lambda n: n.alcance)[self.raiz.id]
         falso = self.agregar(lambda n: 0 if n.es_veraz else n.alcance)[self.raiz.id]
         verif = sum(1 for n in self.preorden() if n.verificado)
-        activos = sum(1 for n in self.preorden() if not n.inmune and not n.es_correccion)
+        activos = len(self.frontera())
         return dict(nodos=len(self), alcance=alcance, alcance_falso=falso,
                     verificados=verif, altura=self.altura(),
                     olas=len(self.por_niveles()), activos=activos)
@@ -213,4 +215,5 @@ class ArbolMutaciones:
         return marcados
 
     def frontera(self) -> list[NodoMutacion]:
-        return [n for n in self.preorden() if not n.inmune and not n.es_correccion]
+        """Nodos que todavía pueden propagarse: ni contenidos ni entregados."""
+        return [n for n in self.preorden() if not n.inmune and not n.entregado]
