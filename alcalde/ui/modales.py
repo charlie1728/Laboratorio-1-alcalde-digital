@@ -251,6 +251,40 @@ class ModalConfirmar:
         self.b_si.dibujar(sup)
 
 
+class ModalPausa:
+    """Pausa manual (tecla P): congela el reloj para poder explicar con calma."""
+    bloquea = True
+
+    def __init__(self, juego):
+        self.j = juego
+        self.rect = pygame.Rect(0, 0, 520, 260)
+        self.rect.center = juego.r_centro.center
+        self.b_seguir = Boton((self.rect.x + 24, self.rect.bottom - 76, self.rect.w - 48, 54), "Continuar",
+                              "seguir", icono="play", estilo="primario", tam=19)
+        self.t0 = pygame.time.get_ticks()
+
+    def evento(self, e):
+        if (e.type == pygame.MOUSEBUTTONDOWN and e.button == 1 and self.b_seguir.clic(e.pos)) or \
+                (e.type == pygame.KEYDOWN and e.key in (pygame.K_p, pygame.K_RETURN, pygame.K_SPACE, pygame.K_ESCAPE)):
+            self.j.app.sonar("click")
+            self.j.cerrar_modal()
+
+    def dibujar(self, sup):
+        c = TEMA.c
+        velo(sup, 150)
+        r = self.rect
+        sticker(sup, r, c["papel"], 24, 7, 3)
+        t = (pygame.time.get_ticks() - self.t0) / 1000
+        sup.blit(personajes.civi("neutral", 130, parpadeo=(t % 3) < 0.12), (r.x - 54, r.y - 44))
+        sup.blit(recursos.icono("pause", 30, c["acento"], 3), (r.x + 86, r.y + 24))
+        titulo(sup, "Partida en pausa", (r.x + 126, r.y + 22), 30, c["texto"])
+        p = self.j.p
+        parrafo(sup, f"Día {min(p.ronda, p.rondas_totales)} de {p.rondas_totales}. El reloj está detenido: "
+                     "explica con calma lo que quieras. Cuando termines, continúa.",
+                r.x + 90, r.y + 76, r.w - 120, 16, c["tinta2"], peso=700, max_lineas=4)
+        self.b_seguir.dibujar(sup)
+
+
 class ModalArchivo:
     """El Archivo de hechos: el árbol AVL con alturas, balance y la última ruta de búsqueda."""
     bloquea = True
@@ -373,7 +407,19 @@ class SecuenciaNoche:
         self.rect.center = juego.r_centro.center
         self.b_ok = Boton((self.rect.x + 24, self.rect.bottom - 70, self.rect.w - 48, 52),
                           "", "ok", icono="sun", estilo="primario", tam=18)
+        self.t_auto = None
         juego.app.sonar("noche")
+
+    def actualizar(self):
+        """Si la partida se juega de seguido, el día siguiente arranca solo unos segundos después."""
+        p = self.j.p
+        if self.j.pausa_dias or p.terminada or not self.listo():
+            return
+        ahora = pygame.time.get_ticks()
+        if self.t_auto is None:
+            self.t_auto = ahora
+        elif ahora - self.t_auto > (1500 if TEMA.op["menos_movimiento"] else 4500):
+            self.j.terminar_noche()
 
     def listo(self):
         return pygame.time.get_ticks() - self.t0 > (900 if TEMA.op["menos_movimiento"] else 3400)
@@ -423,7 +469,20 @@ class SecuenciaNoche:
             y = parrafo(sup, m.texto, r.x + 52, y, r.w - 78, 13, c["texto"], peso=700, max_lineas=2) + 6
             if y > self.b_ok.rect.y - 24:
                 break
-        self.b_ok.etiqueta = "Ver la elección" if p.terminada else "Empezar el día"
+        if p.terminada:
+            self.b_ok.etiqueta = "Ver la elección"
+        elif self.j.pausa_dias:
+            self.b_ok.etiqueta = f"Iniciar día {min(self.dia + 1, p.rondas_totales)}"
+            texto(sup, "Partida en pausa: el reloj arranca cuando pulses el botón.",
+                  (r.centerx, self.b_ok.rect.y - 12), 12, c["tinta2"], peso=800, ancla="c")
+        else:
+            self.b_ok.etiqueta = f"Ir al día {min(self.dia + 1, p.rondas_totales)}"
+            if self.t_auto is not None:
+                espera = 1500 if TEMA.op["menos_movimiento"] else 4500
+                frac = max(0.0, 1 - (pygame.time.get_ticks() - self.t_auto) / espera)
+                barra_r = pygame.Rect(self.b_ok.rect.x, self.b_ok.rect.y - 16, self.b_ok.rect.w, 8)
+                pygame.draw.rect(sup, c["papel3"], barra_r, border_radius=4)
+                pygame.draw.rect(sup, c["acento"], (barra_r.x, barra_r.y, round(barra_r.w * frac), 8), border_radius=4)
         self.b_ok.dibujar(sup)
 
 

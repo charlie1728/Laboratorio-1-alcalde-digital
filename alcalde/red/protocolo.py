@@ -5,7 +5,7 @@ Cliente -> servidor
   {"t": "perfil", "nombre", "rol", "look", "mas_tiempo"} cambiar el personaje en el lobby
   {"t": "iniciar", "rondas"}                             solo el anfitrión
   {"t": "accion", "caso", "nodo", "clave"}               verificar, compartir, reportar...
-  {"t": "mover", "zona"} / {"t": "conversar"} / {"t": "fin_turno"}
+  {"t": "mover", "zona"} / {"t": "conversar"} / {"t": "siguiente"} / {"t": "fin_turno"}
   {"t": "viral", "clave"}                                respuesta a la publicación viral
   {"t": "reaccion", "emoji"}                             reacción rápida visible para todos
 

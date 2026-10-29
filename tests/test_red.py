@@ -92,6 +92,9 @@ class TestClienteServidor(unittest.TestCase):
                 actor = next(c for c in ctrls if c.indice == p.turno_idx)
                 otro = next(c for c in ctrls if c is not actor)
                 otro.terminar_turno()          # fuera de turno: el servidor lo rechaza con un aviso
+                # Se espera el rechazo antes de actuar: si no, el servidor podría leer primero la jugada
+                # del jugador del turno y aceptar este fin de turno como si fuera suyo.
+                self.assertTrue(_esperar(lambda: otro.actualizar() is not None and not otro.esperando, 5))
                 q = actor.partida
                 casos = q.casos_abiertos()
                 if casos and q.jugador_actual.atencion > 0 and rng.random() < 0.7:
@@ -117,6 +120,26 @@ class TestClienteServidor(unittest.TestCase):
             self.assertEqual(c.partida.eleccion["ganador"], p0.eleccion["ganador"])
             self.assertEqual(c.partida.red.num_aristas(), p0.red.num_aristas())
         self.assertEqual(p0.ciudad.v, self.srv.partida.ciudad.v)
+
+    def test_siguiente_publicacion_en_red(self):
+        """Después de decidir, el jugador del turno pide su segunda publicación al servidor."""
+        self._lobby(["ciudadano", "periodista"])
+        self.clientes[0].enviar(dict(t="iniciar", rondas=4))
+        ctrls = self._estado_inicial()
+        actor = next(c for c in ctrls if c.indice == ctrls[0].partida.turno_idx)
+        caso, nodo = actor.partida.publicacion_turno()
+        self.assertFalse(actor.partida.puede_siguiente()[0])          # primero hay que decidir
+        actor.accion(caso.id, nodo.id, "ignorar")
+        self.assertTrue(_esperar(lambda: actor.actualizar()[0] or not actor.esperando, 5))
+        self.assertEqual(actor.partida.turno["atendidas"], 1)
+        actor.siguiente()
+        self.assertTrue(_esperar(lambda: actor.actualizar()[0] or not actor.esperando, 5))
+        q = actor.partida
+        self.assertIsNotNone(q.publicacion_turno()[1])
+        self.assertNotEqual(q.publicacion_turno()[1].id, nodo.id)     # llega otra publicación
+        self.assertIsNone(q.turno["decidio"])
+        self.assertEqual(q.turno["atendidas"], 1)
+        self.assertEqual(q.jugador_actual.minutos, self.srv.partida.jugador_actual.minutos)   # minutos sincronizados
 
     def test_desconexion_en_lobby(self):
         self._lobby(["ciudadano", "periodista"])

@@ -10,14 +10,14 @@
 | Grafos | Red social dirigida y mapa ponderado (`estructuras/grafo.py`, `modelo/red_social.py`, `modelo/mapa.py`) |
 | Interfaz gráfica | `alcalde/ui/`: menú, selección de personajes, juego con tres vistas, noche de elecciones y resultados |
 | Componente aleatorio | 10 tipos de evento cada noche, mutaciones y propagación con probabilidades (`modelo/partida.py`) |
-| Habilidad y tiempo | Publicación viral contra reloj, con el tiempo controlado por el servidor en red |
+| Habilidad y tiempo | Publicación viral contra reloj (controlado por el servidor en red). En el mismo computador, además, un reloj por publicación (20 s por defecto) que pasa el turno solo, pausa manual con `P` y pausa opcional entre días con botón «Iniciar día». Cada jugador administra 12 minutos por turno entre caminar, verificar, decidir y conversar |
 | Estado de la ciudad y puntuación | 6 indicadores, salud de la ciudad, puntos, reputación y 10 logros por jugador |
 | Elección del alcalde | Votación por zonas según lo que cree cada vecino (`modelo/eleccion.py`, `ui/pantalla_eleccion.py`) |
 | Componente inclusivo | Panel de accesibilidad con 8 opciones, paleta para daltonismo y formas por estado, personalización de personajes |
 | Sistema de ayuda | Ayuda con 8 secciones, guía de Civi en el primer turno y vista previa de cada botón |
 | Elementos motivadores | Personajes que reaccionan, sonidos y música, confeti, logros, puntos flotantes, noche y elección animadas |
 | Multijugador cliente-servidor | Sockets TCP con un servidor que guarda la partida (`alcalde/red/`) |
-| Funcionamiento estable | 34 pruebas automáticas, partidas completas con clics y una prueba de estrés de 20.000 acciones al azar |
+| Funcionamiento estable | 46 pruebas automáticas, partidas completas con clics y una prueba de estrés de 20.000 acciones al azar |
 
 ---
 
@@ -131,7 +131,7 @@ Cada mensaje es **un objeto JSON en una línea** (UTF-8) sobre TCP (`red/protoco
 | `hola`, `perfil` | Entrar a la sala y cambiar nombre, rol, apariencia y la opción de más tiempo |
 | `iniciar` | Comenzar la partida (solo el anfitrión, con 2 a 4 jugadores) |
 | `accion` | Verificar, compartir, reportar, ignorar, especial o borrar (`caso`, `nodo`, `clave`) |
-| `mover`, `conversar`, `fin_turno` | Caminar a una zona, conversar con los vecinos, terminar el turno |
+| `mover`, `conversar`, `siguiente`, `fin_turno` | Caminar a una zona, conversar con los vecinos, pasar a la segunda publicación del turno, terminar el turno |
 | `viral` | Respuesta a la publicación viral |
 
 | Servidor › cliente | Para qué |
@@ -246,10 +246,10 @@ Ninguno es solo decoración. Cada uno le dice algo al jugador:
 
 ## 9. Funcionamiento estable
 
-- **34 pruebas automáticas** (`python -m unittest discover -s tests -v`), en menos de un segundo:
+- **46 pruebas automáticas** (`python -m unittest discover -s tests -v`), en un par de segundos:
   - 14 de los árboles y de la partida (entrega 1);
-  - 17 de los grafos, su integración con los árboles y la serialización;
-  - 3 de cliente-servidor con sockets reales.
+  - 28 de los grafos, su integración con los árboles, la serialización y el presupuesto de minutos (turno de 2 publicaciones, caminar con minutos, presencia en la zona);
+  - 4 de cliente-servidor con sockets reales.
 - **Partidas completas con clics reales**: un guion juega de principio a fin con 4 jugadores, en local y en red (dos procesos del juego conectados al servidor). Pasa por la selección, la guía, las verificaciones, la publicación viral, las noches, la elección y los resultados.
 - **Prueba de estrés**: 20.000 clics, teclas y movimientos al azar en todas las pantallas, con 4 semillas, sin ningún error. Esta prueba encontró y permitió corregir un caso en que una animación del mapa podía cerrar el juego.
 - **Rendimiento**: cada cuadro se dibuja en unos 5 ms (el juego va a 60 cuadros por segundo). Las ilustraciones se dibujan una vez y se guardan en caché.

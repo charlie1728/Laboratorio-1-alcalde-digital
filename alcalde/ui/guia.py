@@ -16,18 +16,18 @@ class Guia:
         self.pasos = [
             (J.celular.r_post, "Te llegó una publicación", "En cada turno te llega una publicación de la zona "
                                                            "donde estás. Puede ser verdadera o falsa.", "mapa"),
-            (J.r_centro, "Camina por Ciudad Nova", "Los globitos morados dicen cuántas publicaciones circulan en "
-                                                   "cada zona. Haz clic en una zona para ir: te llegará una de allí.",
+            (J.r_centro, "Camina por Ciudad Nova", "Caminar cuesta minutos: cada zona muestra los suyos. Los globitos "
+                                                   "morados dicen cuántas publicaciones circulan allí. Clic para ir.",
              "mapa"),
             (J.celular.b_verificar.rect.inflate(12, 12), "¿Será verdad?",
              "Verificar te dice la verdad, pero cuesta 3 puntos. Si te acuerdas de lo que descubrieron los "
              "otros jugadores, te los ahorras.", None),
             (pygame.Rect(J.celular.botones[0].rect.topleft,
                          (J.celular.r_acciones.w, 116)).inflate(12, 12), "Decide qué hacer",
-             "Compártela si es verdadera y repórtala si es falsa. Si frenas un rumor, los vecinos de esa zona "
-             "dejan de creerlo. ¡Todos ven si acertaste!", None),
-            (J.r_jugador, "Tu turno", "Aquí ves los pasos de tu turno y tus puntos. Cuando acabes, pulsa "
-                                      "Terminar turno. ¡Ciudad Nova cuenta contigo!", None),
+             "Compártela si es verdadera y repórtala si es falsa. Atiendes hasta 2 por turno. Frenar un rumor "
+             "desde lejos de su zona rinde la mitad. ¡Todos ven si acertaste!", None),
+            (J.r_jugador, "Tu turno", "Aquí ves tus minutos, tus 2 publicaciones y tus puntos. Arriba corre "
+                                      "el reloj: si llega a cero, pasa el turno. P pausa.", None),
         ]
         self.i = 0
         self.b_sig = Boton((0, 0, 140, 44), "Siguiente", "sig", icono="arrow-right", estilo="primario", tam=16)

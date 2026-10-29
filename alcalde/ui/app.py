@@ -51,6 +51,9 @@ class App:
         self.overlay = None
         self.semilla = semilla
         self.rondas = rondas
+        # Se eligen al empezar una partida local: segundos por publicación (0 = sin límite) y si hay
+        # pausa entre días (con botón «Iniciar día») o la partida sigue de corrido.
+        self.ajustes = dict(segundos=20, pausa_dias=True)
         self.corriendo = True
         self.subtitulo = None
         self._fundido_t0 = -10_000
@@ -142,8 +145,12 @@ class App:
         self.actual = pantalla
         self._fundido_t0 = pygame.time.get_ticks()
 
-    def iniciar_local(self, cfg, rondas=None, guia=True):
+    def iniciar_local(self, cfg, rondas=None, guia=True, segundos=None, pausa_dias=None):
         from .pantalla_juego import PantallaJuego
+        if segundos is not None:
+            self.ajustes["segundos"] = segundos
+        if pausa_dias is not None:
+            self.ajustes["pausa_dias"] = pausa_dias
         p = Partida(cfg, rondas=rondas or self.rondas, semilla=self.semilla)
         self.cambiar(PantallaJuego(self, ControladorLocal(p), guia=guia))
 

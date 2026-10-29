@@ -10,6 +10,8 @@ from .tema import TEMA
 from .widgets import Boton, sticker, texto, titulo
 
 DURACIONES = [("Corta", 6), ("Normal", 8), ("Larga", 10)]
+# Segundos que tiene cada jugador para decidir sobre cada publicación (0 = sin límite).
+TIEMPOS = [("Sin límite", 0), ("20 s", 20), ("30 s", 30), ("45 s", 45)]
 
 
 class PantallaSeleccion:
@@ -30,6 +32,17 @@ class PantallaSeleccion:
                       for i, (n, _) in enumerate(DURACIONES)]
         self.guia = TEMA.op["guia"]
         self.r_guia = pygame.Rect(560, 654, 340, 46)
+        aj = getattr(app, "ajustes", {})
+        self.tiempo = next((i for i, (_, s) in enumerate(TIEMPOS) if s == aj.get("segundos", 20)), 1)
+        self.pausa = bool(aj.get("pausa_dias", True))
+        self.r_opciones = pygame.Rect(452, 12, 792, 50)
+        x = 660
+        self.b_tiempo = []
+        for i, (n, _) in enumerate(TIEMPOS):
+            w = 104 if i == 0 else 66
+            self.b_tiempo.append(Boton((x, 18, w, 38), n, i, tam=14, estilo="suave", sombra=3))
+            x += w + 6
+        self.r_pausa = pygame.Rect(x + 14, 18, 1232 - (x + 14), 38)
 
     def escribiendo(self):
         return any(t.editando for t in self.tarjetas)
@@ -53,6 +66,13 @@ class PantallaSeleccion:
                 self.guia = not self.guia
                 TEMA.cambiar("guia", self.guia)
                 self.app.sonar("click")
+            elif self.r_pausa.collidepoint(e.pos):
+                self.pausa = not self.pausa
+                self.app.sonar("click")
+            for b in self.b_tiempo:
+                if b.clic(e.pos):
+                    self.tiempo = b.clave
+                    self.app.sonar("click")
             for b in self.b_dur:
                 if b.clic(e.pos):
                     self.duracion = b.clave
@@ -68,7 +88,8 @@ class PantallaSeleccion:
             return
         cfg = [dict(nombre=t.perfil()["nombre"], rol=t.rol, color=t.color, look=t.look) for t in self.activos()]
         self.app.sonar("logro")
-        self.app.iniciar_local(cfg, rondas=DURACIONES[self.duracion][1], guia=self.guia)
+        self.app.iniciar_local(cfg, rondas=DURACIONES[self.duracion][1], guia=self.guia,
+                               segundos=TIEMPOS[self.tiempo][1], pausa_dias=self.pausa)
 
     def dibujar(self, sup):
         c = TEMA.c
@@ -81,6 +102,7 @@ class PantallaSeleccion:
               c["tinta2"], peso=700, ancla="tr")
         for t in self.tarjetas:
             t.dibujar(sup)
+        self._opciones(sup)
         sticker(sup, (24, 644, 896, 66), c["papel"], 20, 4, 3)
         texto(sup, "Duración", (44, 678), 16, c["texto"], peso=800, ancla="ml")
         for b in self.b_dur:
@@ -99,3 +121,25 @@ class PantallaSeleccion:
         texto(sup, "Guía de Civi en el primer turno", (caja.right + 12, rg.centery), 15, c["texto"], peso=800, ancla="ml")
         self.btn_jugar.activo = 2 <= len(self.activos()) <= 4
         self.btn_jugar.dibujar(sup)
+
+    def _casilla(self, sup, r, marcada, etiqueta):
+        c = TEMA.c
+        sticker(sup, r, c["acento2"] if marcada else c["papel"], 14, 3, 2)
+        caja = pygame.Rect(r.x + 12, r.centery - 12, 24, 24)
+        pygame.draw.rect(sup, c["acento"] if marcada else c["papel"], caja, border_radius=7)
+        pygame.draw.rect(sup, c["borde"], caja, 2, border_radius=7)
+        if marcada:
+            pygame.draw.lines(sup, c["sobre_color"], False, [(caja.x + 5, caja.centery), (caja.x + 10, caja.bottom - 6),
+                                                             (caja.right - 5, caja.y + 6)], 3)
+        texto(sup, etiqueta, (caja.right + 10, r.centery), 14, c["texto"], peso=800, ancla="ml")
+
+    def _opciones(self, sup):
+        """Reloj del turno y pausa entre días, arriba a la derecha."""
+        c = TEMA.c
+        sticker(sup, self.r_opciones, c["papel"], 18, 4, 3)
+        texto(sup, "Tiempo por publicación", (self.r_opciones.x + 16, self.r_opciones.centery), 14, c["texto"],
+              peso=900, ancla="ml")
+        for b in self.b_tiempo:
+            b.seleccionado = b.clave == self.tiempo
+            b.dibujar(sup)
+        self._casilla(sup, self.r_pausa, self.pausa, "Pausa entre días")

@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from ..estructuras.grafo import Grafo
 
-MINUTOS_POR_TURNO = 15
+# Minutos que tiene cada jugador por turno. Con 12 alcanza para 2 publicaciones (verificar y decidir
+# cuestan 4 cada una) y una calle corta, pero no para todo: ir hasta el rumor cuesta una publicación.
+MINUTOS_POR_TURNO = 12
 
 # pos: coordenadas normalizadas (0-1) para dibujar el mapa; poblacion: votantes de la zona.
 ZONAS = {

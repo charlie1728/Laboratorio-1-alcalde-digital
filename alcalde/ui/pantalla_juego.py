@@ -4,14 +4,17 @@ import random
 import pygame
 
 from ..modelo.ciudad import NEGATIVOS, NOMBRES
+from ..modelo.mapa import MINUTOS_POR_TURNO
+from ..modelo.partida import PUBS_POR_TURNO
 from . import personajes, recursos
 from .ayuda import ICONO_ROL
 from .celular import Celular
 from .efectos import EFECTOS, acercar
-from .escena import cielo
+from .escena import cielo, lienzo_total
 from .guia import Guia
 from .juego_comun import cara, color_caso
-from .modales import BannerTurno, HojaVerificacion, ModalArchivo, ModalConfirmar, ModalViral, SecuenciaNoche
+from .modales import (BannerTurno, HojaVerificacion, ModalArchivo, ModalConfirmar, ModalPausa, ModalViral,
+                      SecuenciaNoche)
 from .tema import TEMA
 from .vista_arbol import VistaArbol
 from .vista_mapa import VistaMapa
@@ -53,6 +56,7 @@ class PantallaJuego:
                            estilo="suave", sombra=3)
                      for i, (clave, nombre, ic) in enumerate((("mapa", "Ciudad", "map"), ("red", "Red social", "share-2"),
                                                               ("arbol", "Árbol del rumor", "git-fork")))]
+        self.b_pausa = Boton((900, 12, 100, 42), "Pausa", "pausa", icono="pause", tam=15, sombra=3)
         self.b_ayuda = Boton((1012, 12, 56, 42), "", "ayuda", icono="circle-help", sombra=3)
         self.b_acc = Boton((1076, 12, 56, 42), "", "acc", icono="accessibility", sombra=3)
         self.b_snd = Boton((1140, 12, 56, 42), "", "snd", icono="volume-2", sombra=3)
@@ -83,6 +87,14 @@ class PantallaJuego:
         self.fin_mostrado = False
         self._esperando_verif = None
         self._resaltado_visto = None
+        # Reloj del turno y pausa entre días (solo en el mismo computador; en red lo decidiría el servidor).
+        ajustes = getattr(app, "ajustes", {})
+        self.seg_turno = 0 if ctrl.en_red else int(ajustes.get("segundos", 20))
+        self.pausa_dias = True if ctrl.en_red else bool(ajustes.get("pausa_dias", True))
+        self.reloj = float(self.seg_turno)
+        self._clave_reloj = None
+        self._t_reloj = pygame.time.get_ticks()
+        self._seg_sonado = None
         self._auto_seleccionar()
         if guia and TEMA.op["guia"]:
             self.modal = Guia(self)
@@ -191,6 +203,22 @@ class PantallaJuego:
         self.ctrl.conversar()
         self._sincronizar()
 
+    def siguiente(self):
+        """Pasa a la segunda publicación del turno."""
+        if not self.puedo_actuar():
+            return
+        msgs = self.ctrl.siguiente()
+        if msgs and msgs[0].tipo == "malo" and not self.ctrl.en_red:
+            self.app.toasts.agregar(msgs[0].texto, "malo")
+        else:
+            self.app.sonar("pop")
+        self._sincronizar()
+
+    def turno_agotado(self):
+        """Ya no queda nada por hacer en el turno, solo terminarlo."""
+        p = self.p
+        return bool(p.turno.get("decidio")) and not p.puede_siguiente()[0]
+
     def terminar_turno(self):
         if not self.puedo_actuar():
             if self.ctrl.en_red:
@@ -198,6 +226,42 @@ class PantallaJuego:
             return
         self.ctrl.terminar_turno()
         self._sincronizar()
+
+    # ------------------------------------------------------------------ reloj y pausa
+    def pausar(self):
+        if self.modal is None and not self.p.terminada and not self.ctrl.en_red:
+            self.modal = ModalPausa(self)
+            self.app.sonar("click")
+
+    def _reloj_detenido(self):
+        p = self.p
+        return (p.terminada or self.modal is not None or self.banner is not None
+                or p.evento_viral is not None or self.turno_agotado())
+
+    def _actualizar_reloj(self):
+        ahora = pygame.time.get_ticks()
+        dt = min((ahora - self._t_reloj) / 1000, 0.25)      # el tiempo que pasó con un menú abierto no cuenta
+        self._t_reloj = ahora
+        if not self.seg_turno:
+            return
+        p = self.p
+        clave = (p.ronda, p.turno_idx, p.turno.get("nodo"))
+        if clave != self._clave_reloj:                      # llegó una publicación nueva: el reloj vuelve a empezar
+            self._clave_reloj = clave
+            self.reloj = float(self.seg_turno)
+            self._seg_sonado = None
+            return
+        if self._reloj_detenido():
+            return
+        self.reloj = max(0.0, self.reloj - dt)
+        if self.reloj <= 5 and int(self.reloj) != self._seg_sonado and self.reloj > 0:
+            self._seg_sonado = int(self.reloj)
+            self.app.sonar("tick")
+        if self.reloj <= 0:
+            nombre = p.jugador_actual.nombre
+            self.app.toasts.agregar(f"Se acabó el tiempo de {nombre}: pasa al siguiente jugador.", "malo")
+            self.app.sonar("malo")
+            self.terminar_turno()
 
     def resolver_viral(self, clave):
         ev = self.p.evento_viral
@@ -340,6 +404,10 @@ class PantallaJuego:
                 self.celular.tecla(e.key - pygame.K_1)
             elif e.key == pygame.K_a:
                 self.abrir_archivo()
+            elif e.key == pygame.K_p and not self.ctrl.en_red:
+                self.pausar()
+            elif e.key == pygame.K_n:
+                self.siguiente()
             return
         if e.type == pygame.MOUSEBUTTONDOWN and e.button == 1:
             self.banner = None
@@ -348,6 +416,8 @@ class PantallaJuego:
                     self.vista = b.clave
                     self.app.sonar("click")
                     return
+            if self.b_pausa.visible and self.b_pausa.clic(e.pos):
+                return self.pausar()
             if self.b_ayuda.clic(e.pos):
                 return self.app.abrir(self.app.ayuda)
             if self.b_acc.clic(e.pos):
@@ -441,6 +511,7 @@ class PantallaJuego:
             self.modal.actualizar()
         if self.banner is not None and not self.banner.vivo():
             self.banner = None
+        self._actualizar_reloj()
         for k, v in self.p.ciudad.v.items():
             antes = self.ind_vista.get(k, v)
             if round(antes) != v and k not in self.deltas:
@@ -476,7 +547,8 @@ class PantallaJuego:
             self.btn_fin.etiqueta = f"Turno de {recortar(self.p.jugador_actual.nombre, 18, 160, 600)}"
         else:
             self.btn_fin.etiqueta = "Terminar turno"
-        if self.puedo_actuar() and (self.p.turno.get("decidio") or self.nodo_sel() is None):
+        if self.puedo_actuar() and (self.turno_agotado() or
+                                    (self.nodo_sel() is None and not self.p.turno.get("decidio"))):
             pul = 3 + 2 * math.sin(pygame.time.get_ticks() / 160)
             pygame.draw.rect(sup, c["mango"], self.btn_fin.rect.inflate(10 + pul, 10 + pul), 5, border_radius=18)
         self.btn_fin.dibujar(sup)
@@ -521,12 +593,40 @@ class PantallaJuego:
             yo = self.yo()
             chip(sup, f"Eres {yo.nombre}", (xu + 50, 33), yo.color, c["sobre_color"], "user", 13, ancla="ml")
         self.b_snd.icono = "volume-2" if self.app.snd.activo else "volume-x"
+        self.b_pausa.visible = not self.ctrl.en_red
+        if self.b_pausa.visible:
+            self.b_pausa.etiqueta = "Pausa"
+            self.b_pausa.activo = self.modal is None and not p.terminada
+            self.b_pausa.dibujar(sup)
+            if self.b_pausa.hover:
+                tooltip(sup, "Pausa (P): detiene el reloj", (self.b_pausa.rect.centerx, self.b_pausa.rect.bottom + 34), 170)
         for b in (self.b_ayuda, self.b_acc, self.b_snd, self.b_menu):
             b.dibujar(sup)
+        self._dibujar_reloj(sup)
         for b, t in ((self.b_ayuda, "Ayuda (H)"), (self.b_acc, "Accesibilidad"), (self.b_snd, "Quitar o poner sonido (M)"),
                      (self.b_menu, "Salir al menú")):
             if b.hover:
                 tooltip(sup, t, (b.rect.centerx, b.rect.bottom + 34), 150)
+
+    def _dibujar_reloj(self, sup):
+        """Franja de arriba que se vacía con los segundos del turno; se pone roja al final."""
+        if not self.seg_turno or self.p.terminada:
+            return
+        c = TEMA.c
+        frac = max(0.0, min(1.0, self.reloj / self.seg_turno))
+        corre = not self._reloj_detenido()
+        urgente = self.reloj <= 5 and corre
+        col = c["malo"] if urgente else (c["aviso"] if frac < 0.5 else c["bueno"])
+        base, ox = lienzo_total(sup)
+        ancho = base.get_width()
+        pygame.draw.rect(base, c["papel3"], (0, 0, ancho, 8))
+        pygame.draw.rect(base, col, (0, 0, round(ancho * frac), 8))
+        # Los segundos, grandes, junto al botón de pausa.
+        r = pygame.Rect(self.b_pausa.rect.x - 112, 12, 104, 42)
+        pul = 2 * math.sin(pygame.time.get_ticks() / 90) if urgente and not TEMA.op["menos_movimiento"] else 0
+        sticker(sup, r.inflate(pul, pul), c["malo2"] if urgente else c["papel"], 14, 3, 3)
+        sup.blit(recursos.icono("timer", 22, col, 2.8), (r.x + 10, r.centery - 11))
+        titulo(sup, f"{math.ceil(self.reloj)} s", (r.x + 38, r.centery - 16), 26, col if urgente else c["texto"])
 
     def _panel_jugador(self, sup):
         c = TEMA.c
@@ -547,20 +647,30 @@ class PantallaJuego:
               peso=700, fam="titulo")
         nombre_rol = recortar(j.candidato, 12, r.right - x - 48, 800) if j.candidato else j.info_rol["nombre"]
         chip(sup, nombre_rol, (x, r.y + 44), c["mango2"], c["texto"], ICONO_ROL[j.rol], 12)
-        # Los pasos del turno, con su casilla marcada cuando ya se hicieron.
-        y = r.y + 78
+        # Minutos del día: caminar, verificar, decidir y conversar los gastan.
+        y = r.y + 76
         t = p.turno
-        for hecho, etiqueta in ((t.get("camino"), "1. Camina (si quieres)"),
-                                (bool(t.get("decidio")), "2. Decide qué hacer")):
-            caja = pygame.Rect(x, y, 18, 18)
-            pygame.draw.rect(sup, c["bueno"] if hecho else c["papel"], caja, border_radius=5)
-            pygame.draw.rect(sup, c["borde"], caja, 2, border_radius=5)
+        ancho = r.right - x - 14
+        texto(sup, "Minutos del día", (x, y), 12, c["tinta2"], peso=900)
+        texto(sup, f"{j.minutos} / {MINUTOS_POR_TURNO}", (r.right - 14, y), 13, c["texto"], peso=900, ancla="tr")
+        poco = j.minutos <= 4
+        barra(sup, (x, y + 18, ancho, 12), 100 * j.minutos / MINUTOS_POR_TURNO, c["aviso"] if poco else c["acento"])
+        y += 38
+        # Las dos publicaciones del turno, con su casilla marcada cuando ya se decidieron.
+        atendidas = t.get("atendidas", 0)
+        texto(sup, "Publicaciones", (x, y + 9), 12, c["tinta2"], peso=900, ancla="ml")
+        for k in range(PUBS_POR_TURNO):
+            caja = pygame.Rect(x + 92 + k * 30, y, 22, 22)
+            hecho = k < atendidas
+            actual = k == atendidas and bool(t.get("nodo") is not None)
+            pygame.draw.rect(sup, c["bueno"] if hecho else (c["mango"] if actual else c["papel"]), caja, border_radius=6)
+            pygame.draw.rect(sup, c["borde"], caja, 2, border_radius=6)
             if hecho:
-                pygame.draw.lines(sup, c["sobre_color"], False, [(caja.x + 4, caja.centery), (caja.x + 8, caja.bottom - 5),
-                                                                 (caja.right - 4, caja.y + 4)], 3)
-            texto(sup, etiqueta, (x + 26, y + 9), 13, c["tinta2"] if hecho else c["texto"], peso=800, ancla="ml")
-            y += 25
-        y += 8
+                pygame.draw.lines(sup, c["sobre_color"], False, [(caja.x + 5, caja.centery), (caja.x + 9, caja.bottom - 6),
+                                                                 (caja.right - 5, caja.y + 5)], 3)
+            else:
+                texto(sup, str(k + 1), caja.center, 12, c["texto"], peso=900, ancla="c")
+        y += 32
         sup.blit(recursos.icono("star", 22, c["logro"], 2.6), (x, y + 2))
         titulo(sup, f"{j.puntos}", (x + 28, y - 2), 26, c["texto"])
         texto(sup, "puntos", (x + 30 + recursos.fuente(26, 700, "titulo").size(str(j.puntos))[0], y + 12), 12,

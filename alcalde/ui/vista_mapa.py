@@ -6,6 +6,7 @@ import pygame
 import pygame.gfxdraw
 
 from ..modelo.mapa import CALLES, ZONAS, nombre_zona
+from ..modelo.partida import COSTO_MIN_CONVERSAR
 from ..modelo.red_social import residentes
 from . import edificios, personajes, recursos
 from .efectos import suave
@@ -42,6 +43,7 @@ class VistaMapa:
         self.pulsos = []
         self.flashes = {}
         self.hover = None
+        self._dist = {}
         self.btn_conversar = Boton((self.rect.right - 214, self.rect.bottom - 70, 196, 50), "Conversar", "conversar",
                                    costo=1, icono="message-circle", estilo="primario", tam=17)
 
@@ -191,8 +193,10 @@ class VistaMapa:
                 if z != self.p.jugador_actual.zona and z in self.p.destinos():
                     self.j.mover(z)
                 elif z != self.p.jugador_actual.zona:
-                    self.j.app.toasts.agregar("Ya caminaste en este turno. En el siguiente puedes ir a otra zona.",
-                                              "info")
+                    d = self.p.distancias().get(z)
+                    self.j.app.toasts.agregar(
+                        f"{nombre_zona(z)} queda a {int(d)} min y solo te quedan {self.p.jugador_actual.minutos}.",
+                        "info")
                 return True
         return False
 
@@ -207,6 +211,7 @@ class VistaMapa:
         mi_turno = self.j.puedo_actuar()
         j = p.jugador_actual
         destinos = p.destinos() if mi_turno else {}
+        self._dist = p.distancias() if mi_turno else {}
         ruta_prev = []
         if mi_turno and self.hover and self.hover in destinos and self.hover != j.zona:
             _, ruta_prev = p.mapa.camino_mas_corto(j.zona, self.hover)
@@ -274,7 +279,8 @@ class VistaMapa:
         c = TEMA.c
         x, y = pos
         info = ZONAS[z]
-        alcanzable = False
+        alcanzable = z in destinos and z != j.zona
+        lejana = z in self._dist and not alcanzable
         if alcanzable:
             pul = 3 * math.sin(ahora / 200) if mov else 0
             pygame.gfxdraw.filled_ellipse(sup, round(x), round(y + 20), round(56 + pul), round(20 + pul / 2),
@@ -294,6 +300,9 @@ class VistaMapa:
         nombre = info["nombre"]
         if alcanzable:
             chip(sup, f"{nombre}  {int(destinos[z])} min", (x, y + 32), c["mango"], c["texto"], "clock", 12,
+                 ancla="c", alto=22)
+        elif lejana:
+            chip(sup, f"{nombre}  {int(self._dist[z])} min", (x, y + 32), c["papel2"], c["tenue"], "clock", 12,
                  ancla="c", alto=22)
         else:
             chip(sup, nombre, (x, y + 32), c["papel"], c["texto"], None, 12, ancla="c", alto=22)
@@ -408,7 +417,7 @@ class VistaMapa:
         if aqui and puedo:
             ok, motivo = p.puede_conversar()
             self.btn_conversar.activo = ok
-            self.btn_conversar.etiqueta = f"Conversar ({len(charla)})" if ok else "Conversar"
+            self.btn_conversar.etiqueta = f"Conversar ({len(charla)}) · {COSTO_MIN_CONVERSAR} min" if ok else "Conversar"
             self.btn_conversar.rect.size = (derecha.w, 50)
             self.btn_conversar.rect.center = derecha.center
             self.btn_conversar.dibujar(sup)
@@ -416,10 +425,13 @@ class VistaMapa:
                 from .widgets import tooltip
                 tooltip(sup, motivo, self.btn_conversar.rect.midtop, 240)
         elif not aqui and puedo:
-            if z in destinos and (p.turno.get("verifico") or p.turno.get("decidio")):
-                msg, col = f"Clic para caminar hasta aquí ({int(destinos[z])} min por la ruta más corta).", c["bueno"]
+            costo = int(self._dist.get(z, 0))
+            if z in destinos and p.turno.get("decidio") and p.puede_siguiente()[0]:
+                msg, col = f"Clic para ir ({costo} min): al llegar te toca tu siguiente publicación de aquí.", c["bueno"]
+            elif z in destinos and (p.turno.get("verifico") or p.turno.get("decidio")):
+                msg, col = f"Clic para caminar hasta aquí ({costo} min por la ruta más corta).", c["bueno"]
             elif z in destinos:
-                msg, col = "Clic para ir: te llegará una publicación de aquí.", c["bueno"]
+                msg, col = f"Clic para ir ({costo} min): te llegará una publicación de aquí.", c["bueno"]
             else:
-                msg, col = "Ya caminaste en este turno.", c["tinta2"]
+                msg, col = f"Muy lejos: {costo} min y te quedan {j.minutos}.", c["aviso"]
             parrafo(sup, msg, derecha.x, derecha.y + 4, derecha.w, 13, col, peso=900, max_lineas=3, interlineado=3)

@@ -39,6 +39,9 @@ class ControladorLocal:
     def conversar(self) -> list[Mensaje]:
         return self.partida.conversar()
 
+    def siguiente(self) -> list[Mensaje]:
+        return self.partida.siguiente_publicacion()
+
     def terminar_turno(self) -> None:
         self.partida.terminar_turno()
 
@@ -97,6 +100,9 @@ class ControladorRed:
 
     def conversar(self):
         return self._enviar(dict(t="conversar"))
+
+    def siguiente(self):
+        return self._enviar(dict(t="siguiente"))
 
     def terminar_turno(self):
         self._enviar(dict(t="fin_turno"))

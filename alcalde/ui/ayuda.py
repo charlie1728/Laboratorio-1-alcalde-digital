@@ -31,9 +31,17 @@ SECCIONES = [
     ("Cómo se juega", "list", [
         ("item", "smartphone", "Te llega una publicación", "En cada turno te llega una publicación de la zona "
                                                           "donde estás. Puede ser verdadera o falsa."),
-        ("item", "map", "Camina (si quieres)", "Antes de decidir puedes caminar a otra zona: te llegará una "
-                                              "publicación de allí. Los globitos morados del mapa dicen cuántas "
-                                              "hay en cada zona."),
+        ("item", "clock", "12 minutos por turno", "Caminar, verificar (2 min), decidir (2 min) y conversar "
+                                                 "(3 min) gastan minutos. Se acaban y no alcanza para todo: "
+                                                 "hay que elegir. Atiendes hasta 2 publicaciones por turno."),
+        ("item", "map", "Camina (si quieres)", "Cada calle cuesta los minutos que dice el mapa. Si caminas antes "
+                                              "de decidir, te llega una publicación de la zona nueva; si ya "
+                                              "verificaste, la publicación te acompaña. Los globitos morados dicen "
+                                              "cuántas hay en cada zona."),
+        ("item", "footprints", "Estar donde está el rumor", "Frenar un rumor desde lejos de su zona rinde solo la "
+                                                         "mitad. Estando en la zona, rinde completo."),
+        ("item", "timer", "El reloj", "Cada publicación tiene su tiempo (20 s por defecto, se elige al empezar). "
+                                     "Si llega a cero, el turno pasa solo al siguiente jugador. P pausa."),
         ("item", "search", "Verificar o recordar", "Verificar te dice la verdad pero cuesta 3 puntos. Cuando "
                                                   "alguien decide, todos ven si era verdad: si te acuerdas, te "
                                                   "ahorras la verificación."),
@@ -59,8 +67,9 @@ SECCIONES = [
         ("item", "sparkles", "Especial (5)", "Depende de tu personaje. Solo sirve si la publicación es falsa."),
         ("item", "message-circle", "Conversar", "En el mapa: convences a los vecinos de tu zona que creen un "
                                                "rumor ya descubierto."),
-        ("item", "keyboard", "Teclas", "1-5 acciones, Enter terminar turno, Tab cambiar de vista, "
-                                      "H ayuda, C contraste, M sonido, F11 pantalla completa, Esc cerrar."),
+        ("item", "keyboard", "Teclas", "1-5 acciones, N siguiente publicación, Enter terminar turno, "
+                                      "P pausa, Tab cambiar de vista, H ayuda, C contraste, M sonido, "
+                                      "F11 pantalla completa, Esc cerrar."),
     ]),
     ("Personajes", "users", [("roles",)]),
     ("Cómo ganar", "trophy", [

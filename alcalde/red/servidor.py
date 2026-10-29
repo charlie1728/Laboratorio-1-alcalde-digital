@@ -241,6 +241,10 @@ class Servidor:
             msgs = p.conversar()
             if msgs and msgs[0].tipo == "malo" and "charla" not in p.ultimo_resaltado:
                 self._a(cid, dict(t="aviso", tipo="malo", texto=msgs[0].texto))
+        elif t == "siguiente":
+            msgs = p.siguiente_publicacion()
+            if msgs and msgs[0].tipo == "malo":
+                self._a(cid, dict(t="aviso", tipo="malo", texto=msgs[0].texto))
         elif t == "fin_turno":
             p.terminar_turno()
         else:

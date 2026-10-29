@@ -8,8 +8,9 @@ import unittest
 
 from alcalde.estructuras.archivo_avl import ArchivoHechosAVL
 from alcalde.estructuras.grafo import Grafo
-from alcalde.modelo.mapa import CALLES, ZONAS, crear_mapa
-from alcalde.modelo.partida import Partida
+from alcalde.modelo.mapa import CALLES, MINUTOS_POR_TURNO, ZONAS, crear_mapa
+from alcalde.modelo.partida import (COSTO_MIN_CONVERSAR, COSTO_MIN_DECIDIR, COSTO_MIN_VERIFICAR,
+                                    Partida)
 from alcalde.modelo.red_social import residentes
 from alcalde.modelo.serializacion import partida_a_dict, partida_desde_dict
 
@@ -106,17 +107,40 @@ class TestMapa(unittest.TestCase):
     def test_mover_usa_dijkstra(self):
         p = Partida(JUGADORES, semilla=3)
         j = p.jugador_actual
-        destinos = p.destinos()
-        self.assertEqual(set(destinos), set(ZONAS) - {j.zona})
-        z = max(destinos, key=destinos.get)                      # la zona más lejana
+        j.minutos = 99                                           # presupuesto de sobra
+        distancias = p.distancias()
+        self.assertEqual(set(distancias), set(ZONAS) - {j.zona})
+        self.assertEqual(p.destinos(), distancias)               # con minutos de sobra, todas alcanzan
+        z = max(distancias, key=distancias.get)                  # la zona más lejana
         p.mover(z)
         ruta = p.ultimo_resaltado["ruta"]
         self.assertEqual(ruta, p.mapa.camino_mas_corto(ruta[0], z)[1])   # camina por la ruta más corta
         self.assertEqual(j.zona, z)
         self.assertEqual(p.red.dato(j.nombre).zona, z)
-        otra = next(x for x in ZONAS if x != z)
-        self.assertEqual(p.mover(otra)[0].tipo, "malo")          # una caminata por turno
-        self.assertEqual(p.destinos(), {})
+        self.assertEqual(j.minutos, 99 - int(distancias[z]))     # caminar gasta los minutos de la ruta
+
+    def test_caminar_gasta_minutos_y_no_alcanza_para_todo(self):
+        p = Partida(JUGADORES, semilla=3)
+        j = p.jugador_actual
+        origen = j.zona
+        self.assertEqual(j.minutos, MINUTOS_POR_TURNO)
+        todas = p.distancias()
+        j.minutos = int(min(todas.values()))                     # alcanza justo para la calle más corta
+        destinos = p.destinos()
+        self.assertTrue(destinos and all(d <= j.minutos for d in destinos.values()))
+        presupuesto = j.minutos
+        fuera = next(z for z, d in todas.items() if d > presupuesto)
+        msg = p.mover(fuera)
+        self.assertEqual(msg[0].tipo, "malo")                    # no alcanza: no se mueve
+        self.assertEqual(j.zona, origen)
+        self.assertEqual(j.minutos, presupuesto)
+        cerca = min(destinos, key=destinos.get)
+        p.mover(cerca)
+        self.assertEqual(j.minutos, presupuesto - int(destinos[cerca]))
+        # se puede seguir caminando mientras queden minutos
+        for z, d in p.destinos().items():
+            self.assertLessEqual(d, j.minutos)
+
 
     def test_turno_reparte_una_publicacion(self):
         p = Partida(JUGADORES, semilla=4)
@@ -140,6 +164,7 @@ class TestMapa(unittest.TestCase):
     def test_caminar_trae_publicacion_de_la_zona(self):
         p = Partida(JUGADORES, semilla=7)
         j = p.jugador_actual
+        j.minutos = 99                                   # aquí no se prueba el presupuesto
         otra = max((z for z in ZONAS if z != j.zona), key=p.publicaciones_en)
         self.assertGreater(p.publicaciones_en(otra), 0)
         p.mover(otra)
@@ -158,6 +183,7 @@ class TestMapa(unittest.TestCase):
             engañados = [v for v in residentes(p.red, zona) if caso.creencia.get(v) == "falso"]
             if not engañados:
                 continue
+            p.jugador_actual.zona = zona                     # estando en la zona del rumor, lo oye toda
             p.ejecutar("reportar", caso, nodo)
             self.assertTrue(all(caso.creencia.get(v) != "falso" for v in engañados))
             return
@@ -177,6 +203,9 @@ class TestVerificarEnTerreno(unittest.TestCase):
             p.ejecutar("verificar", caso, nodo)
             self.assertFalse(nodo.verificado)
             self.assertFalse(p.turno["verifico"])          # sin datos: no cuenta
+            minutos = j.minutos
+            self.assertEqual(minutos, MINUTOS_POR_TURNO)    # y tampoco gasta minutos
+            j.minutos = 99                                  # (aquí no se prueba el presupuesto)
             p.mover(caso.hecho.lugar)                       # va al lugar de los hechos
             p.ejecutar("verificar", caso, nodo)
             self.assertTrue(nodo.verificado)                # ahí sí se verifica
@@ -279,3 +308,105 @@ class TestSerializacion(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestMinutosYTurno(unittest.TestCase):
+    """El día de cada jugador es un presupuesto de minutos y atiende hasta 2 publicaciones."""
+
+    def test_verificar_y_decidir_gastan_minutos(self):
+        p = Partida(JUGADORES, semilla=4)
+        j = p.jugador_actual
+        caso, nodo = p.publicacion_turno()
+        self.assertEqual(j.minutos, MINUTOS_POR_TURNO)
+        p.ejecutar("verificar", caso, nodo)
+        if p.turno["verifico"]:
+            self.assertEqual(j.minutos, MINUTOS_POR_TURNO - COSTO_MIN_VERIFICAR)
+        antes = j.minutos
+        p.ejecutar("ignorar", caso, nodo)
+        self.assertEqual(j.minutos, antes - COSTO_MIN_DECIDIR)
+        self.assertEqual(p.turno["atendidas"], 1)
+        p.terminar_turno()
+        self.assertEqual(p.jugador_actual.minutos, MINUTOS_POR_TURNO)    # cada día se renuevan
+
+    def test_sin_minutos_no_se_puede_verificar_pero_si_decidir(self):
+        p = Partida(JUGADORES, semilla=4)
+        j = p.jugador_actual
+        caso, nodo = p.publicacion_turno()
+        j.minutos = 1
+        acc = {a["clave"]: a for a in p.acciones_para(nodo)}
+        self.assertFalse(acc["verificar"]["ok"])
+        self.assertTrue(acc["ignorar"]["ok"])            # nunca queda atrapado sin poder decidir
+        p.ejecutar("ignorar", caso, nodo)
+        self.assertEqual(j.minutos, 0)
+
+    def test_dos_publicaciones_por_turno(self):
+        p = Partida(JUGADORES, semilla=4)
+        caso1, nodo1 = p.publicacion_turno()
+        self.assertFalse(p.puede_siguiente()[0])         # primero hay que decidir
+        p.ejecutar("ignorar", caso1, nodo1)
+        self.assertTrue(p.puede_siguiente()[0])
+        self.assertEqual(p.siguiente_publicacion(), [])
+        caso2, nodo2 = p.publicacion_turno()
+        self.assertIsNotNone(nodo2)
+        self.assertNotEqual(nodo1.id, nodo2.id)          # no se repite
+        self.assertIsNone(p.turno["decidio"])            # la segunda llega sin decidir
+        p.ejecutar("ignorar", caso2, nodo2)
+        self.assertEqual(p.turno["atendidas"], 2)
+        ok, motivo = p.puede_siguiente()
+        self.assertFalse(ok)                             # máximo 2
+        self.assertEqual(p.siguiente_publicacion()[0].tipo, "malo")
+
+    def test_caminar_despues_de_decidir_trae_la_segunda(self):
+        p = Partida(JUGADORES, semilla=7)
+        j = p.jugador_actual
+        caso, nodo = p.publicacion_turno()
+        p.ejecutar("ignorar", caso, nodo)
+        destino = min(p.destinos(), key=p.destinos().get)
+        p.mover(destino)
+        caso2, nodo2 = p.publicacion_turno()
+        self.assertIsNotNone(nodo2)
+        self.assertNotEqual(nodo2.id, nodo.id)
+        self.assertIsNone(p.turno["decidio"])
+        self.assertEqual(p.turno["atendidas"], 1)
+
+    def test_conversar_cuesta_minutos(self):
+        for semilla in range(60):
+            p = Partida(JUGADORES, semilla=semilla)
+            for c in p.casos:
+                c.descubierto = True
+            j = p.jugador_actual
+            if not p.objetivo_charla():
+                continue
+            j.minutos = COSTO_MIN_CONVERSAR - 1
+            ok, motivo = p.puede_conversar()
+            self.assertFalse(ok)
+            self.assertIn("min", motivo)
+            j.minutos = COSTO_MIN_CONVERSAR + 4
+            p.conversar()
+            self.assertEqual(j.minutos, 4)
+            return
+        self.skipTest("ninguna semilla dejó vecinos engañados en la zona inicial")
+
+    def test_lejos_de_la_zona_frenar_rinde_la_mitad(self):
+        comparadas = 0
+        for semilla in range(60):
+            lejos = Partida(JUGADORES, semilla=semilla)
+            caso, nodo = lejos.publicacion_turno()
+            zona = lejos.zona_de(nodo)
+            if nodo.es_veraz or zona not in ZONAS or zona == lejos.jugador_actual.zona:
+                continue
+            aqui = Partida(JUGADORES, semilla=semilla)       # misma partida, pero parado en la zona del rumor
+            aqui.jugador_actual.zona = zona
+            aqui.red.dato(aqui.jugador_actual.nombre).zona = zona
+            caso2, nodo2 = aqui.publicacion_turno()
+            self.assertEqual((nodo.autor, nodo.afirmacion), (nodo2.autor, nodo2.afirmacion))
+            lejos.ejecutar("reportar", caso, nodo)
+            aqui.ejecutar("reportar", caso2, nodo2)
+            ganado_lejos = lejos.jugador_actual.puntos
+            ganado_aqui = aqui.jugador_actual.puntos
+            self.assertGreater(ganado_aqui, 0)
+            self.assertEqual(ganado_lejos, (ganado_aqui + 1) // 2)
+            comparadas += 1
+            if comparadas >= 5:
+                break
+        self.assertGreater(comparadas, 0)

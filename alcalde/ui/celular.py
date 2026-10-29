@@ -3,6 +3,7 @@
 import pygame
 
 from ..modelo.mapa import ZONAS, nombre_zona
+from ..modelo.partida import COSTO_MIN_DECIDIR, COSTO_MIN_VERIFICAR, PUBS_POR_TURNO
 from . import personajes, recursos
 from .ayuda import ICONO_ROL
 from .juego_comun import cara, color_caso, color_estado, estado_nodo
@@ -43,7 +44,7 @@ class Celular:
         a = pygame.Rect(s.x + 10, self.r_post.bottom + 12, s.w - 20, s.bottom - self.r_post.bottom - 30)
         self.r_acciones = a
         w = (a.w - 8) // 2
-        self.b_verificar = Boton((a.x, a.y, a.w, 50), "Verificar (cuesta 3 puntos)", "verificar", icono="search",
+        self.b_verificar = Boton((a.x, a.y, a.w, 50), "Verificar (3 pts · 2 min)", "verificar", icono="search",
                                  estilo="primario", tam=17)
         y = a.y + 92
         self.botones = [
@@ -55,6 +56,9 @@ class Celular:
         ]
         for b in [self.b_verificar] + self.botones:
             b.clave_real = b.clave
+        self.b_sig = Boton((a.x + 12, a.bottom - 70, a.w - 24, 46), "Siguiente publicación", "siguiente",
+                           icono="arrow-right", estilo="primario", tam=16)
+        self.b_sig.visible = False
 
     @property
     def p(self):
@@ -63,6 +67,9 @@ class Celular:
     # ------------------------------------------------------------------ eventos
     def evento(self, e):
         if e.type == pygame.MOUSEBUTTONDOWN and e.button == 1:
+            if self.b_sig.visible and self.b_sig.clic(e.pos):
+                self.j.siguiente()
+                return True
             for b in [self.b_verificar] + self.botones:
                 if b.visible and b.clic(e.pos):
                     self.j.accion(b.clave_real)
@@ -105,15 +112,19 @@ class Celular:
             f"Le llegó a {jugador.nombre}{desde}"
         texto(sup, recortar(titulo, 14, s.w - 30, 900), (s.x + 16, s.y + 80), 14, c["tinta2"], peso=900, ancla="ml")
         resultado = p.turno.get("resultado")
+        # Al reportar o desmentir, Civitas retira la publicación: el resultado se muestra igual.
+        caso_res = p.caso_por_id(resultado["caso"]) if resultado else None
         if n is None:
             r = self.r_post
             sticker(sup, r, c["papel2"], 18, 0, 2)
-            parrafo(sup, "Hoy no te llegó ninguna publicación nueva. Camina por la ciudad o termina tu turno.",
+            parrafo(sup, "Esa publicación ya no está en Civitas." if resultado else
+                    "Hoy no te llegó ninguna publicación nueva. Camina por la ciudad o termina tu turno.",
                     r.x + 16, r.y + 90, r.w - 32, 15, c["tinta2"], peso=700, centrado=True)
         else:
             self._post(sup, n, caso)
-        if resultado and caso is not None:
-            self._resultado(sup, resultado, caso)
+        self.b_sig.visible = False
+        if resultado and caso_res is not None:
+            self._resultado(sup, resultado, caso_res)
         else:
             self._acciones(sup, n, caso)
         pygame.draw.rect(sup, c["tinta"], (s.centerx - 50, s.bottom - 10, 100, 5), border_radius=3)
@@ -157,11 +168,11 @@ class Celular:
             return f"Este hecho no está en el Archivo: ve a {nombre_zona(caso.hecho.lugar)} para verificarlo."
         if clave == "compartir":
             k = p.red.grado_salida(j.nombre) if j.nombre in p.red else 0
-            return f"Se la mandas a tus {k} seguidores. Gana si es verdadera."
+            return f"Se la mandas a tus {k} seguidores. Gana si es verdadera. Decidir cuesta {COSTO_MIN_DECIDIR} min."
         if clave == "reportar":
-            return "Civitas la borra con sus reenvíos. Gana si es falsa."
+            return f"Civitas la borra con sus reenvíos. Gana si es falsa. Decidir cuesta {COSTO_MIN_DECIDIR} min."
         if clave == "ignorar":
-            return "No haces nada con ella."
+            return f"No haces nada con ella. Decidir cuesta {COSTO_MIN_DECIDIR} min."
         if clave in ESPECIALES:
             return j.info_rol["descripcion"] + " Solo sirve si es falsa."
         return ""
@@ -186,7 +197,8 @@ class Celular:
                 b.icono = ICONO_ROL[j.rol]
             b.activo = bool(info and info["ok"]) and puedo
             if b is self.b_verificar:
-                b.etiqueta = "Ya está verificada" if (n is not None and n.verificado) else "Verificar (cuesta 3 puntos)"
+                b.etiqueta = ("Ya está verificada" if (n is not None and n.verificado)
+                              else f"Verificar (3 pts · {COSTO_MIN_VERIFICAR} min)")
             if b.rect.collidepoint(raton):
                 if not puedo:
                     hint, hint_col = self.j.motivo_espera(), c["aviso"]
@@ -199,9 +211,24 @@ class Celular:
             if not puedo:
                 hint, hint_col = self.j.motivo_espera(), c["aviso"]
             else:
-                hint = "Si no te acuerdas si es verdad, verifícala primero."
+                hint, hint_col = self._presencia(n)
         parrafo(sup, hint, a.x + 2, self.botones[-1].rect.bottom + 10, a.w, 12, hint_col, peso=800, max_lineas=2,
                 interlineado=2)
+
+    def _presencia(self, n):
+        """Dónde estás respecto a la zona del rumor: aquí, frenarlo rinde completo; lejos, la mitad."""
+        c = TEMA.c
+        p = self.p
+        zona = p.zona_de(n) if n is not None else None
+        if zona not in ZONAS:
+            return "Si no te acuerdas si es verdad, verifícala primero.", c["tinta2"]
+        j = p.jugador_actual
+        if zona == j.zona:
+            return f"Estás en {nombre_zona(zona)}: aquí frenar un rumor rinde completo.", c["bueno"]
+        d = p.distancias().get(zona)
+        lejos = f" ({int(d)} min)" if d is not None else ""
+        return (f"Estás lejos de {nombre_zona(zona)}{lejos}: frenar este rumor desde aquí rinde la mitad. "
+                "Camina hasta allá para que rinda completo."), c["aviso"]
 
     def _resultado(self, sup, resultado, caso):
         c = TEMA.c
@@ -220,6 +247,19 @@ class Celular:
         y = parrafo(sup, cuerpo, r.x + 62, r.y + 42, r.w - 76, 14, c["texto"], peso=800, max_lineas=3) + 6
         texto(sup, "Para recordar, el hecho real:", (r.x + 16, y), 12, c["tinta2"], peso=900)
         parrafo(sup, caso.hecho.afirmacion_real().texto(), r.x + 16, y + 18, r.w - 32, 13, c["tinta2"], peso=700,
-                max_lineas=4)
-        texto(sup, "Puedes caminar por la ciudad o terminar tu turno.", (r.centerx, r.bottom - 16), 12, c["texto"],
-              peso=900, ancla="c")
+                max_lineas=3)
+        p = self.p
+        ok, motivo = p.puede_siguiente()
+        j = p.jugador_actual
+        if ok:
+            self.b_sig.rect.midbottom = (r.centerx, r.bottom - 26)
+            self.b_sig.etiqueta = f"Siguiente publicación ({p.turno.get('atendidas', 0) + 1} de {PUBS_POR_TURNO})"
+            self.b_sig.visible = self.j.puedo_actuar()
+            self.b_sig.activo = self.b_sig.visible
+            self.b_sig.dibujar(sup)
+            texto(sup, f"Te quedan {j.minutos} min. También puedes caminar.", (r.centerx, r.bottom - 12), 11,
+                  c["texto"], peso=900, ancla="c")
+        else:
+            texto(sup, recortar(motivo + ". Termina tu turno." if p.turno.get("atendidas", 0) >= PUBS_POR_TURNO
+                                else motivo, 12, r.w - 24, 900), (r.centerx, r.bottom - 16), 12, c["texto"],
+                  peso=900, ancla="c")

@@ -9,7 +9,9 @@ Ciudad Nova elige alcalde y todos hablan en **Civitas**, su red social. Ahí cir
 
 No hay preguntas de trivia: se aprende verificando antes de compartir, descubriendo dónde se torció una historia y viendo las consecuencias.
 
-**Cómo es un turno:** te llega una publicación de la zona del mapa donde estás; si prefieres otra, caminas a otra zona y te llega una de allí (los globitos del mapa dicen cuántas circulan en cada zona). Puedes verificarla (cuesta 3 puntos) y luego decides qué hacer: compartirla, reportarla, ignorarla o usar el poder de tu personaje. Al decidir, todos ven si era verdadera o falsa, así que conviene acordarse: quien recuerda lo que ya se descubrió se ahorra las verificaciones y saca más puntos. Lo que decides se nota en esa zona: si frenas un rumor, sus vecinos dejan de creerlo; si lo compartes, la zona se agita.
+**Cómo es un turno:** cada jugador tiene **12 minutos** y atiende **hasta 2 publicaciones**. Te llega una publicación de la zona del mapa donde estás; si prefieres otra, caminas a otra zona y te llega una de allí (los globitos del mapa dicen cuántas circulan en cada zona). **Caminar cuesta los minutos de la calle** (el mapa muestra el costo de cada zona), verificar y decidir cuestan 2 minutos cada una y conversar cuesta 3, así que no alcanza para todo: hay que elegir. Puedes verificarla (cuesta además 3 puntos) y luego decides qué hacer: compartirla, reportarla, ignorarla o usar el poder de tu personaje. Al decidir, todos ven si era verdadera o falsa, así que conviene acordarse: quien recuerda lo que ya se descubrió se ahorra las verificaciones y saca más puntos. Lo que decides se nota en la zona donde circula la publicación: si frenas un rumor, sus vecinos dejan de creerlo; si lo compartes, la zona se agita. **Estar en esa zona importa:** frenar un rumor desde lejos rinde solo la mitad.
+
+**Reloj y pausa (en el mismo computador):** al empezar eliges cuánto tiempo tiene cada jugador para decidir sobre cada publicación (20 s por defecto, o sin límite). Si el reloj llega a cero, el turno pasa solo al siguiente jugador. También eliges si hay **pausa entre días**: con pausa, al llegar la noche todo se detiene hasta pulsar «Iniciar día» (útil para explicar con calma); sin pausa, la partida sigue de corrido. Con la tecla `P` o el botón «Pausa» se detiene el reloj en cualquier momento.
 
 | | |
 |---|---|
@@ -68,15 +70,17 @@ Si Windows pregunta por el firewall, hay que permitir el acceso en redes privada
 python -m unittest discover -s tests -v
 ```
 
-Son 34 pruebas: árboles, grafos, su integración y una partida completa en red con sockets reales.
+Son 46 pruebas: árboles, grafos, su integración, el presupuesto de minutos del turno y una partida completa en red con sockets reales.
 
 ## Controles
 
 | Acción | Cómo |
 |---|---|
-| Verificar la publicación del turno | Botón del celular o tecla `1` (cuesta 3 puntos) |
-| Decidir: compartir, reportar, ignorar o especial | Botones del celular o teclas `2` a `5` |
-| Caminar por la ciudad | Clic en una zona del mapa (una vez por turno) |
+| Verificar la publicación del turno | Botón del celular o tecla `1` (3 puntos y 2 minutos) |
+| Decidir: compartir, reportar, ignorar o especial | Botones del celular o teclas `2` a `5` (2 minutos) |
+| Pasar a la segunda publicación del turno | Botón «Siguiente publicación» o tecla `N` |
+| Caminar por la ciudad | Clic en una zona del mapa (cuesta los minutos de la ruta más corta) |
+| Pausar la partida | Botón «Pausa» o tecla `P` |
 | Conversar con los vecinos | Botón «Conversar» en la tarjeta de tu zona |
 | Cambiar de vista (ciudad, red, árbol) | Pestañas o `Tab` |
 | Terminar el turno | Botón o `Enter` |

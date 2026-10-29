@@ -60,7 +60,7 @@ Se escogió lista de adyacencia y no matriz porque la red es dispersa: 24 vérti
 El enunciado pide que la ciudad y el personaje del jugador se vean, y que las acciones tengan consecuencias en la ciudad. El mapa le da un **lugar** a cada cosa:
 
 - Cada hecho pasó en una zona (`Hecho.lugar`) y cada ciudadano vive en una zona.
-- Cada jugador está en una zona y puede **caminar una vez por turno** a cualquier zona, por la ruta más corta.
+- Cada jugador está en una zona y puede **caminar a cualquier zona que alcance con sus minutos**, por la ruta más corta. Cada turno tiene 12 minutos, caminar gasta los minutos de la ruta y verificar, decidir y conversar también gastan, así que no alcanza para todo.
 - **Cada publicación circula en la zona de quien la publicó.** La que le llega al jugador sale de su zona o, si allí no hay, de la más cercana: se mide con un **BFS sobre el grafo de la ciudad** (nivel = número de calles). Si camina antes de verificar o decidir, le llega una de la zona nueva.
 - **Decidir tiene efecto local:** frenar un rumor (reportar o usar el poder especial) corrige a los vecinos de esa zona que lo creían y baja su tensión; compartir un rumor la sube. Eso conecta el grafo de la ciudad con la red social y con el árbol del rumor.
 - **En persona** se pueden hacer cosas que no se pueden hacer desde el celular:
@@ -92,7 +92,7 @@ Todas están en `alcalde/estructuras/grafo.py`, que no depende de nada del juego
 | **DFS** (pila) | `dfs(origen)` | O(V + E) | Base de las componentes conexas; herramienta DFS de la vista |
 | Componentes conexas | `componentes_conexas()`, `es_conexo()` | O(V + E) | Detectar **burbujas**: si una discusión parte la red, el juego avisa que un grupo quedó aislado |
 | **Dijkstra** (montículo) | `dijkstra(origen, costo, limite)`, `camino_mas_corto(u, v)` | O((V + E) log V) | **Moverse por el mapa** por la ruta más corta |
-| Dijkstra acotado | `alcanzables(origen, limite)` | O((V + E) log V) | Implementada y probada; el juego ya no la usa desde que caminar no tiene límite de minutos |
+| Dijkstra acotado | `alcanzables(origen, limite)` | O((V + E) log V) | **Zonas a las que alcanzan los minutos del turno**: el mapa solo marca como alcanzables las que cuestan, por la ruta más corta, igual o menos que los minutos que te quedan |
 | Camino de máxima confianza | `confianza_maxima(origen)` | O((V + E) log V) | **Desmentido oficial** del candidato |
 | Serializar | `a_dict()`, `desde_dict(d)` | O(V + E) | Enviar la red y el mapa del servidor a los clientes (entrega final) |
 
@@ -151,7 +151,7 @@ En la vista **Red social**, al elegir una historia, las aristas por las que pas�
 | Desmentido oficial (candidato) | `inmunizar` e `insertar` la corrección | `confianza_maxima(jugador)`: convence a quien confía en el candidato por algún camino |
 | Verificar | `buscar` en el AVL | En el mapa: si estás en el lugar de los hechos y falta en el AVL, se `inserta` |
 | Conversar | (sin árbol) | `residentes(zona)` del mapa: corrige a los vecinos de tu zona |
-| Caminar | Te llega un nodo del árbol de esa zona | `dijkstra` para la ruta más corta y `bfs` del mapa para escoger la publicación más cercana |
+| Caminar | Te llega un nodo del árbol de esa zona | `dijkstra` para la ruta más corta, `alcanzables` (Dijkstra acotado) para las zonas que alcanzan los minutos del turno y `bfs` del mapa para escoger la publicación más cercana |
 
 ### 4.3 Qué pasa cuando cambian las relaciones
 
@@ -177,7 +177,7 @@ Esta es una de las preguntas de la sustentación. Cuando una discusión **elimin
   - **Grados**: muestra el top 3 de seguidores.
   - **Confianza**: dibuja el camino de máxima confianza con el producto de los pesos.
 
-**Vista Ciudad** (`alcalde/ui/vista_mapa.py`): debajo de cada edificio están las caras de sus vecinos, con su estado. Cuando una publicación viaja, se ve pasar de cara en cara por la ciudad. Cada zona muestra un globito morado con cuántas publicaciones circulan allí. Al pasar el mouse por una zona se dibuja la ruta de Dijkstra y la tarjeta dice sus minutos; al hacer clic el personaje camina por esa ruta. Sobre las zonas con tensión alta aparecen nubes de tormenta.
+**Vista Ciudad** (`alcalde/ui/vista_mapa.py`): debajo de cada edificio están las caras de sus vecinos, con su estado. Cuando una publicación viaja, se ve pasar de cara en cara por la ciudad. Cada zona muestra un globito morado con cuántas publicaciones circulan allí. Al pasar el mouse por una zona se dibuja la ruta de Dijkstra y la tarjeta dice sus minutos; al hacer clic el personaje camina por esa ruta y gasta esos minutos. Las zonas que no alcanzan con los minutos que te quedan se ven apagadas, con su costo. Sobre las zonas con tensión alta aparecen nubes de tormenta.
 
 | | |
 |---|---|
@@ -190,7 +190,7 @@ Esta es una de las preguntas de la sustentación. Cuando una discusión **elimin
 `tests/test_grafos.py` tiene 21 pruebas:
 
 - **Grafo:** tamaño y grados; BFS por niveles con su árbol de padres; DFS; Dijkstra y reconstrucción del camino; Dijkstra acotado; eliminar una arista que parte el grafo en dos componentes; eliminar un vértice; grafo dirigido con predecesores; camino de máxima confianza (0,9 × 0,9 = 0,81 gana a 0,5 directo); ajuste de pesos; serialización.
-- **Mapa:** es conexo; caminar sigue la ruta más corta de Dijkstra y solo se puede una vez por turno; al caminar llega una publicación de la zona nueva; reportar un rumor corrige a los vecinos de su zona.
+- **Mapa:** es conexo; caminar sigue la ruta más corta de Dijkstra y gasta minutos (solo se puede ir a zonas que alcanzan; verificar, decidir y conversar también gastan); al caminar llega una publicación de la zona nueva; reportar un rumor corrige a los vecinos de su zona.
 - **Integración:** el árbol de mutaciones es el árbol BFS de la red; la desinformación sale de la red; reportar avisa a quien lo recibió; alertar usa los contactos; la elección suma bien las zonas.
 - **Serialización:** el AVL se reconstruye con la misma forma; la partida completa va y vuelve por JSON sin cambiar.
 

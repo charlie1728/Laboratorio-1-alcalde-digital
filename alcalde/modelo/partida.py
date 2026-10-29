@@ -19,6 +19,15 @@ from .roles import ROLES
 ATENCION_POR_TURNO = 3
 # Verificar cuesta puntos: quien recuerda lo que ya verificó otro jugador se lo ahorra.
 COSTO_VERIFICAR = 3
+# El día de cada jugador es un presupuesto de minutos (MINUTOS_POR_TURNO, en mapa.py).
+# Caminar gasta los minutos de la calle; verificar, decidir y conversar también gastan.
+# Con 12 minutos no alcanza para todo: hay que elegir adónde ir y qué hacer allá.
+PUBS_POR_TURNO = 2
+COSTO_MIN_VERIFICAR = 2
+COSTO_MIN_DECIDIR = 2
+COSTO_MIN_CONVERSAR = 3
+# Frenar un rumor desde lejos de la zona donde circula rinde solo la mitad.
+ACCIONES_FRENAR = ("reportar", "alertar", "rastrear", "amplificar", "desmentir")
 DECISIONES = ("compartir", "reportar", "ignorar", "alertar", "rastrear", "amplificar", "desmentir", "borrar")
 MAX_NODOS_CASO = 30
 MAX_CASOS = 3
@@ -396,7 +405,7 @@ class Partida:
     @staticmethod
     def _turno_vacio() -> dict:
         return dict(caso=None, nodo=None, verifico=False, decidio=None, resultado=None, camino=False,
-                    converso=False)
+                    converso=False, atendidas=0)
 
     def zona_de(self, nodo: NodoMutacion) -> Optional[str]:
         """Una publicación circula en la zona donde vive quien la publicó."""
@@ -467,9 +476,12 @@ class Partida:
             elif self.terminada:
                 a["ok"], a["motivo"] = False, "La campaña terminó"
             elif self.turno.get("decidio"):
-                a["ok"], a["motivo"] = False, "Ya decidiste en este turno"
+                a["ok"], a["motivo"] = False, "Ya decidiste sobre esta publicación"
             elif a["clave"] == "verificar" and (nodo.verificado or self.turno.get("verifico")):
                 a["ok"], a["motivo"] = False, "Ya está verificada"
+            elif a["clave"] == "verificar" and j.minutos < COSTO_MIN_VERIFICAR:
+                a["ok"], a["motivo"] = False, (f"Verificar cuesta {COSTO_MIN_VERIFICAR} min y te quedan "
+                                               f"{j.minutos}. Decide sin verificar.")
             elif nodo.es_correccion and a["clave"] not in ("compartir", "ignorar"):
                 a["ok"], a["motivo"] = False, "Es un desmentido"
             elif a["clave"] == "compartir" and len(caso.arbol) >= MAX_NODOS_CASO:
@@ -487,14 +499,25 @@ class Partida:
         antes = len(self.mensajes)
         puntos_antes = j.puntos
         self.ultimo_resaltado = {}
+        lejos = self.esta_lejos(nodo) if not gratis else False
         getattr(self, "_a_" + clave)(j, caso, nodo)
         if clave in DECISIONES:
-            self._efecto_en_zona(j, caso, nodo, clave)
+            frenar_rumor = clave in ACCIONES_FRENAR and not nodo.es_veraz
+            self._efecto_en_zona(j, caso, nodo, clave, lejos and frenar_rumor)
+            if lejos and frenar_rumor:
+                # Presencia: frenar un rumor desde lejos de su zona rinde solo la mitad de los puntos.
+                ganado = j.puntos - puntos_antes
+                if ganado > 0:
+                    j.puntos = puntos_antes + (ganado + 1) // 2
+                self.log(f"{j.nombre} está lejos de {nombre_zona(self.zona_de(nodo))}: frenar el rumor "
+                         "desde aquí rinde la mitad. Ir hasta allá rinde el doble.", "info")
             # Decidir revela la verdad frente a todos: los demás tienen que acordarse.
             nodo.verificado = True
             self.repartidos.add(nodo.id)
             if not gratis:
                 self.turno["decidio"] = clave
+                self.turno["atendidas"] = self.turno.get("atendidas", 0) + 1
+                j.minutos = max(0, j.minutos - COSTO_MIN_DECIDIR)
             revelado = dict(nodo=nodo.id, caso=caso.id, decision=clave, veraz=nodo.es_veraz,
                             puntos=j.puntos - puntos_antes, jugador=self.indice_de(j))
             self.ultimo_resaltado["revelado"] = revelado
@@ -504,6 +527,7 @@ class Partida:
             # Si el hecho no estaba en el Archivo no cuenta: puede ir al lugar y verificar allá.
             if not self.ultimo_resaltado.get("verificacion", {}).get("inconclusa"):
                 self.turno["verifico"] = True
+                j.minutos = max(0, j.minutos - COSTO_MIN_VERIFICAR)
         j.reputacion = max(0, min(100, j.reputacion))
         if caso.arbol.raiz is None and caso.abierto:
             caso.abierto = False
@@ -512,16 +536,28 @@ class Partida:
         self._recalcular()
         return self.mensajes[antes:]
 
-    def _efecto_en_zona(self, j: Jugador, caso: Caso, nodo: NodoMutacion, clave: str) -> None:
-        """Lo que se decide con una publicación se nota en la zona donde circula."""
+    def esta_lejos(self, nodo: Optional[NodoMutacion]) -> bool:
+        """True si la publicación circula en una zona distinta a donde está el jugador del turno."""
+        if nodo is None:
+            return False
+        zona = self.zona_de(nodo)
+        return zona in ZONAS and zona != self.jugador_actual.zona
+
+    def _efecto_en_zona(self, j: Jugador, caso: Caso, nodo: NodoMutacion, clave: str,
+                        lejos: bool = False) -> None:
+        """Lo que se decide con una publicación se nota en la zona donde circula.
+
+        Si el jugador está lejos de esa zona, solo la mitad de los vecinos engañados lo oye."""
         zona = self.zona_de(nodo)
         if zona not in ZONAS:
             return
-        frenar = clave == "reportar" or clave in ("alertar", "rastrear", "amplificar", "desmentir")
+        frenar = clave in ACCIONES_FRENAR
         if not nodo.es_veraz and frenar:
-            vecinos = [v for v in residentes(self.red, zona) if caso.creencia.get(v) == "falso"]
+            vecinos = sorted(v for v in residentes(self.red, zona) if caso.creencia.get(v) == "falso")
+            if lejos:
+                vecinos = vecinos[:len(vecinos) // 2]
             corregidos, _ = self._corregir(caso, vecinos)
-            self.tension_extra[zona] = max(0.0, self.tension_extra[zona] - 10)
+            self.tension_extra[zona] = max(0.0, self.tension_extra[zona] - (5 if lejos else 10))
             if corregidos:
                 j.stats["corregidos"] += len(corregidos)
                 self.animar(t="charla", zona=zona, a=corregidos, jugador=self.indice_de(j))
@@ -821,40 +857,80 @@ class Partida:
                  f"{len(corregidos)} personas convencidas por caminos de confianza.{extra}", "bueno")
 
     # ------------------------------------------------------------------ acciones en el mapa
-    def destinos(self) -> dict[str, float]:
-        """Zonas a las que se puede ir este turno (todas, una vez) con su distancia por Dijkstra."""
+    def distancias(self) -> dict[str, float]:
+        """Minutos hasta cada zona por la ruta más corta (Dijkstra), alcance o no el presupuesto."""
         j = self.jugador_actual
-        if self.turno.get("camino") or self.terminada:
+        if self.terminada:
             return {}
         dist, _ = self.mapa.dijkstra(j.zona)
         return {z: d for z, d in dist.items() if z != j.zona}
+
+    def destinos(self) -> dict[str, float]:
+        """Zonas a las que alcanzan los minutos que te quedan, con su costo en minutos."""
+        j = self.jugador_actual
+        if self.terminada:
+            return {}
+        # Dijkstra acotado: solo se exploran las zonas a las que alcanzan los minutos que te quedan.
+        alcanzables = self.mapa.alcanzables(j.zona, j.minutos)
+        return {z: d for z, d in alcanzables.items() if z != j.zona}
 
     def mover(self, zona: str) -> list[Mensaje]:
         j = self.jugador_actual
         if zona not in self.mapa or zona == j.zona or self.terminada:
             return []
-        if self.turno.get("camino"):
-            return [Mensaje("Ya caminaste en este turno. En el siguiente puedes ir a otra zona.", "malo")]
         dist, prev = self.mapa.dijkstra(j.zona)
+        costo = int(dist[zona])
+        if costo > j.minutos:
+            return [Mensaje(f"{nombre_zona(zona)} queda a {costo} min y solo te quedan {j.minutos}. "
+                            "Elige una zona más cerca o termina tu turno.", "malo")]
         antes = len(self.mensajes)
         ruta = Grafo.reconstruir(prev, zona)
         self.turno["camino"] = True
-        j.stats["km"] += int(dist[zona])
+        j.minutos -= costo
+        j.stats["km"] += costo
         j.zona = zona
         self.red.dato(j.nombre).zona = zona
         self.ultimo_resaltado = {"ruta": ruta}
         self.animar(t="mover", jugador=self.indice_de(j), ruta=ruta)
-        self.log(f"{j.nombre} caminó hasta {nombre_zona(zona)}.", "info")
+        self.log(f"{j.nombre} caminó hasta {nombre_zona(zona)} ({costo} min).", "info")
         if not self.turno.get("verifico") and not self.turno.get("decidio"):
             if self.turno.get("nodo") is not None:
                 self.repartidos.discard(self.turno["nodo"])
             self.repartir()
+        elif self.turno.get("decidio") and self.puede_siguiente()[0]:
+            # Ya decidiste sobre la primera: al llegar te toca la segunda, de esta zona.
+            self._nueva_publicacion()
         clave = (self.ronda, j.nombre, zona)
         if j.candidato and clave not in self._visitas:
             self._visitas.add(clave)
             self.apoyo_zona[zona][j.candidato] += 2
             self.log(f"{j.candidato} saludó a los vecinos de {nombre_zona(zona)}: más apoyo en la zona.", "bueno")
         return self.mensajes[antes:]
+
+    def puede_siguiente(self) -> tuple[bool, str]:
+        """¿Puede el jugador pasar a su segunda publicación del turno?"""
+        j = self.jugador_actual
+        if self.terminada:
+            return False, "La campaña terminó"
+        if not self.turno.get("decidio"):
+            return False, "Primero decide sobre esta publicación"
+        if self.turno.get("atendidas", 0) >= PUBS_POR_TURNO:
+            return False, f"Ya atendiste tus {PUBS_POR_TURNO} publicaciones de hoy"
+        if j.minutos < COSTO_MIN_DECIDIR:
+            return False, f"Te quedan {j.minutos} min: no alcanzan para otra publicación"
+        return True, ""
+
+    def _nueva_publicacion(self) -> None:
+        self.turno.update(caso=None, nodo=None, verifico=False, decidio=None, resultado=None)
+        self.ultimo_resaltado = {}
+        self.repartir()
+
+    def siguiente_publicacion(self) -> list[Mensaje]:
+        ok, motivo = self.puede_siguiente()
+        if not ok:
+            return [Mensaje(motivo, "malo")]
+        self._nueva_publicacion()
+        return []
 
     def objetivo_charla(self, zona: Optional[str] = None) -> list[str]:
         """Vecinos de la zona que creen una historia que ya se descubrió falsa."""
@@ -871,6 +947,8 @@ class Partida:
             return False, "Ya conversaste en este turno"
         if not self.objetivo_charla():
             return False, "Aquí nadie cree un rumor ya descubierto"
+        if j.minutos < COSTO_MIN_CONVERSAR:
+            return False, f"Conversar cuesta {COSTO_MIN_CONVERSAR} min y te quedan {j.minutos}"
         return True, ""
 
     def conversar(self) -> list[Mensaje]:
@@ -884,6 +962,7 @@ class Partida:
             if c.descubierto:
                 self._corregir(c, gente)
         self.turno["converso"] = True
+        j.minutos -= COSTO_MIN_CONVERSAR
         pts = 2 + 3 * len(gente)
         j.puntos += pts
         j.reputacion += 2
