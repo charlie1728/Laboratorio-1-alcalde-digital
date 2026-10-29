@@ -3,6 +3,7 @@ import pygame
 from ..modelo.partida import LOGROS
 from ..modelo.roles import ORDEN_ROLES, ROLES
 from . import personajes, recursos
+from .escena import lienzo_total
 from .tema import TEMA
 from .widgets import Boton, forma_estado, parrafo, sticker, texto, titulo
 
@@ -131,9 +132,10 @@ class Ayuda:
 
     def dibujar(self, sup):
         c = TEMA.c
-        velo = pygame.Surface(sup.get_size(), pygame.SRCALPHA)
+        base, _ = lienzo_total(sup)
+        velo = pygame.Surface(base.get_size(), pygame.SRCALPHA)
         velo.fill((*c["tinta"], 150))
-        sup.blit(velo, (0, 0))
+        base.blit(velo, (0, 0))
         sticker(sup, self.rect, c["papel"], 26, 8, 3)
         sup.blit(recursos.icono("book-open", 30, c["acento"], 2.6), (self.rect.x + 24, self.rect.y + 26))
         titulo(sup, "Ayuda", (self.rect.x + 64, self.rect.y + 22), 32, c["texto"])

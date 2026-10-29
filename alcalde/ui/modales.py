@@ -5,19 +5,22 @@ import pygame
 
 from ..modelo.mapa import nombre_zona
 from . import personajes, recursos
+from .escena import lienzo_total
 from .efectos import EFECTOS, rebote, suave
 from .juego_comun import cara
 from .tema import TEMA
 from .widgets import Boton, ancho_texto, circulo, parrafo, recortar, sticker, texto, titulo
 
 
-def velo(sup, alpha=150, rect=None):
+def velo(sup, alpha=150, rect=None, color=None):
+    """Oscurece todo el lienzo (también lo que queda a los lados de la pantalla del juego)."""
     c = TEMA.c
-    capa = pygame.Surface(sup.get_size(), pygame.SRCALPHA)
-    capa.fill((*c["tinta"], alpha))
+    base, ox = lienzo_total(sup)
+    capa = pygame.Surface(base.get_size(), pygame.SRCALPHA)
+    capa.fill((*(color or c["tinta"]), alpha))
     if rect is not None:
-        capa.fill((0, 0, 0, 0), rect)
-    sup.blit(capa, (0, 0))
+        capa.fill((0, 0, 0, 0), pygame.Rect(rect).move(ox, 0))
+    base.blit(capa, (0, 0))
 
 
 class ModalViral:
@@ -390,10 +393,11 @@ class SecuenciaNoche:
         e = (pygame.time.get_ticks() - self.t0) / 1000
         centro = self.j.r_centro
         alpha = round(min(1, e / 0.6) * 150)
-        capa = pygame.Surface(sup.get_size(), pygame.SRCALPHA)
+        base, ox = lienzo_total(sup)
+        capa = pygame.Surface(base.get_size(), pygame.SRCALPHA)
         capa.fill((20, 18, 60, alpha))
-        capa.fill((20, 18, 60, alpha // 3), centro)
-        sup.blit(capa, (0, 0))
+        capa.fill((20, 18, 60, alpha // 3), centro.move(ox, 0))
+        base.blit(capa, (0, 0))
         leyenda = f"Noche del día {self.dia}: las publicaciones viajan"
         etiqueta = pygame.Rect(0, 0, ancho_texto(leyenda, 14, 900) + 72, 50)
         etiqueta.midtop = (centro.centerx, centro.y + 8)

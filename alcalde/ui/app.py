@@ -1,3 +1,5 @@
+import sys
+
 import pygame
 
 from ..controlador import ControladorLocal
@@ -25,12 +27,15 @@ class App:
     def __init__(self, semilla=None, rondas=8):
         pygame.init()
         pygame.display.set_caption("Alcalde Digital")
-        # El juego se dibuja siempre en un lienzo de 1280x720 y se escala a la ventana.
-        # La ventana arranca maximizada; lo que sobra a los lados se rellena con el cielo.
+        # La ventana arranca maximizada. El juego se dibuja en un lienzo de 720 de alto con la
+        # misma forma de la ventana: la pantalla de 1280x720 va centrada y los fondos (cielo,
+        # pasto, calle, gente) se dibujan de borde a borde, así que no quedan franjas.
         self.completa = False
+        self._maximizar = 0
         self.ventana = self._abrir_ventana()
-        self.pantalla = pygame.Surface((ANCHO, ALTO)).convert()
-        self._escala = (1.0, 0, 0)
+        self.lienzo = None
+        self._escala = (1.0, 0, 0, 0)
+        self._ajustar_lienzo()
         self._instalar_raton()
         try:
             pygame.display.set_icon(civi("feliz", 64))
@@ -62,13 +67,20 @@ class App:
             escritorio = pygame.display.get_desktop_sizes()[0]
         except (pygame.error, IndexError, AttributeError):
             escritorio = (ANCHO, ALTO)
-        tam = (min(ANCHO, escritorio[0] - 80), min(ALTO, escritorio[1] - 120))
+        tam = (max(640, escritorio[0] - 40), max(360, escritorio[1] - 110))
         ventana = pygame.display.set_mode(tam, pygame.RESIZABLE)
-        try:
-            from pygame._sdl2.video import Window
-            Window.from_display_module().maximize()
-        except Exception:
-            pass
+        if sys.platform == "win32":
+            # Maximizar con la API de Windows: ocupa la pantalla sin tapar la barra de tareas.
+            # (pygame._sdl2.Window.from_display_module() no sirve: al liberarse destruye la ventana.)
+            try:
+                import ctypes
+                hwnd = pygame.display.get_wm_info().get("window")
+                if hwnd:
+                    ctypes.windll.user32.ShowWindow(hwnd, 1)   # restaurar (si venía de pantalla completa)
+                    ctypes.windll.user32.ShowWindow(hwnd, 3)   # maximizar
+            except (OSError, AttributeError, pygame.error):
+                pass
+            self._maximizar = 3          # al volver de F11 Windows a veces ignora el primer intento
         return pygame.display.get_surface() or ventana
 
     def alternar_pantalla_completa(self):
@@ -85,9 +97,18 @@ class App:
             return self.a_lienzo(real())
         pygame.mouse.get_pos = en_lienzo
 
+    def _ajustar_lienzo(self):
+        ventana = pygame.display.get_surface()
+        w, h = ventana.get_size() if ventana else (ANCHO, ALTO)
+        ancho = max(ANCHO, min(round(ALTO * w / max(1, h)), ALTO * 3))
+        if self.lienzo is None or self.lienzo.get_width() != ancho:
+            self.lienzo = pygame.Surface((ancho, ALTO)).convert()
+            self.pantalla = self.lienzo.subsurface(((ancho - ANCHO) // 2, 0, ANCHO, ALTO))
+
     def a_lienzo(self, pos):
-        k, ox, oy = self._escala
-        return (round((pos[0] - ox) / k), round((pos[1] - oy) / k))
+        """Coordenadas de la ventana a coordenadas de la pantalla de 1280x720."""
+        k, ox, oy, recorte = self._escala
+        return (round((pos[0] - ox) / k) - recorte, round((pos[1] - oy) / k))
 
     def _convertir(self, e):
         if hasattr(e, "pos") and e.type in (pygame.MOUSEMOTION, pygame.MOUSEBUTTONDOWN, pygame.MOUSEBUTTONUP):
@@ -99,18 +120,20 @@ class App:
     def _presentar(self):
         ventana = pygame.display.get_surface()
         w, h = ventana.get_size()
-        k = min(w / ANCHO, h / ALTO)
-        dw, dh = round(ANCHO * k), round(ALTO * k)
+        lw, lh = self.lienzo.get_size()
+        k = min(w / lw, h / lh)
+        dw, dh = round(lw * k), round(lh * k)
         ox, oy = (w - dw) // 2, (h - dh) // 2
-        self._escala = (k, ox, oy)
-        if (dw, dh) == (ANCHO, ALTO):
-            ventana.blit(self.pantalla, (ox, oy))
+        self._escala = (k, ox, oy, (lw - ANCHO) // 2)
+        if ox > 0 or oy > 0:
+            # Solo en ventanas más altas que anchas: se repite la fila de arriba y la de abajo.
+            ventana.blit(pygame.transform.scale(self.lienzo.subsurface((0, 0, lw, 1)), (w, oy + 1)), (0, 0))
+            ventana.blit(pygame.transform.scale(self.lienzo.subsurface((0, lh - 1, lw, 1)), (w, h - oy - dh + 1)),
+                         (0, oy + dh - 1))
+        if (dw, dh) == (lw, lh):
+            ventana.blit(self.lienzo, (ox, oy))
         else:
-            # Los márgenes muestran el mismo dibujo muy difuminado, en vez de franjas negras.
-            if ox > 0 or oy > 0:
-                mini = pygame.transform.smoothscale(self.pantalla, (32, 18))
-                ventana.blit(pygame.transform.smoothscale(mini, (w, h)), (0, 0))
-            ventana.blit(pygame.transform.smoothscale(self.pantalla, (dw, dh)), (ox, oy))
+            ventana.blit(pygame.transform.smoothscale(self.lienzo, (dw, dh)), (ox, oy))
 
     # ------------------------------------------------------------------ navegación
     def cambiar(self, pantalla):
@@ -195,10 +218,11 @@ class App:
         self._dibujar_subtitulo()
         edad = pygame.time.get_ticks() - self._fundido_t0
         if edad < 260 and not TEMA.op["menos_movimiento"]:
-            velo = pygame.Surface((ANCHO, ALTO))
+            destino = self.pantalla.get_parent() or self.pantalla
+            velo = pygame.Surface(destino.get_size())
             velo.fill(TEMA.c["tinta"])
             velo.set_alpha(int(255 * (1 - edad / 260)))
-            self.pantalla.blit(velo, (0, 0))
+            destino.blit(velo, (0, 0))
 
     def _dibujar_subtitulo(self):
         if not self.subtitulo:
@@ -220,6 +244,18 @@ class App:
 
     def ejecutar(self):
         while self.corriendo:
+            if getattr(self, "_maximizar", 0):
+                self._maximizar -= 1
+                if self._maximizar == 0 and sys.platform == "win32" and not self.completa:
+                    try:
+                        import ctypes
+                        hwnd = pygame.display.get_wm_info().get("window")
+                        if pygame.display.get_surface().get_size() != pygame.display.get_desktop_sizes()[0]:
+                            ctypes.windll.user32.ShowWindow(hwnd, 1)
+                            ctypes.windll.user32.ShowWindow(hwnd, 3)
+                    except (OSError, AttributeError, pygame.error):
+                        pass
+            self._ajustar_lienzo()
             self.paso([self._convertir(e) for e in pygame.event.get()])
             self._presentar()
             pygame.display.flip()

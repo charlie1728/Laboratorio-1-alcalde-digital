@@ -184,10 +184,15 @@ class VistaMapa:
                 pygame.draw.line(sup, c["acento"], (x1 + (x2 - x1) * t1, y1 + (y2 - y1) * t1),
                                  (x1 + (x2 - x1) * t2, y1 + (y2 - y1) * t2), 7)
                 d += 20
-        for posicion, minutos, _ in self._etiquetas_calles(pts):
-            self._minutos_calle(sup, posicion, minutos)
+        etiquetas = self._etiquetas_calles(pts)
+        for posicion, minutos, libre in etiquetas:
+            if libre:
+                self._minutos_calle(sup, posicion, minutos)
         for z in sorted(ZONAS, key=lambda z: pts[z][1]):
             self._zona(sup, z, pts[z], destinos, j, ahora, mov)
+        for posicion, minutos, libre in etiquetas:
+            if not libre:
+                self._minutos_calle(sup, posicion, minutos)
         for z in ZONAS:
             self._insignias(sup, z, pts[z])
         for i, jj in sorted(enumerate(p.jugadores), key=lambda t: self._pos_token(t[0], t[1], ahora)[1]):
@@ -201,12 +206,14 @@ class VistaMapa:
         Devuelve (posición, minutos, libre).
         """
         if getattr(self, "_etiquetas", None) is None:
-            ocupado = []
+            edificios_r, textos_r = [], []
             for x, y in pts.values():
-                ocupado += [pygame.Rect(x - 46, y - 56, 92, 80), pygame.Rect(x - 84, y + 18, 168, 28)]
+                edificios_r.append(pygame.Rect(x - 46, y - 56, 92, 80))
+                # nombre de la zona y globitos de tareas (a la izquierda o a la derecha del edificio)
+                textos_r += [pygame.Rect(x - 84, y + 18, 168, 28), pygame.Rect(x - 120, y - 62, 240, 28)]
             puestas = []
-            for a, b, minutos in CALLES:
-                (x1, y1), (x2, y2) = pts[a], pts[b]
+
+            def buscar(x1, y1, x2, y2, ocupado):
                 largo = max(1.0, math.hypot(x2 - x1, y2 - y1))
                 nx, ny = -(y2 - y1) / largo, (x2 - x1) / largo
                 mejor, valor_mejor = None, -1e9
@@ -222,7 +229,15 @@ class VistaMapa:
                         valor = -1000 * choques - abs(t - 0.5) * 40 - abs(lado)
                         if valor > valor_mejor:
                             mejor, valor_mejor = (x, y), valor
-                puestas.append((mejor, minutos, valor_mejor > -500))
+                return mejor, valor_mejor > -500
+
+            for a, b, minutos in CALLES:
+                (x1, y1), (x2, y2) = pts[a], pts[b]
+                pos, libre = buscar(x1, y1, x2, y2, edificios_r + textos_r)
+                if not libre:
+                    # Calle muy corta: el número va encima del edificio, sin tapar nombres ni globitos.
+                    pos, _ = buscar(x1, y1, x2, y2, textos_r)
+                puestas.append((pos, minutos, libre))
             self._etiquetas = puestas
         return self._etiquetas
 

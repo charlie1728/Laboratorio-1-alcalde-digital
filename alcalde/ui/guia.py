@@ -2,6 +2,7 @@
 import pygame
 
 from . import personajes
+from .escena import lienzo_total
 from .tema import TEMA
 from .widgets import Boton, parrafo, sticker, texto, titulo
 
@@ -66,10 +67,11 @@ class Guia:
         c = TEMA.c
         foco, tit, cuerpo, _ = self.pasos[self.i]
         foco = pygame.Rect(foco)
-        capa = pygame.Surface(sup.get_size(), pygame.SRCALPHA)
+        base, ox = lienzo_total(sup)
+        capa = pygame.Surface(base.get_size(), pygame.SRCALPHA)
         capa.fill((*c["tinta"], 165))
-        pygame.draw.rect(capa, (0, 0, 0, 0), foco.inflate(10, 10), border_radius=22)
-        sup.blit(capa, (0, 0))
+        pygame.draw.rect(capa, (0, 0, 0, 0), foco.inflate(10, 10).move(ox, 0), border_radius=22)
+        base.blit(capa, (0, 0))
         pygame.draw.rect(sup, c["mango"], foco.inflate(14, 14), 4, border_radius=24)
         w, h = 400, 170
         if foco.right + w + 40 < 1280:
