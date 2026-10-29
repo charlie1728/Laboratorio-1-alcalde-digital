@@ -11,7 +11,7 @@ from . import edificios, personajes, recursos
 from .efectos import suave
 from .juego_comun import EXPRESION, cara, color_estado
 from .tema import TEMA
-from .widgets import Boton, chip, circulo, recortar, sticker, texto
+from .widgets import Boton, chip, circulo, parrafo, recortar, sticker, texto
 
 ICONO_EVENTO = dict(falsa="triangle-alert", rumor="message-square-warning", verdadera="newspaper", viral="flame",
                     discusion="zap", campana="heart-handshake", reporte="flag", vence="archive", bot="bot",
@@ -184,31 +184,53 @@ class VistaMapa:
                 pygame.draw.line(sup, c["acento"], (x1 + (x2 - x1) * t1, y1 + (y2 - y1) * t1),
                                  (x1 + (x2 - x1) * t2, y1 + (y2 - y1) * t2), 7)
                 d += 20
-        for (mx, my), minutos in self._etiquetas_calles(pts):
-            chip(sup, f"{minutos} min", (mx, my), c["papel"], c["tinta2"], None, 11, ancla="c", alto=20)
+        for posicion, minutos, _ in self._etiquetas_calles(pts):
+            self._minutos_calle(sup, posicion, minutos)
         for z in sorted(ZONAS, key=lambda z: pts[z][1]):
             self._zona(sup, z, pts[z], destinos, j, ahora, mov)
+        for z in ZONAS:
+            self._insignias(sup, z, pts[z])
         for i, jj in sorted(enumerate(p.jugadores), key=lambda t: self._pos_token(t[0], t[1], ahora)[1]):
             self._token(sup, i, jj, ahora, mov)
         self._tarjeta_zona(sup, destinos)
 
     def _etiquetas_calles(self, pts):
+        """Dónde va el número de minutos de cada calle: el punto libre más cercano al centro de la calle.
+
+        Se evitan el edificio, el nombre y los vecinos de cada zona y los otros números.
+        Devuelve (posición, minutos, libre).
+        """
         if getattr(self, "_etiquetas", None) is None:
+            ocupado = []
+            for x, y in pts.values():
+                ocupado += [pygame.Rect(x - 46, y - 56, 92, 80), pygame.Rect(x - 80, y + 18, 160, 28),
+                            pygame.Rect(x - 52, y + 44, 104, 26)]
             puestas = []
             for a, b, minutos in CALLES:
                 (x1, y1), (x2, y2) = pts[a], pts[b]
-                mejor, holgura = None, -1
-                for t in (0.5, 0.42, 0.58, 0.34, 0.66, 0.28, 0.72):
-                    x, y = x1 + (x2 - x1) * t, y1 + (y2 - y1) * t
-                    d = min([math.hypot(x - px, y - (py + 20)) for px, py in pts.values()] +
-                            [math.hypot(x - qx, y - qy) * 1.6 for (qx, qy), _ in puestas] + [999])
-                    if d > holgura:
-                        mejor, holgura = (x, y), d
-                    if d > 70:
-                        break
-                puestas.append((mejor, minutos))
+                largo = max(1.0, math.hypot(x2 - x1, y2 - y1))
+                nx, ny = -(y2 - y1) / largo, (x2 - x1) / largo
+                mejor, valor_mejor = None, -1e9
+                for k in range(2, 19):
+                    t = k / 20
+                    for lado in (0, 16, -16):
+                        x = x1 + (x2 - x1) * t + nx * lado
+                        y = y1 + (y2 - y1) * t + ny * lado
+                        caja = pygame.Rect(0, 0, 26, 26)
+                        caja.center = (x, y)
+                        choques = sum(1 for o in ocupado if o.colliderect(caja))
+                        choques += sum(1 for (qx, qy), _, _ in puestas if abs(qx - x) < 28 and abs(qy - y) < 28)
+                        valor = -1000 * choques - abs(t - 0.5) * 40 - abs(lado)
+                        if valor > valor_mejor:
+                            mejor, valor_mejor = (x, y), valor
+                puestas.append((mejor, minutos, valor_mejor > -500))
             self._etiquetas = puestas
         return self._etiquetas
+
+    def _minutos_calle(self, sup, pos, minutos):
+        c = TEMA.c
+        circulo(sup, pos, 12, c["papel"], c["borde"], 2)
+        texto(sup, str(minutos), (pos[0], pos[1] + 1), 12, c["texto"], peso=900, ancla="c")
 
     def _zona(self, sup, z, pos, destinos, j, ahora, mov):
         p = self.p
@@ -276,6 +298,26 @@ class VistaMapa:
             pygame.draw.polygon(sup, c["mango"], [(x - 9, ay), (x + 9, ay), (x, ay + 11)])
             pygame.draw.polygon(sup, c["tinta"], [(x - 9, ay), (x + 9, ay), (x, ay + 11)], 2)
 
+    def tareas(self, z):
+        """Qué se puede hacer en persona en una zona: (vecinos para conversar, hecho para verificar aquí)."""
+        p = self.p
+        charla = p.objetivo_charla(z)
+        hecho = next((cs.hecho for cs in p.casos_abiertos()
+                      if cs.hecho.lugar == z and cs.hecho.id not in p.archivo), None)
+        return charla, hecho
+
+    def _insignias(self, sup, z, pos):
+        c = TEMA.c
+        charla, hecho = self.tareas(z)
+        x, y = pos
+        bx = x + 36
+        if charla:
+            r = chip(sup, str(len(charla)), (bx, y - 46), c["bueno"], c["sobre_color"], "message-circle", 12,
+                     ancla="ml", alto=24)
+            bx = r.right + 4
+        if hecho:
+            chip(sup, "", (bx, y - 46), c["mango"], c["texto"], "search", 12, ancla="ml", alto=24)
+
     def _tarjeta_zona(self, sup, destinos):
         p = self.p
         c = TEMA.c
@@ -287,37 +329,41 @@ class VistaMapa:
         sup.blit(img, (r.x + 10, r.y + 8))
         gente = residentes(p.red, z)
         creen = sum(1 for v in gente if p.estado_ciudadano(v) == "falso")
-        objetivo = p.objetivo_charla(z)
+        charla, hecho = self.tareas(z)
         aqui = z == j.zona
-        titulo = (f"Estás en {nombre_zona(z)}" if aqui else nombre_zona(z))
-        if self.j.en_red() and not self.j.puedo_actuar():
-            titulo = f"{j.nombre} está en {nombre_zona(j.zona)}" if aqui else titulo
-        texto(sup, titulo, (r.x + 84, r.y + 10), 16, c["texto"], peso=900)
-        linea = f"{len(gente)} vecinos, {creen} creen algo falso. Tensión {p.tension(z)}."
-        texto(sup, linea, (r.x + 84, r.y + 32), 13, c["tinta2"], peso=700)
-        hechos = [cs.hecho for cs in p.casos_abiertos() if cs.hecho.lugar == z]
-        if hechos:
-            h = hechos[0]
-            falta = h.id not in p.archivo
-            extra = " Falta en el Archivo: si verificas aquí, lo registras." if falta else ""
-            texto(sup, recortar(f"Aquí pasó: {h.titulo}.{extra}", 12, r.w - 320, 700), (r.x + 84, r.y + 51), 12,
-                  c["aviso"] if falta else c["tinta2"], peso=800)
-        self.btn_conversar.visible = aqui and self.j.puedo_actuar()
-        if aqui and self.j.puedo_actuar():
+        puedo = self.j.puedo_actuar()
+        derecha = pygame.Rect(r.right - 214, r.y + 10, 202, r.h - 20)
+        ancho = derecha.x - (r.x + 84) - 10
+        titulo = f"Estás en {nombre_zona(z)}" if aqui else nombre_zona(z)
+        if self.j.en_red() and not puedo and aqui:
+            titulo = f"{j.nombre} está en {nombre_zona(j.zona)}"
+        texto(sup, recortar(titulo, 16, ancho, 900), (r.x + 84, r.y + 8), 16, c["texto"], peso=900)
+        texto(sup, recortar(f"{len(gente)} vecinos, {creen} creen algo falso. Tensión {p.tension(z)}.", 13, ancho,
+                            700), (r.x + 84, r.y + 30), 13, c["tinta2"], peso=700)
+        if charla:
+            tarea, col = f"Puedes convencer a {len(charla)} vecinos engañados.", c["bueno"]
+        elif hecho:
+            tarea, col = f"Verifica aquí «{hecho.titulo}»: falta en el Archivo.", c["aviso"]
+        elif creen:
+            tarea, col = "Hay vecinos engañados: verifica lo que creen y vuelve.", c["tinta2"]
+        else:
+            tarea, col = "Nada pendiente aquí.", c["tenue"]
+        texto(sup, recortar(tarea, 12, ancho, 800), (r.x + 84, r.y + 51), 12, col, peso=800)
+        self.btn_conversar.visible = aqui and puedo
+        if aqui and puedo:
             ok, motivo = p.puede_conversar()
             self.btn_conversar.activo = ok
-            self.btn_conversar.etiqueta = f"Conversar ({len(objetivo)})" if ok else "Conversar"
-            self.btn_conversar.rect.topright = (r.right - 12, r.y + 12)
+            self.btn_conversar.etiqueta = f"Conversar ({len(charla)})" if ok else "Conversar"
+            self.btn_conversar.rect.size = (derecha.w, 50)
+            self.btn_conversar.rect.center = derecha.center
             self.btn_conversar.dibujar(sup)
             if not ok and self.btn_conversar.rect.collidepoint(pygame.mouse.get_pos()):
                 from .widgets import tooltip
                 tooltip(sup, motivo, self.btn_conversar.rect.midtop, 240)
-        elif not aqui and self.j.puedo_actuar():
+        elif not aqui and puedo:
             if z in destinos:
-                msg = f"Clic para ir: {int(destinos[z])} min de {j.minutos}"
-                col = c["bueno"]
+                msg, col = f"Clic para ir: {int(destinos[z])} de tus {j.minutos} min", c["bueno"]
             else:
                 dist = p.mapa.camino_mas_corto(j.zona, z)[0]
-                msg = f"Queda a {int(dist)} min: no alcanzas este turno"
-                col = c["malo"]
-            texto(sup, msg, (r.right - 16, r.centery), 14, col, peso=900, ancla="mr")
+                msg, col = f"Queda a {int(dist)} min y te quedan {j.minutos}: no alcanzas este turno", c["malo"]
+            parrafo(sup, msg, derecha.x, derecha.y + 4, derecha.w, 13, col, peso=900, max_lineas=3, interlineado=3)

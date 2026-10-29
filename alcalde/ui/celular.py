@@ -163,6 +163,7 @@ class Celular:
         self.b_next.activo = idx < len(feed) - 1
         self.b_prev.dibujar(sup)
         self.b_next.dibujar(sup)
+        texto(sup, f"{idx + 1} de {len(feed)}", (r.right - 38, y + 44), 11, c["tinta2"], peso=800, ancla="c")
         y += 50
         tag = next((t for cs, m, t in feed if m is n), "")
         circulo(sup, (x + 6, y + 9), 6, color_caso(caso.id))

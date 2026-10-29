@@ -698,11 +698,11 @@ class PantallaJuego:
                 img = img.copy()
                 img.set_alpha(90)
             if actual:
-                pygame.draw.circle(sup, j.color, (x - 22, y), 23, 4)
+                pygame.draw.circle(sup, j.color, (x - 22, y), 22, 4)
             sup.blit(img, (x - 40, y - 18))
-            ancho = (self.r_jugadores.w - 20) / len(p.jugadores) - 44
-            texto(sup, recortar(j.nombre, 12, ancho, 900), (x - 1, y - 14), 12, c["texto"], peso=900)
-            texto(sup, f"{j.puntos} pts", (x - 1, y + 2), 12, c["tinta2"], peso=800)
+            ancho = (self.r_jugadores.w - 20) / len(p.jugadores) - 50
+            texto(sup, recortar(j.nombre, 12, ancho, 900), (x + 4, y - 14), 12, c["texto"], peso=900)
+            texto(sup, f"{j.puntos} pts", (x + 4, y + 2), 12, c["tinta2"], peso=800)
 
     def _dibujar_arbol(self, sup):
         c = TEMA.c

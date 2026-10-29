@@ -219,7 +219,8 @@ class VistaRed:
         for zona in ZONAS:
             ax, ay = self._ancla(zona)
             pygame.draw.circle(sup, c["papel2"], (ax, ay), 44)
-            texto(sup, nombre_zona(zona), (ax, ay + 52), 11, c["tenue"], peso=800, ancla="c")
+            if not self.herr:
+                texto(sup, nombre_zona(zona), (ax, ay - 54), 11, c["tenue"], peso=800, ancla="c")
         datos = self.herr_datos
         e_herr = (ahora - self.herr_t0)
         if self.herr == "burbujas":
@@ -350,8 +351,8 @@ class VistaRed:
             if jugador:
                 texto(sup, recortar(v, 12, 80, 800), (x, y + r + 9), 12, c["texto"], peso=900, ancla="c")
             if fl and ahora - fl[0] < 900 and fl[2]:
-                circulo(sup, (x - r * 0.8, y - r * 0.8), 9, fl[1], c["borde"], 2)
-                sup.blit(recursos.icono(fl[2], 12, c["sobre_color"], 3), (x - r * 0.8 - 6, y - r * 0.8 - 6))
+                circulo(sup, (x + r * 0.8, y - r * 0.8), 9, fl[1], c["borde"], 2)
+                sup.blit(recursos.icono(fl[2], 12, c["sobre_color"], 3), (x + r * 0.8 - 6, y - r * 0.8 - 6))
             self._marca_herramienta(sup, v, x, y, r, e_herr)
         self._leyenda(sup)
         for b in self.botones:
@@ -376,12 +377,14 @@ class VistaRed:
             etiqueta = f"#{datos['top'][v] + 1}"
             pygame.draw.circle(sup, c["mango"], (x, y), r + 6, 4)
         if etiqueta:
-            circulo(sup, (x - r * 0.85, y + r * 0.85), 10, c["resalte"], c["borde"], 2)
-            texto(sup, etiqueta, (x - r * 0.85, y + r * 0.85), 11, c["texto"], peso=900, ancla="c")
+            circulo(sup, (x - r * 0.85, y - r * 0.85), 10, c["resalte"], c["borde"], 2)
+            texto(sup, etiqueta, (x - r * 0.85, y - r * 0.85), 11, c["texto"], peso=900, ancla="c")
 
     def _chips(self, sup, caso):
         c = TEMA.c
         self.chips = []
+        if type(self.j.modal).__name__ == "SecuenciaNoche":
+            return
         x = self.rect.x + 14
         y = self.rect.y + 14
         r = chip(sup, "Todas", (x, y), c["acento"] if self.caso_id is None else c["papel"],

@@ -30,10 +30,7 @@ class App:
         os.environ.setdefault("SDL_RENDER_SCALE_QUALITY", "linear")
         pygame.init()
         pygame.display.set_caption("Alcalde Digital")
-        try:
-            self.pantalla = pygame.display.set_mode((ANCHO, ALTO), pygame.SCALED | pygame.RESIZABLE)
-        except pygame.error:
-            self.pantalla = pygame.display.set_mode((ANCHO, ALTO))
+        self.pantalla = self._abrir_ventana(TEMA.op["pantalla_completa"])
         try:
             pygame.display.set_icon(civi("feliz", 64))
         except pygame.error:
@@ -53,6 +50,23 @@ class App:
         self._fundido_t0 = -10_000
         self.actual = PantallaMenu(self)
         self.snd.musica(TEMA.op["musica"] and TEMA.op["sonido"])
+
+    def _abrir_ventana(self, completa):
+        """Pantalla completa escalada (sin franjas en monitores 16:9) o ventana redimensionable."""
+        modos = [pygame.SCALED | pygame.FULLSCREEN] if completa else []
+        modos += [pygame.SCALED | pygame.RESIZABLE, 0]
+        for flags in modos:
+            try:
+                return pygame.display.set_mode((ANCHO, ALTO), flags)
+            except pygame.error:
+                continue
+
+    def alternar_pantalla_completa(self):
+        TEMA.cambiar("pantalla_completa", not TEMA.op["pantalla_completa"])
+        try:
+            pygame.display.toggle_fullscreen()
+        except pygame.error:
+            self.pantalla = self._abrir_ventana(TEMA.op["pantalla_completa"])
 
     # ------------------------------------------------------------------ navegación
     def cambiar(self, pantalla):
@@ -121,10 +135,7 @@ class App:
                     self.alternar_sonido()
                     continue
                 if e.key == pygame.K_F11:
-                    try:
-                        pygame.display.toggle_fullscreen()
-                    except pygame.error:
-                        pass
+                    self.alternar_pantalla_completa()
                     continue
             self.actual.evento(e)
         if hasattr(self.actual, "actualizar") and self.overlay is None:

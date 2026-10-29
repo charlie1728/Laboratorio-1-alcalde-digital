@@ -8,7 +8,7 @@ from . import personajes, recursos
 from .efectos import EFECTOS, rebote, suave
 from .juego_comun import cara
 from .tema import TEMA
-from .widgets import Boton, circulo, parrafo, recortar, sticker, texto, titulo
+from .widgets import Boton, ancho_texto, circulo, parrafo, recortar, sticker, texto, titulo
 
 
 def velo(sup, alpha=150, rect=None):
@@ -183,7 +183,13 @@ class HojaVerificacion:
         elif d.get("diferencias"):
             texto(sup, "Qué cambió frente al hecho oficial", (r.x + 16, y), 14, c["texto"], peso=900)
             y += 26
-            for nombre, dice, oficial in self.nodo.afirmacion.explicar_diferencias(hecho)[:4]:
+            difs = self.nodo.afirmacion.explicar_diferencias(hecho)
+            limite = self.b_avl.rect.y - 30
+            for k, (nombre, dice, oficial) in enumerate(difs):
+                if y + 62 > limite:
+                    texto(sup, f"y {len(difs) - k} cambio{'s' if len(difs) - k > 1 else ''} más", (r.x + 16, y), 13,
+                          c["malo"], peso=900)
+                    break
                 texto(sup, nombre, (r.x + 16, y), 14, c["malo"], peso=900)
                 y += 20
                 y = parrafo(sup, f"Dice: {dice}", r.x + 24, y, r.w - 44, 13, c["tinta2"], peso=700, max_lineas=2,
@@ -388,12 +394,13 @@ class SecuenciaNoche:
         capa.fill((20, 18, 60, alpha))
         capa.fill((20, 18, 60, alpha // 3), centro)
         sup.blit(capa, (0, 0))
-        etiqueta = pygame.Rect(0, 0, 330, 50)
+        leyenda = f"Noche del día {self.dia}: las publicaciones viajan"
+        etiqueta = pygame.Rect(0, 0, ancho_texto(leyenda, 14, 900) + 72, 50)
         etiqueta.midtop = (centro.centerx, centro.y + 8)
-        sticker(sup, etiqueta, c["tinta"], 25, 0, 3, color_borde=c["papel"])
+        sticker(sup, etiqueta, c["tinta"] if not TEMA.alto_contraste else (0, 0, 0), 25, 0, 3,
+                color_borde=c["papel"] if not TEMA.alto_contraste else c["mango"])
         sup.blit(recursos.icono("moon", 24, c["mango"], 2.6), (etiqueta.x + 18, etiqueta.y + 13))
-        texto(sup, f"Noche del día {self.dia}: las publicaciones viajan", (etiqueta.x + 50, etiqueta.centery), 14,
-              c["papel"] if not TEMA.alto_contraste else c["texto"], peso=900, ancla="ml")
+        texto(sup, leyenda, (etiqueta.x + 52, etiqueta.centery), 14, (255, 255, 255), peso=900, ancla="ml")
         if not self.listo():
             return
         r = self.rect
