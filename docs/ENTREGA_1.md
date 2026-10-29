@@ -1,5 +1,7 @@
 # Primera entrega: árboles
 
+> Esta página es la de la entrega 1. Desde la entrega 2 la interfaz cambió (personajes ilustrados, mapa y red social) y la propagación usa el grafo social: ver [ENTREGA_2.md](ENTREGA_2.md) y [ENTREGA_FINAL.md](ENTREGA_FINAL.md). Las estructuras de árbol y sus operaciones siguen siendo las mismas.
+
 **Alcalde Digital: el árbol de mutaciones.** Criterios evaluados: árboles, pertinencia de la estructura, operaciones y recorridos, interfaz gráfica preliminar y relación del árbol con la lógica del juego.
 
 El juego usa **dos árboles distintos**, cada uno para un problema diferente:
