@@ -88,11 +88,11 @@ Todas están en `alcalde/estructuras/grafo.py`, que no depende de nada del juego
 | Cambiar peso | `ajustar_peso(u, v, Δ)` | O(1) | Exponer al paciente cero, compartir lo verificado, alertar contactos |
 | Vecinos y predecesores | `vecinos(u)`, `predecesores(v)`, `contactos(u)` | O(grado) | A quién le llega una publicación; la publicación que le toca al jugador; **Alertar contactos** |
 | Grado y centralidad | `grado_salida`, `centralidad_grado(n)` | O(V log V) | **Superpropagadores**: la publicación viral sale con más probabilidad de quien tiene más seguidores |
-| **BFS** (cola) | `bfs(origen)`, `bfs_niveles(origen, max_nivel)` | O(V + E) | **Propagación por olas**; **Amplificar desmentido** (corrige a 2 saltos); contagio de tensión entre zonas |
+| **BFS** (cola) | `bfs(origen)`, `bfs_niveles(origen, max_nivel)` | O(V + E) | **Propagación por olas**; **Amplificar desmentido** (corrige a 2 saltos); contagio de tensión entre zonas; **escoger la publicación de la zona más cercana** al jugador |
 | **DFS** (pila) | `dfs(origen)` | O(V + E) | Base de las componentes conexas; herramienta DFS de la vista |
 | Componentes conexas | `componentes_conexas()`, `es_conexo()` | O(V + E) | Detectar **burbujas**: si una discusión parte la red, el juego avisa que un grupo quedó aislado |
 | **Dijkstra** (montículo) | `dijkstra(origen, costo, limite)`, `camino_mas_corto(u, v)` | O((V + E) log V) | **Moverse por el mapa** por la ruta más corta |
-| Dijkstra acotado | `alcanzables(origen, limite)` | O((V + E) log V) | Zonas a las que llegas con los minutos que te quedan (se iluminan en el mapa) |
+| Dijkstra acotado | `alcanzables(origen, limite)` | O((V + E) log V) | Implementada y probada; el juego ya no la usa desde que caminar no tiene límite de minutos |
 | Camino de máxima confianza | `confianza_maxima(origen)` | O((V + E) log V) | **Desmentido oficial** del candidato |
 | Serializar | `a_dict()`, `desde_dict(d)` | O(V + E) | Enviar la red y el mapa del servidor a los clientes (entrega final) |
 
@@ -151,7 +151,7 @@ En la vista **Red social**, al elegir una historia, las aristas por las que pas�
 | Desmentido oficial (candidato) | `inmunizar` e `insertar` la corrección | `confianza_maxima(jugador)`: convence a quien confía en el candidato por algún camino |
 | Verificar | `buscar` en el AVL | En el mapa: si estás en el lugar de los hechos y falta en el AVL, se `inserta` |
 | Conversar | (sin árbol) | `residentes(zona)` del mapa: corrige a los vecinos de tu zona |
-| Moverse | (sin árbol) | `dijkstra` acotado por los minutos que te quedan |
+| Caminar | Te llega un nodo del árbol de esa zona | `dijkstra` para la ruta más corta y `bfs` del mapa para escoger la publicación más cercana |
 
 ### 4.3 Qué pasa cuando cambian las relaciones
 
@@ -187,10 +187,10 @@ Esta es una de las preguntas de la sustentación. Cuando una discusión **elimin
 
 ## 6. Pruebas
 
-`tests/test_grafos.py` tiene 17 pruebas:
+`tests/test_grafos.py` tiene 21 pruebas:
 
 - **Grafo:** tamaño y grados; BFS por niveles con su árbol de padres; DFS; Dijkstra y reconstrucción del camino; Dijkstra acotado; eliminar una arista que parte el grafo en dos componentes; eliminar un vértice; grafo dirigido con predecesores; camino de máxima confianza (0,9 × 0,9 = 0,81 gana a 0,5 directo); ajuste de pesos; serialización.
-- **Mapa:** es conexo; caminar sigue la ruta más corta de Dijkstra y solo se puede una vez por turno.
+- **Mapa:** es conexo; caminar sigue la ruta más corta de Dijkstra y solo se puede una vez por turno; al caminar llega una publicación de la zona nueva; reportar un rumor corrige a los vecinos de su zona.
 - **Integración:** el árbol de mutaciones es el árbol BFS de la red; la desinformación sale de la red; reportar avisa a quien lo recibió; alertar usa los contactos; la elección suma bien las zonas.
 - **Serialización:** el AVL se reconstruye con la misma forma; la partida completa va y vuelve por JSON sin cambiar.
 
