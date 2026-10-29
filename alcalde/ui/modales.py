@@ -464,7 +464,7 @@ class BannerTurno:
         else:
             t = f"Turno de {self.jug.nombre}"
         titulo(capa, t, (180, 34), 34, c["texto"])
-        texto(capa, f"{self.jug.info_rol['nombre']}: 3 rayos de atención y 15 minutos para caminar.", (182, 86), 15,
+        texto(capa, f"{self.jug.info_rol['nombre']}: te llegó una publicación. ¿Qué harás con ella?", (182, 86), 15,
               c["tinta2"], peso=800)
         capa.set_alpha(alpha)
         sup.blit(capa, (r.x - 4, r.y - 4))

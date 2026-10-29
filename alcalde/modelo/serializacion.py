@@ -83,6 +83,7 @@ def partida_a_dict(p: Partida) -> dict:
         mensajes=[[m.texto, m.tipo] for m in recientes],
         n_mensajes=off + len(p.mensajes), anim=p.anim[-40:], seq=p._seq,
         ajuste=p._ajuste_desinfo, sig_caso=p._sig_caso,
+        turno=p.turno, repartidos=sorted(p.repartidos),
     )
 
 
@@ -104,6 +105,8 @@ def partida_desde_dict(d: dict) -> Partida:
     p.eleccion = d["eleccion"]
     p.ultimo_resaltado = d["ultimo_resaltado"] or {}
     p._ajuste_desinfo, p._sig_caso, p._visitas = d["ajuste"], d["sig_caso"], set()
+    p.turno = dict(d.get("turno") or Partida._turno_vacio())
+    p.repartidos = set(d.get("repartidos", []))
     p.mapa = crear_mapa()
     datos = {v: Ciudadano(**c) for v, c in d["red"]["datos"].items()}
     p.red = Grafo.desde_dict(d["red"]["grafo"], datos)

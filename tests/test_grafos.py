@@ -8,7 +8,7 @@ import unittest
 
 from alcalde.estructuras.archivo_avl import ArchivoHechosAVL
 from alcalde.estructuras.grafo import Grafo
-from alcalde.modelo.mapa import CALLES, MINUTOS_POR_TURNO, ZONAS, crear_mapa
+from alcalde.modelo.mapa import CALLES, ZONAS, crear_mapa
 from alcalde.modelo.partida import Partida
 from alcalde.modelo.serializacion import partida_a_dict, partida_desde_dict
 
@@ -106,14 +106,34 @@ class TestMapa(unittest.TestCase):
         p = Partida(JUGADORES, semilla=3)
         j = p.jugador_actual
         destinos = p.destinos()
-        lejos = [z for z in ZONAS if z not in destinos]
-        self.assertTrue(lejos, "Con 15 minutos no se debe llegar a toda la ciudad")
-        self.assertEqual(p.mover(lejos[0])[0].tipo, "malo")
-        z = min((z for z in destinos if z != j.zona), key=lambda z: -destinos[z])
+        self.assertEqual(set(destinos), set(ZONAS) - {j.zona})
+        z = max(destinos, key=destinos.get)                      # la zona más lejana
         p.mover(z)
+        ruta = p.ultimo_resaltado["ruta"]
+        self.assertEqual(ruta, p.mapa.camino_mas_corto(ruta[0], z)[1])   # camina por la ruta más corta
         self.assertEqual(j.zona, z)
-        self.assertEqual(j.minutos, MINUTOS_POR_TURNO - int(destinos[z]))
         self.assertEqual(p.red.dato(j.nombre).zona, z)
+        otra = next(x for x in ZONAS if x != z)
+        self.assertEqual(p.mover(otra)[0].tipo, "malo")          # una caminata por turno
+        self.assertEqual(p.destinos(), {})
+
+    def test_turno_reparte_una_publicacion(self):
+        p = Partida(JUGADORES, semilla=4)
+        vistas = set()
+        for _ in range(8):
+            caso, nodo = p.publicacion_turno()
+            self.assertIsNotNone(nodo)
+            self.assertNotIn(nodo.id, vistas)                    # nunca se repite
+            vistas.add(nodo.id)
+            antes = p.jugador_actual.puntos
+            p.ejecutar("verificar", caso, nodo)
+            self.assertEqual(p.jugador_actual.puntos, antes - 3)  # verificar cuesta 3 puntos
+            self.assertFalse(next(a for a in p.acciones_para(nodo) if a["clave"] == "verificar")["ok"])
+            p.ejecutar("ignorar", caso, nodo)
+            self.assertTrue(all(not a["ok"] for a in p.acciones_para(nodo)))  # una decisión por turno
+            p.terminar_turno()
+            if p.evento_viral:
+                p.resolver_viral(None)
 
 
 class TestIntegracionArbolGrafo(unittest.TestCase):

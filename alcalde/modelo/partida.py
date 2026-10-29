@@ -17,6 +17,9 @@ from .red_social import (BOTS, MAX_CIUDADANOS, RESERVA, Ciudadano, conectar_juga
 from .roles import ROLES
 
 ATENCION_POR_TURNO = 3
+# Verificar cuesta puntos: quien recuerda lo que ya verificó otro jugador se lo ahorra.
+COSTO_VERIFICAR = 3
+DECISIONES = ("compartir", "reportar", "ignorar", "alertar", "rastrear", "amplificar", "desmentir", "borrar")
 MAX_NODOS_CASO = 30
 MAX_CASOS = 3
 MIN_CASOS = 2
@@ -136,6 +139,8 @@ class Partida:
         self._ajuste_desinfo = 0.0
         self._sig_caso = 1
         self._visitas = set()
+        self.repartidos: set[int] = set()
+        self.turno = self._turno_vacio()
 
         self.mapa = crear_mapa()
         cfgs = [_normalizar_config(c) for c in config_jugadores]
@@ -173,6 +178,7 @@ class Partida:
         self._recalcular()
         self.ciudad.historial = [dict(self.ciudad.v)]
         self.log("Día 1: circulan las primeras publicaciones en Civitas.", "evento")
+        self.repartir()
 
     # ------------------------------------------------------------------ utilidades
     def log(self, texto: str, tipo: str = "info") -> None:
@@ -385,39 +391,73 @@ class Partida:
             n += 1
         return n
 
+    # ------------------------------------------------------------------ turno: una publicación
+    @staticmethod
+    def _turno_vacio() -> dict:
+        return dict(caso=None, nodo=None, verifico=False, decidio=None, resultado=None, camino=False,
+                    converso=False)
+
+    def repartir(self) -> None:
+        """El juego le reparte al jugador del turno UNA publicación que nadie ha revelado todavía.
+
+        Se prefieren las que le llegaron por la red social y las que siguen circulando. Una
+        publicación que ya se decidió no vuelve a salir.
+        """
+        j = self.jugador_actual
+        self.turno = self._turno_vacio()
+        for intento in range(2):
+            opciones = []
+            for c in self.casos_abiertos():
+                for n in c.arbol.preorden():
+                    if n.id in self.repartidos or n.verificado or n.inmune or n.autor == j.nombre:
+                        continue
+                    if n.es_correccion:
+                        continue
+                    valor = self.rng.random() * 3
+                    if c.receptores.get(j.nombre) == n.id:
+                        valor += 4
+                    if not n.entregado:
+                        valor += 2
+                    opciones.append((valor, c, n))
+            if opciones:
+                _, c, n = max(opciones, key=lambda x: x[0])
+                self.turno.update(caso=c.id, nodo=n.id)
+                self.repartidos.add(n.id)
+                return
+            if intento == 0 and not self.terminada:
+                self._nuevo_caso(falso=self.rng.random() < 0.6)
+                self._recalcular()
+
+    def publicacion_turno(self) -> tuple[Optional[Caso], Optional[NodoMutacion]]:
+        caso = self.caso_por_id(self.turno.get("caso")) if self.turno.get("caso") else None
+        nodo = caso.arbol.buscar(self.turno["nodo"]) if caso is not None else None
+        return (caso, nodo) if nodo is not None else (None, None)
+
     # ------------------------------------------------------------------ acciones
     def acciones_para(self, nodo: Optional[NodoMutacion]) -> list[dict]:
+        """Qué se puede hacer con la publicación: verificarla (opcional) y luego una decisión."""
         j = self.jugador_actual
-        esp_clave, esp_nombre, esp_costo = j.info_rol["especial"]
+        esp_clave, esp_nombre, _ = j.info_rol["especial"]
         acciones = [
-            dict(clave="verificar", nombre="Verificar", costo=1),
-            dict(clave="compartir", nombre="Compartir", costo=1),
-            dict(clave="reportar", nombre="Reportar", costo=1),
-            dict(clave="ignorar", nombre="Ignorar", costo=1),
-            dict(clave=esp_clave, nombre=esp_nombre, costo=esp_costo, especial=True),
+            dict(clave="verificar", nombre="Verificar", costo=0, puntos=-COSTO_VERIFICAR),
+            dict(clave="compartir", nombre="Compartir", costo=0),
+            dict(clave="reportar", nombre="Reportar", costo=0),
+            dict(clave="ignorar", nombre="Ignorar", costo=0),
+            dict(clave=esp_clave, nombre=esp_nombre, costo=0, especial=True),
         ]
-        if nodo is not None and nodo.autor == j.nombre and not nodo.es_correccion:
-            acciones.append(dict(clave="borrar", nombre="Borrar mi publicación", costo=1))
         caso = self._caso_de(nodo) if nodo is not None else None
         for a in acciones:
             a["ok"], a["motivo"] = True, ""
             if nodo is None or caso is None:
-                a["ok"], a["motivo"] = False, "Elige una publicación"
+                a["ok"], a["motivo"] = False, "No hay publicación"
             elif self.terminada:
                 a["ok"], a["motivo"] = False, "La campaña terminó"
-            elif j.atencion < a["costo"]:
-                a["ok"], a["motivo"] = False, "Te falta atención"
+            elif self.turno.get("decidio"):
+                a["ok"], a["motivo"] = False, "Ya decidiste en este turno"
+            elif a["clave"] == "verificar" and (nodo.verificado or self.turno.get("verifico")):
+                a["ok"], a["motivo"] = False, "Ya está verificada"
             elif nodo.es_correccion and a["clave"] not in ("compartir", "ignorar"):
                 a["ok"], a["motivo"] = False, "Es un desmentido"
-            elif a["clave"] in ("alertar", "amplificar", "desmentir"):
-                if not nodo.verificado or nodo.es_veraz:
-                    a["ok"], a["motivo"] = False, "Primero verifica que es falsa"
-                elif nodo.inmune:
-                    a["ok"], a["motivo"] = False, "Esa rama ya está contenida"
-            elif a["clave"] == "rastrear" and nodo.es_veraz and nodo.verificado:
-                a["ok"], a["motivo"] = False, "Es fiel al hecho"
-            elif a["clave"] == "compartir" and nodo.inmune and not nodo.es_correccion:
-                a["ok"], a["motivo"] = False, "Rama contenida"
             elif a["clave"] == "compartir" and len(caso.arbol) >= MAX_NODOS_CASO:
                 a["ok"], a["motivo"] = False, "Hilo saturado"
         return acciones
@@ -426,15 +466,27 @@ class Partida:
                  gratis: bool = False) -> list[Mensaje]:
         j = self.jugador_actual
         acc = next((a for a in self.acciones_para(nodo) if a["clave"] == clave), None)
-        if acc is None:
+        if acc is None and clave != "borrar":
             return [Mensaje("Esa acción no está disponible", "malo")]
-        if not gratis and not acc["ok"]:
+        if not gratis and acc is not None and not acc["ok"]:
             return [Mensaje(acc["motivo"], "malo")]
         antes = len(self.mensajes)
+        puntos_antes = j.puntos
         self.ultimo_resaltado = {}
         getattr(self, "_a_" + clave)(j, caso, nodo)
-        if not gratis:
-            j.atencion -= acc["costo"]
+        if clave in DECISIONES:
+            # Decidir revela la verdad frente a todos: los demás tienen que acordarse.
+            nodo.verificado = True
+            self.repartidos.add(nodo.id)
+            if not gratis:
+                self.turno["decidio"] = clave
+            revelado = dict(nodo=nodo.id, caso=caso.id, decision=clave, veraz=nodo.es_veraz,
+                            puntos=j.puntos - puntos_antes, jugador=self.indice_de(j))
+            self.ultimo_resaltado["revelado"] = revelado
+            if not gratis:
+                self.turno["resultado"] = revelado
+        elif clave == "verificar" and not gratis:
+            self.turno["verifico"] = True
         j.reputacion = max(0, min(100, j.reputacion))
         if caso.arbol.raiz is None and caso.abierto:
             caso.abierto = False
@@ -442,6 +494,15 @@ class Partida:
             self.log(f"La historia '{caso.hecho.titulo}' fue retirada de Civitas.", "evento")
         self._recalcular()
         return self.mensajes[antes:]
+
+    def _en_vano(self, j: Jugador, que: str) -> bool:
+        """Usar un desmentido sobre algo verdadero: no había nada que corregir."""
+        j.puntos -= 3
+        j.reputacion -= 3
+        self.ciudad.ajustar(confianza=-1)
+        self.log(f"{j.nombre} usó {que} sobre una publicación VERDADERA: no había nada que desmentir. "
+                 "-3 pts", "malo")
+        return True
 
     def _descubrir(self, caso: Caso, nodo: NodoMutacion) -> None:
         if not nodo.es_veraz:
@@ -459,21 +520,16 @@ class Partida:
         self.animar(t="difusion", de=j.nombre, caso=caso.id, pasos=pasos)
         self.ultimo_resaltado = {"nuevos": [nuevo.id] + [h.id for h in hijos], "difusion": j.nombre}
         if nodo.es_veraz:
-            if nodo.verificado or nodo.es_correccion:
-                pts = min(30, 4 + 2 * alcance)
-                j.puntos += pts
-                j.reputacion += 4
-                self.ciudad.ajustar(confianza=1 + alcance // 4, bienestar=1)
-                self._confianza_aristas(j.nombre, 0.04)
-                self._ajuste_desinfo -= 1 + alcance / 6
-                que = "un desmentido" if nodo.es_correccion else "información verificada"
-                self.log(f"{j.nombre} difundió {que}: le llegó a {alcance} personas. +{pts} pts", "bueno")
-                if alcance >= 8 and j.logro("Voz de la verdad"):
-                    self.log(f"Logro de {j.nombre}: Voz de la verdad", "logro")
-            else:
-                j.puntos += 2
-                self.log(f"{j.nombre} compartió sin verificar y por suerte era cierta "
-                         f"(le llegó a {alcance} personas). +2 pts", "info")
+            pts = min(20, 4 + 2 * alcance)
+            j.puntos += pts
+            j.reputacion += 4
+            self.ciudad.ajustar(confianza=1 + alcance // 4, bienestar=1)
+            self._confianza_aristas(j.nombre, 0.04)
+            self._ajuste_desinfo -= 1 + alcance / 6
+            que = "un desmentido" if nodo.es_correccion else "una noticia VERDADERA"
+            self.log(f"{j.nombre} compartió {que}: le llegó a {alcance} personas. +{pts} pts", "bueno")
+            if alcance >= 8 and j.logro("Voz de la verdad"):
+                self.log(f"Logro de {j.nombre}: Voz de la verdad", "logro")
         else:
             nodo.verificado = nuevo.verificado = True
             self._descubrir(caso, nodo)
@@ -503,7 +559,7 @@ class Partida:
                 hecho, comps, ruta = self.archivo.buscar(caso.hecho.id)
                 self.ultimo_resaltado["avl_ruta"] = ruta
                 self.ultimo_resaltado["avl_nuevo"] = caso.hecho.id
-                j.puntos += 4
+                j.puntos += 2
                 if j.logro("Investigador"):
                     self.log(f"Logro de {j.nombre}: Investigador", "logro")
             else:
@@ -518,7 +574,7 @@ class Partida:
         nodo.verificado = True
         self._descubrir(caso, nodo)
         if not ya:
-            j.puntos += 5
+            j.puntos -= COSTO_VERIFICAR
             j.reputacion += 2
             j.stats["verificados"] += 1
             self.ciudad.ajustar(confianza=1)
@@ -580,9 +636,9 @@ class Partida:
         if not nodo.es_veraz:
             j.puntos += 2
             self.ciudad.ajustar(bienestar=1)
-            self.log(f"{j.nombre} no alimentó el rumor. +2 pts", "info")
+            self.log(f"{j.nombre} ignoró una publicación FALSA: no la alimentó. +2 pts", "info")
         else:
-            self.log(f"{j.nombre} dejó pasar la publicación.", "info")
+            self.log(f"{j.nombre} ignoró una publicación VERDADERA que valía la pena compartir.", "info")
 
     def _a_borrar(self, j: Jugador, caso: Caso, nodo: NodoMutacion) -> None:
         hijos = len(nodo.hijos)
@@ -612,6 +668,8 @@ class Partida:
         return corregidos, prevenidos
 
     def _a_alertar(self, j: Jugador, caso: Caso, nodo: NodoMutacion) -> None:
+        if nodo.es_veraz and self._en_vano(j, "Alertar contactos"):
+            return
         contactos = sorted(self.red.contactos(j.nombre), key=str)
         corregidos, prevenidos = self._corregir(caso, contactos, prevenir=True)
         marcados = {nodo.id: nodo}
@@ -644,7 +702,7 @@ class Partida:
         self.ultimo_resaltado = {"camino": [n.id for n in camino],
                                  "mutacion": [n.id for n in puntos.values()],
                                  "ruta_social": [n.autor for n in reversed(camino)]}
-        j.puntos += 4 + 2 * len(camino)
+        j.puntos += (4 + 2 * len(camino)) if not nodo.es_veraz else 2
         j.reputacion += 4
         j.stats["rastreos"] += 1
         self.ciudad.ajustar(confianza=3)
@@ -675,6 +733,8 @@ class Partida:
         return corr
 
     def _a_amplificar(self, j: Jugador, caso: Caso, nodo: NodoMutacion) -> None:
+        if nodo.es_veraz and self._en_vano(j, "Amplificar desmentido"):
+            return
         puntos = caso.arbol.punto_de_mutacion(nodo.id)
         objetivo = min(puntos.values(), key=lambda n: n.profundidad) if puntos else nodo
         marcados = caso.arbol.inmunizar(objetivo.id)
@@ -698,6 +758,8 @@ class Partida:
             self.log(f"Logro de {j.nombre}: Cortafuegos", "logro")
 
     def _a_desmentir(self, j: Jugador, caso: Caso, nodo: NodoMutacion) -> None:
+        if nodo.es_veraz and self._en_vano(j, "el Desmentido oficial"):
+            return
         marcados = caso.arbol.inmunizar(nodo.id)
         corr = self._insertar_correccion(caso, j, nodo)
         corr.inmune = True
@@ -723,27 +785,29 @@ class Partida:
 
     # ------------------------------------------------------------------ acciones en el mapa
     def destinos(self) -> dict[str, float]:
-        """Zonas a las que el jugador actual llega con los minutos que le quedan (Dijkstra acotado)."""
+        """Zonas a las que se puede ir este turno (todas, una vez) con su distancia por Dijkstra."""
         j = self.jugador_actual
-        return self.mapa.alcanzables(j.zona, j.minutos)
+        if self.turno.get("camino") or self.terminada:
+            return {}
+        dist, _ = self.mapa.dijkstra(j.zona)
+        return {z: d for z, d in dist.items() if z != j.zona}
 
     def mover(self, zona: str) -> list[Mensaje]:
         j = self.jugador_actual
         if zona not in self.mapa or zona == j.zona or self.terminada:
             return []
+        if self.turno.get("camino"):
+            return [Mensaje("Ya caminaste en este turno. En el siguiente puedes ir a otra zona.", "malo")]
         dist, prev = self.mapa.dijkstra(j.zona)
-        if dist.get(zona, 1e9) > j.minutos:
-            return [Mensaje(f"{nombre_zona(zona)} queda a {int(dist.get(zona, 0))} min y solo te quedan "
-                            f"{j.minutos} min este turno.", "malo")]
         antes = len(self.mensajes)
         ruta = Grafo.reconstruir(prev, zona)
-        j.minutos -= int(dist[zona])
+        self.turno["camino"] = True
         j.stats["km"] += int(dist[zona])
         j.zona = zona
         self.red.dato(j.nombre).zona = zona
         self.ultimo_resaltado = {"ruta": ruta}
         self.animar(t="mover", jugador=self.indice_de(j), ruta=ruta)
-        self.log(f"{j.nombre} fue a {nombre_zona(zona)} ({int(dist[zona])} min).", "info")
+        self.log(f"{j.nombre} caminó hasta {nombre_zona(zona)}.", "info")
         clave = (self.ronda, j.nombre, zona)
         if j.candidato and clave not in self._visitas:
             self._visitas.add(clave)
@@ -762,8 +826,8 @@ class Partida:
         j = self.jugador_actual
         if self.terminada:
             return False, "La campaña terminó"
-        if j.atencion < 1:
-            return False, "Te falta atención"
+        if self.turno.get("converso"):
+            return False, "Ya conversaste en este turno"
         if not self.objetivo_charla():
             return False, "Aquí nadie cree un rumor ya descubierto"
         return True, ""
@@ -778,7 +842,7 @@ class Partida:
         for c in self.casos:
             if c.descubierto:
                 self._corregir(c, gente)
-        j.atencion -= 1
+        self.turno["converso"] = True
         pts = 2 + 3 * len(gente)
         j.puntos += pts
         j.reputacion += 2
@@ -804,7 +868,9 @@ class Partida:
             self._fin_de_ronda()
         self.jugador_actual.atencion = ATENCION_POR_TURNO
         self.jugador_actual.minutos = MINUTOS_POR_TURNO
+        self.turno = self._turno_vacio()
         if not self.terminada:
+            self.repartir()
             self.log(f"Turno de {self.jugador_actual.nombre} "
                      f"({self.jugador_actual.info_rol['nombre']}).", "info")
 

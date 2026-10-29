@@ -9,6 +9,8 @@ Ciudad Nova elige alcalde y todos hablan en **Civitas**, su red social. Ahí cir
 
 No hay preguntas de trivia: se aprende verificando antes de compartir, descubriendo dónde se torció una historia y viendo las consecuencias.
 
+**Cómo es un turno:** el juego te da una publicación. Puedes verificarla (cuesta 3 puntos) y luego decides qué hacer: compartirla, reportarla, ignorarla o usar el poder de tu personaje. Al decidir, todos ven si era verdadera o falsa, así que conviene acordarse: quien recuerda lo que ya se descubrió se ahorra las verificaciones y saca más puntos. Si quieres, también caminas a otra zona para conversar con los vecinos engañados.
+
 | | |
 |---|---|
 | ![El mapa de Ciudad Nova](docs/img/v2/mapa.png) | ![La red social durante una propagación](docs/img/v2/red_propagacion.png) |
@@ -72,9 +74,9 @@ Son 34 pruebas: árboles, grafos, su integración y una partida completa en red 
 
 | Acción | Cómo |
 |---|---|
-| Elegir una publicación | Clic en las historias del celular, flechas, o clic en una cara de la red o del árbol |
-| Acciones sobre la publicación | Botones del celular o teclas `1` a `6` (pasa el mouse para ver qué va a pasar) |
-| Caminar por la ciudad | Clic en una zona iluminada del mapa |
+| Verificar la publicación del turno | Botón del celular o tecla `1` (cuesta 3 puntos) |
+| Decidir: compartir, reportar, ignorar o especial | Botones del celular o teclas `2` a `5` |
+| Caminar por la ciudad | Clic en una zona del mapa (una vez por turno) |
 | Conversar con los vecinos | Botón «Conversar» en la tarjeta de tu zona |
 | Cambiar de vista (ciudad, red, árbol) | Pestañas o `Tab` |
 | Terminar el turno | Botón o `Enter` |

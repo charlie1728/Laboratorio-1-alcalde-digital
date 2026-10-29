@@ -29,12 +29,14 @@ SECCIONES = [
          "cómo tus decisiones cambian la ciudad y hasta el resultado de la elección."),
     ]),
     ("Cómo se juega", "list", [
-        ("item", "zap", "Tu turno", "Tienes 3 puntos de atención (rayos) para actuar sobre publicaciones y "
-                                   "15 minutos para moverte por el mapa."),
-        ("item", "smartphone", "El celular", "A la izquierda está tu feed de Civitas. Elige una publicación y "
-                                            "usa los botones de abajo, como en cualquier red social."),
-        ("item", "map", "El mapa", "Haz clic en una zona cercana para caminar hasta allá. En persona puedes "
-                                  "conversar con los vecinos y comprobar hechos que faltan en el Archivo."),
+        ("item", "smartphone", "Te llega una publicación", "En cada turno el juego te da una publicación de "
+                                                          "Civitas. Puede ser verdadera o falsa."),
+        ("item", "search", "Verificar o recordar", "Verificar te dice la verdad pero cuesta 3 puntos. Cuando "
+                                                  "alguien decide, todos ven si era verdad: si te acuerdas, te "
+                                                  "ahorras la verificación."),
+        ("item", "check", "Decide", "Comparte lo verdadero y reporta lo falso. Solo hay una decisión por turno."),
+        ("item", "map", "Camina (si quieres)", "Haz clic en una zona para ir. Donde haya un globito verde puedes "
+                                              "conversar con vecinos que creen un rumor."),
         ("item", "moon", "La noche", "Cuando todos juegan llega la noche: las publicaciones viajan por la red "
                                     "social (una ola), algunas mutan y ocurre un evento al azar."),
         ("item", "flame", "Publicaciones virales", "A veces algo se vuelve viral y hay que decidir contra "
@@ -43,25 +45,23 @@ SECCIONES = [
                                        "cambia sus votos."),
     ]),
     ("Botones", "mouse-pointer-click", [
-        ("item", "search", "Verificar (1)", "Compara la publicación con el Archivo de hechos y te muestra "
-                                           "exactamente qué partes son falsas."),
-        ("item", "share-2", "Compartir (2)", "Se la envías a tus seguidores. Si es verdadera y verificada, "
-                                            "ganas; si es falsa, la ciudad se desinforma."),
-        ("item", "flag", "Reportar (3)", "Si es falsa, Civitas la retira con todos sus reenvíos y avisa a "
-                                        "quienes la vieron. Reportar algo cierto también hace daño."),
-        ("item", "eye-off", "Ignorar (4)", "No la alimentas. Pequeño premio si era falsa."),
-        ("item", "sparkles", "Especial (5)", "Depende de tu personaje (mira la sección Personajes)."),
-        ("item", "trash-2", "Borrar (6)", "Solo en lo que tú publicaste. Sus reenvíos siguen circulando: "
-                                         "borrar no deshace lo compartido."),
+        ("item", "search", "Verificar (1)", "Compara la publicación con el Archivo de hechos y te muestra qué "
+                                           "le cambiaron. Cuesta 3 puntos."),
+        ("item", "share-2", "Compartir (2)", "Se la envías a tus seguidores. Ganas si es verdadera; si es "
+                                            "falsa, la ciudad se desinforma."),
+        ("item", "flag", "Reportar (3)", "Civitas la retira con todos sus reenvíos. Ganas si es falsa; "
+                                        "reportar algo cierto también hace daño."),
+        ("item", "eye-off", "Ignorar (4)", "No haces nada con ella. Pequeño premio si era falsa."),
+        ("item", "sparkles", "Especial (5)", "Depende de tu personaje. Solo sirve si la publicación es falsa."),
         ("item", "message-circle", "Conversar", "En el mapa: convences a los vecinos de tu zona que creen un "
                                                "rumor ya descubierto."),
-        ("item", "keyboard", "Teclas", "1-6 acciones, Enter terminar turno, Tab cambiar de vista, "
+        ("item", "keyboard", "Teclas", "1-5 acciones, Enter terminar turno, Tab cambiar de vista, "
                                       "H ayuda, C contraste, M sonido, F11 pantalla completa, Esc cerrar."),
     ]),
     ("Personajes", "users", [("roles",)]),
     ("Cómo ganar", "trophy", [
-        ("item", "star", "Puntos y reputación", "Las acciones responsables suben tus puntos y tu reputación; "
-                                               "compartir sin verificar o reportar lo cierto los bajan."),
+        ("item", "star", "Puntos", "Acertar suma puntos y equivocarse los resta. Verificar cuesta 3: gana "
+                                  "quien mejor recuerda lo que ya se descubrió."),
         ("item", "heart-pulse", "La ciudad gana contigo", "La salud de Ciudad Nova sale de sus seis "
                                                         "indicadores. Todos juegan para que termine alta."),
         ("item", "vote", "Elección del alcalde", "Gana más apoyo quien logra confianza, buena reputación y "
@@ -86,7 +86,7 @@ SECCIONES = [
         ("item", "share-2", "Red social (grafo dirigido)", "Quién sigue a quién y cuánto confía. Cada noche "
                                                            "una publicación avanza un nivel de recorrido en "
                                                            "anchura (BFS) y ese recorrido es el árbol de mutaciones."),
-        ("item", "map", "Mapa de la ciudad (grafo ponderado)", "Calles con minutos. Moverse usa la ruta más "
+        ("item", "map", "Mapa de la ciudad (grafo ponderado)", "Calles con minutos. Caminar usa la ruta más "
                                                                "corta (Dijkstra) y los conflictos se contagian a "
                                                                "las zonas vecinas."),
     ]),

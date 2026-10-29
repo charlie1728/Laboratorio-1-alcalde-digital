@@ -14,23 +14,20 @@ class Guia:
         self.j = juego
         J = juego
         self.pasos = [
-            (J.celular.rect, "Tu celular", "Aquí llegan las publicaciones de Civitas. Arriba están como historias; "
-                                           "en el centro ves la que elegiste.", None),
-            (J.celular.r_acciones.inflate(12, 34).move(0, -6), "Piensa antes de compartir",
-             "Pasa el mouse por un botón para ver qué va a pasar. Cada acción gasta un rayo de atención y tienes 3 "
-             "por turno. Verificar primero casi siempre es buena idea.", None),
-            (J.r_jugador, "Tu personaje", "Aquí ves tu atención, tus minutos para caminar y tus puntos. Tu personaje "
-                                          "reacciona a lo que haces.", None),
-            (J.r_centro, "El mapa de Ciudad Nova", "Haz clic en una zona cercana para caminar hasta allá. En persona "
-                                                   "puedes conversar con los vecinos y comprobar hechos.", "mapa"),
-            (J.r_centro, "La red social", "Cada cara es una persona y cada flecha dice a quién le llega lo que "
-                                          "publica. Cada noche las publicaciones viajan por aquí.", "red"),
-            (J.r_centro, "El árbol del rumor", "Muestra quién reenvió a quién. Con él descubres en qué reenvío se "
-                                               "torció la historia.", "arbol"),
-            (J.r_ciudad, "La ciudad", "Tus decisiones mueven estos indicadores. Cuando todos terminan su turno "
-                                      "llega la noche.", None),
-            (J.btn_fin.rect.inflate(12, 12), "Terminar turno", "Cuando acabes, pulsa aquí o la tecla Enter. "
-                                                               "¡Ciudad Nova cuenta contigo!", "mapa"),
+            (J.celular.r_post, "Te llegó una publicación", "En cada turno el juego te da una publicación de "
+                                                           "Civitas. Puede ser verdadera o falsa.", "mapa"),
+            (J.celular.b_verificar.rect.inflate(12, 12), "¿Será verdad?",
+             "Verificar te dice la verdad, pero cuesta 3 puntos. Si te acuerdas de lo que descubrieron los "
+             "otros jugadores, te los ahorras.", None),
+            (pygame.Rect(J.celular.botones[0].rect.topleft,
+                         (J.celular.r_acciones.w, 116)).inflate(12, 12), "Decide qué hacer",
+             "Compártela si es verdadera y repórtala si es falsa. Al decidir, todos ven si acertaste: "
+             "¡acuérdense para sus turnos!", None),
+            (J.r_centro, "Ciudad Nova", "Las caras son los vecinos. Haz clic en una zona para caminar hasta "
+                                        "allá; donde veas un globito verde, puedes conversar con vecinos engañados.",
+             "mapa"),
+            (J.r_jugador, "Tu turno", "Aquí ves los pasos de tu turno y tus puntos. Cuando acabes, pulsa "
+                                      "Terminar turno. ¡Ciudad Nova cuenta contigo!", None),
         ]
         self.i = 0
         self.b_sig = Boton((0, 0, 140, 44), "Siguiente", "sig", icono="arrow-right", estilo="primario", tam=16)

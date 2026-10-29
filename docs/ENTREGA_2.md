@@ -37,7 +37,7 @@ Ahora esas respuestas salen de las relaciones entre las personas:
 
 ### 1.3 Representación
 
-Lista de adyacencia con diccionarios: `_ady[u][v] = {"peso": ..., "tipo": ...}`. Además se guarda el índice inverso `_inv[v][u]` para saber **a quién sigue** cada persona (sus predecesores) sin recorrer todo el grafo. Esto se usa para armar el feed del jugador: le aparecen las publicaciones de la gente que sigue.
+Lista de adyacencia con diccionarios: `_ady[u][v] = {"peso": ..., "tipo": ...}`. Además se guarda el índice inverso `_inv[v][u]` para saber **a quién sigue** cada persona (sus predecesores) sin recorrer todo el grafo. Esto se usa para escoger la publicación que le toca al jugador en su turno: se prefieren las que le llegaron de gente que sigue.
 
 Se escogió lista de adyacencia y no matriz porque la red es dispersa: 24 vértices y unas 120 aristas, frente a 576 casillas de una matriz. Además vértices y aristas entran y salen durante la partida, y con diccionarios eso cuesta O(1).
 
@@ -60,7 +60,7 @@ Se escogió lista de adyacencia y no matriz porque la red es dispersa: 24 vérti
 El enunciado pide que la ciudad y el personaje del jugador se vean, y que las acciones tengan consecuencias en la ciudad. El mapa le da un **lugar** a cada cosa:
 
 - Cada hecho pasó en una zona (`Hecho.lugar`) y cada ciudadano vive en una zona.
-- Cada jugador está en una zona y tiene **15 minutos por turno** para caminar. Moverse cuesta minutos, no atención.
+- Cada jugador está en una zona y puede **caminar una vez por turno** a cualquier zona, por la ruta más corta.
 - **En persona** se pueden hacer cosas que no se pueden hacer desde el celular:
   - **Verificar en terreno.** Si el hecho no está en el Archivo AVL, quien esté en el lugar de los hechos lo comprueba y lo **inserta** en el AVL (antes solo podía el periodista).
   - **Conversar con los vecinos.** Convence a los residentes de tu zona que creen un rumor que ya se descubrió falso.
@@ -69,7 +69,7 @@ El enunciado pide que la ciudad y el personaje del jugador se vean, y que las ac
 
 ### 2.2 ¿Por qué un grafo no dirigido y ponderado?
 
-Las calles se recorren en los dos sentidos y lo que importa para moverse es el tiempo de cada calle, no solo cuántas calles hay. Con 15 minutos por turno, el jugador tiene que pensar la ruta: el Estadio puede quedar a dos calles pero a 15 minutos, mientras que la Plaza queda a una calle y 4 minutos.
+Las calles se recorren en los dos sentidos y lo que importa para moverse es el tiempo de cada calle, no solo cuántas calles hay. Por eso la ruta que recorre el personaje es la de menos minutos (Dijkstra), que no siempre es la de menos calles.
 
 ---
 
@@ -84,7 +84,7 @@ Todas están en `alcalde/estructuras/grafo.py`, que no depende de nada del juego
 | Agregar arista | `agregar_arista(u, v, peso)` | O(1) | Generación de la red; la campaña de convivencia **reconcilia amistades rotas** |
 | Eliminar arista | `eliminar_arista(u, v)` | O(1) | Una **discusión** hace que dos vecinos dejen de seguirse |
 | Cambiar peso | `ajustar_peso(u, v, Δ)` | O(1) | Exponer al paciente cero, compartir lo verificado, alertar contactos |
-| Vecinos y predecesores | `vecinos(u)`, `predecesores(v)`, `contactos(u)` | O(grado) | A quién le llega una publicación; el feed del jugador; **Alertar contactos** |
+| Vecinos y predecesores | `vecinos(u)`, `predecesores(v)`, `contactos(u)` | O(grado) | A quién le llega una publicación; la publicación que le toca al jugador; **Alertar contactos** |
 | Grado y centralidad | `grado_salida`, `centralidad_grado(n)` | O(V log V) | **Superpropagadores**: la publicación viral sale con más probabilidad de quien tiene más seguidores |
 | **BFS** (cola) | `bfs(origen)`, `bfs_niveles(origen, max_nivel)` | O(V + E) | **Propagación por olas**; **Amplificar desmentido** (corrige a 2 saltos); contagio de tensión entre zonas |
 | **DFS** (pila) | `dfs(origen)` | O(V + E) | Base de las componentes conexas; herramienta DFS de la vista |
@@ -175,7 +175,7 @@ Esta es una de las preguntas de la sustentación. Cuando una discusión **elimin
   - **Grados**: muestra el top 3 de seguidores.
   - **Confianza**: dibuja el camino de máxima confianza con el producto de los pesos.
 
-**Vista Ciudad** (`alcalde/ui/vista_mapa.py`): las calles muestran sus minutos. Las zonas a las que alcanzas se iluminan y muestran el tiempo. Al pasar el mouse se dibuja la ruta de Dijkstra, y al hacer clic el personaje camina por esa ruta. Sobre las zonas con tensión alta aparecen nubes de tormenta.
+**Vista Ciudad** (`alcalde/ui/vista_mapa.py`): debajo de cada edificio están las caras de sus vecinos, con su estado. Cuando una publicación viaja, se ve pasar de cara en cara por la ciudad. Al pasar el mouse por una zona se dibuja la ruta de Dijkstra y la tarjeta dice sus minutos; al hacer clic el personaje camina por esa ruta. Sobre las zonas con tensión alta aparecen nubes de tormenta.
 
 | | |
 |---|---|
@@ -188,7 +188,7 @@ Esta es una de las preguntas de la sustentación. Cuando una discusión **elimin
 `tests/test_grafos.py` tiene 17 pruebas:
 
 - **Grafo:** tamaño y grados; BFS por niveles con su árbol de padres; DFS; Dijkstra y reconstrucción del camino; Dijkstra acotado; eliminar una arista que parte el grafo en dos componentes; eliminar un vértice; grafo dirigido con predecesores; camino de máxima confianza (0,9 × 0,9 = 0,81 gana a 0,5 directo); ajuste de pesos; serialización.
-- **Mapa:** es conexo; moverse descuenta exactamente los minutos de Dijkstra y rechaza zonas que no alcanzas.
+- **Mapa:** es conexo; caminar sigue la ruta más corta de Dijkstra y solo se puede una vez por turno.
 - **Integración:** el árbol de mutaciones es el árbol BFS de la red; la desinformación sale de la red; reportar avisa a quien lo recibió; alertar usa los contactos; la elección suma bien las zonas.
 - **Serialización:** el AVL se reconstruye con la misma forma; la partida completa va y vuelve por JSON sin cambiar.
 

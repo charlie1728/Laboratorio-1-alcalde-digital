@@ -34,7 +34,7 @@ En la entrega 1 la profesora comentó que el juego funcionaba bien, pero que **n
   - vestuario según el rol: el ciudadano lleva saco con capota; el periodista, chaleco, cámara y carné; el influencer, chaqueta y celular; el candidato, traje y banda de campaña;
   - expresiones: normal, feliz, preocupado, enojado, sorprendido y confundido, además del parpadeo.
 - **Los jugadores arman su personaje** antes de empezar, con un botón de varita mágica.
-- **Los 20 ciudadanos de la red tienen cara propia**: salen en el feed, en la red social, en el árbol del rumor y en el mapa. Cuando un vecino cree algo falso, su cara se ve confundida.
+- **Los 20 ciudadanos de la red tienen cara propia**: salen en el celular, en la red social, en el árbol del rumor y en el mapa. Cuando un vecino cree algo falso, su cara se ve confundida.
 - **Los 4 candidatos** tienen afiches de campaña con lema.
 - **Civi, la lechuza de Civitas**, es la mascota que guía al jugador.
 - **Las cuentas bot** se dibujan como robots para que se reconozcan.
@@ -48,11 +48,11 @@ La dirección visual es **«pegatina de campaña en una ciudad caribeña a pleno
 
 ![El celular de Civitas con la publicación y sus botones](img/v2/verificacion.png)
 
-- **El celular funciona como cualquier red social.** Arriba están las historias (un círculo por publicación, con el color de su caso), en el centro la publicación elegida y abajo los botones fijos. Siempre están en el mismo lugar.
-- **Vista previa de la consecuencia.** Al pasar el mouse por un botón se ve qué va a pasar: «Le llega a tus 6 seguidores», «Retira esta y 3 reenvíos (le llegaron a 14 personas)» o «Ese hecho no está en el Archivo: ve al Hospital». Si un botón está apagado, se explica por qué.
-- **Antes de compartir algo sin verificar, Civi pregunta** si está seguro. Es un «empujón» de exactitud, una intervención que la investigación usa contra la desinformación. El jugador puede compartir igual o verificar primero.
+- **Un turno simple.** El juego te da una publicación en el celular. Puedes verificarla (cuesta 3 puntos) y luego decides qué hacer con ella. Al decidir, todos ven si era verdadera o falsa: quien se acuerda se ahorra las verificaciones de los próximos turnos. El panel del jugador muestra los tres pasos del turno con casillas.
+- **Vista previa de la consecuencia.** Al pasar el mouse por un botón se ve qué hace: «Se la mandas a tus 6 seguidores. Gana si es verdadera» o «Este hecho no está en el Archivo: ve al Hospital para verificarlo». Si un botón está apagado, se explica por qué.
+- **El resultado se explica.** Después de decidir, el celular dice si acertaste, cuántos puntos ganaste o perdiste y cuál es el hecho real, para que todos lo recuerden.
 - **Al verificar se ve la diferencia exacta** entre la publicación y el hecho oficial, con un sello de Falsa, Verdadera o Sin datos. Por ejemplo: *Cifra inflada. Dice: «durante 30 días». Oficial: «durante 3 días».*
-- **La pantalla sigue a la acción.** Si compartes, pasa a la red social y ves los pulsos. Si rastreas o reportas, pasa al árbol. Si caminas, se queda en el mapa.
+- **Todo pasa en el mapa.** Las publicaciones viajan de cara en cara por la ciudad, también en la ola de cada noche. Las pestañas Red social y Árbol del rumor muestran las estructuras con más detalle.
 - **Guía de Civi** en el primer turno: 8 pasos que señalan cada parte de la pantalla. Se puede saltar.
 
 ---
@@ -205,7 +205,7 @@ Además son aleatorios quién cree y quién reenvía en cada ola, qué distorsi�
 | **Subtítulos de sonidos**: cada sonido importante aparece escrito («Sonido: alarma de publicación viral») | Personas sordas o con hipoacusia, o juego sin parlantes |
 | **Reducir movimiento**: quita sacudidas, confeti y animaciones de fondo | Sensibilidad al movimiento, epilepsia fotosensible o distracción |
 | **Personalización de personajes**: tono de piel, peinado, ropa y detalles | Representación: cada quien puede verse en su personaje |
-| **Atajos de teclado** para las acciones del turno (1 a 6, Enter, Tab, flechas, H, C, M, Esc) | Menos precisión con el mouse; jugar más rápido |
+| **Atajos de teclado** para las acciones del turno (1 a 5, Enter, Tab, H, C, M, F11, Esc) | Menos precisión con el mouse; jugar más rápido |
 
 Las opciones se guardan en el computador (`~/.alcalde_digital.json`).
 

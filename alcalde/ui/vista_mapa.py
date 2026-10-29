@@ -16,6 +16,8 @@ from .widgets import Boton, chip, circulo, parrafo, recortar, sticker, texto
 ICONO_EVENTO = dict(falsa="triangle-alert", rumor="message-square-warning", verdadera="newspaper", viral="flame",
                     discusion="zap", campana="heart-handshake", reporte="flag", vence="archive", bot="bot",
                     vecino="house")
+# En estas zonas los globitos van a la izquierda del edificio y las caras a la derecha.
+ZONAS_IZQ = ("ESTADIO", "HOSPITAL", "PLAZA", "ALCALDIA")
 RIO = [(0.67, -0.06), (0.63, 0.10), (0.69, 0.27), (0.77, 0.36), (1.06, 0.34)]
 
 
@@ -35,6 +37,8 @@ class VistaMapa:
         self._fondo_clave = None
         self.tokens = {}
         self.eventos = []
+        self.pulsos = []
+        self.flashes = {}
         self.hover = None
         self.btn_conversar = Boton((self.rect.right - 214, self.rect.bottom - 70, 196, 50), "Conversar", "conversar",
                                    costo=1, icono="message-circle", estilo="primario", tam=17)
@@ -111,6 +115,17 @@ class VistaMapa:
     def animar(self, ev):
         t = ev.get("t")
         ahora = pygame.time.get_ticks()
+        pasos = ev.get("pasos") or []
+        if t in ("ola", "difusion", "caso") and pasos:
+            paso = min(60, 2600 / max(1, len(pasos)))
+            for i, (u, v, cid, tipo, que) in enumerate(pasos):
+                self.pulsos.append(dict(u=u, v=v, t0=ahora + i * paso, dur=650, tipo=tipo, que=que))
+        elif t == "alerta":
+            for i, v in enumerate(ev.get("a", [])):
+                self.pulsos.append(dict(u=ev["de"], v=v, t0=ahora + i * 70, dur=600, tipo="correccion", que="corrige"))
+        elif t == "charla":
+            for v in ev.get("a", []):
+                self.flashes[v] = (ahora, "corrige")
         if t == "mover":
             self.tokens[ev["jugador"]] = dict(ruta=ev["ruta"], t0=ahora)
         elif t == "evento" and ev.get("zona") in ZONAS:
@@ -131,6 +146,26 @@ class VistaMapa:
                 (x1, y1), (x2, y2) = self.pos_zona(ruta[k]), self.pos_zona(ruta[k + 1])
                 return x1 + (x2 - x1) * f + ox * 0.4, y1 + (y2 - y1) * f + oy * 0.4, x2 < x1, True
         return base_x + ox, base_y + oy, False, False
+
+    def pos_persona(self, nombre, ahora=None):
+        """Dónde está una persona en el mapa: su ficha si es jugador, o su cara junto a su edificio."""
+        p = self.p
+        j = p.jugador_de(nombre)
+        if j is not None:
+            x, y, _, _ = self._pos_token(p.jugadores.index(j), j, ahora or pygame.time.get_ticks())
+            return x, y - 30
+        dato = p.ciudadano(nombre)
+        if dato is None or dato.zona not in ZONAS:
+            return None
+        gente = residentes(p.red, dato.zona)
+        k = gente.index(nombre) if nombre in gente else 0
+        return self._pos_cara(dato.zona, k)
+
+    def _pos_cara(self, z, k):
+        """Las caras de los vecinos van en fila debajo del nombre de su zona."""
+        x, y = self.pos_zona(z)
+        n = min(6, len(residentes(self.p.red, z)))
+        return x + (k - (n - 1) / 2) * 23, y + 56
 
     def zona_en(self, punto):
         mejor, dmin = None, 56
@@ -154,9 +189,8 @@ class VistaMapa:
                 if z != self.p.jugador_actual.zona and z in self.p.destinos():
                     self.j.mover(z)
                 elif z != self.p.jugador_actual.zona:
-                    dist = self.p.mapa.camino_mas_corto(self.p.jugador_actual.zona, z)[0]
-                    self.j.app.toasts.agregar(f"{nombre_zona(z)} queda a {int(dist)} min y te quedan "
-                                              f"{self.p.jugador_actual.minutos} min este turno.", "malo")
+                    self.j.app.toasts.agregar("Ya caminaste en este turno. En el siguiente puedes ir a otra zona.",
+                                              "info")
                 return True
         return False
 
@@ -184,74 +218,61 @@ class VistaMapa:
                 pygame.draw.line(sup, c["acento"], (x1 + (x2 - x1) * t1, y1 + (y2 - y1) * t1),
                                  (x1 + (x2 - x1) * t2, y1 + (y2 - y1) * t2), 7)
                 d += 20
-        etiquetas = self._etiquetas_calles(pts)
-        for posicion, minutos, libre in etiquetas:
-            if libre:
-                self._minutos_calle(sup, posicion, minutos)
         for z in sorted(ZONAS, key=lambda z: pts[z][1]):
             self._zona(sup, z, pts[z], destinos, j, ahora, mov)
-        for posicion, minutos, libre in etiquetas:
-            if not libre:
-                self._minutos_calle(sup, posicion, minutos)
         for z in ZONAS:
             self._insignias(sup, z, pts[z])
+        for z in ZONAS:
+            self._caras(sup, z, ahora)
         for i, jj in sorted(enumerate(p.jugadores), key=lambda t: self._pos_token(t[0], t[1], ahora)[1]):
             self._token(sup, i, jj, ahora, mov)
+        self._pulsos(sup, ahora)
         self._tarjeta_zona(sup, destinos)
 
-    def _etiquetas_calles(self, pts):
-        """Dónde va el número de minutos de cada calle: el punto libre más cercano al centro de la calle.
-
-        Se evitan el edificio, el nombre y los vecinos de cada zona y los otros números.
-        Devuelve (posición, minutos, libre).
-        """
-        if getattr(self, "_etiquetas", None) is None:
-            edificios_r, textos_r = [], []
-            for x, y in pts.values():
-                edificios_r.append(pygame.Rect(x - 46, y - 56, 92, 80))
-                # nombre de la zona y globitos de tareas (a la izquierda o a la derecha del edificio)
-                textos_r += [pygame.Rect(x - 84, y + 18, 168, 28), pygame.Rect(x - 120, y - 62, 240, 28)]
-            puestas = []
-
-            def buscar(x1, y1, x2, y2, ocupado):
-                largo = max(1.0, math.hypot(x2 - x1, y2 - y1))
-                nx, ny = -(y2 - y1) / largo, (x2 - x1) / largo
-                mejor, valor_mejor = None, -1e9
-                for k in range(2, 19):
-                    t = k / 20
-                    for lado in (0, 16, -16):
-                        x = x1 + (x2 - x1) * t + nx * lado
-                        y = y1 + (y2 - y1) * t + ny * lado
-                        caja = pygame.Rect(0, 0, 26, 26)
-                        caja.center = (x, y)
-                        choques = sum(1 for o in ocupado if o.colliderect(caja))
-                        choques += sum(1 for (qx, qy), _, _ in puestas if abs(qx - x) < 28 and abs(qy - y) < 28)
-                        valor = -1000 * choques - abs(t - 0.5) * 40 - abs(lado)
-                        if valor > valor_mejor:
-                            mejor, valor_mejor = (x, y), valor
-                return mejor, valor_mejor > -500
-
-            for a, b, minutos in CALLES:
-                (x1, y1), (x2, y2) = pts[a], pts[b]
-                pos, libre = buscar(x1, y1, x2, y2, edificios_r + textos_r)
-                if not libre:
-                    # Calle muy corta: el número va encima del edificio, sin tapar nombres ni globitos.
-                    pos, _ = buscar(x1, y1, x2, y2, textos_r)
-                puestas.append((pos, minutos, libre))
-            self._etiquetas = puestas
-        return self._etiquetas
-
-    def _minutos_calle(self, sup, pos, minutos):
+    def _caras(self, sup, z, ahora):
+        p = self.p
         c = TEMA.c
-        circulo(sup, pos, 12, c["papel"], c["borde"], 2)
-        texto(sup, str(minutos), (pos[0], pos[1] + 1), 12, c["texto"], peso=900, ancla="c")
+        gente = residentes(p.red, z)
+        for k, v in enumerate(gente[:6]):
+            x, y = self._pos_cara(z, k)
+            est = p.estado_ciudadano(v)
+            fl = self.flashes.get(v)
+            if fl and ahora - fl[0] < 900:
+                e = (ahora - fl[0]) / 900
+                col = color_estado("corregido" if fl[1] in ("corrige",) else est)
+                pygame.gfxdraw.filled_circle(sup, round(x), round(y), round(13 + 9 * e), (*col, round(140 * (1 - e))))
+            img = cara(p, v, 22, expresion=EXPRESION.get(est, "neutral"),
+                       borde=color_estado(est) if est != "nada" else c["borde"], grosor=3 if est != "nada" else 2)
+            sup.blit(img, (x - 11, y - 11))
+
+    def _pulsos(self, sup, ahora):
+        c = TEMA.c
+        vivos = []
+        for pu in self.pulsos:
+            e = (ahora - pu["t0"]) / pu["dur"]
+            if e < 0:
+                vivos.append(pu)
+                continue
+            a, b = self.pos_persona(pu["u"], ahora), self.pos_persona(pu["v"], ahora)
+            if a is None or b is None:
+                continue
+            col = color_estado("falso" if pu["tipo"] == "falso" else "veraz" if pu["tipo"] == "veraz" else "corregido")
+            if e >= 1:
+                self.flashes[pu["v"]] = (ahora, pu["que"])
+                continue
+            k = suave(e)
+            x, y = a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k - math.sin(math.pi * k) * 26
+            pygame.gfxdraw.filled_circle(sup, round(x), round(y), 11, (*col, 90))
+            circulo(sup, (x, y), 6, col, c["borde"], 2)
+            vivos.append(pu)
+        self.pulsos = vivos
 
     def _zona(self, sup, z, pos, destinos, j, ahora, mov):
         p = self.p
         c = TEMA.c
         x, y = pos
         info = ZONAS[z]
-        alcanzable = z in destinos and z != j.zona
+        alcanzable = False
         if alcanzable:
             pul = 3 * math.sin(ahora / 200) if mov else 0
             pygame.gfxdraw.filled_ellipse(sup, round(x), round(y + 20), round(56 + pul), round(20 + pul / 2),
@@ -274,7 +295,7 @@ class VistaMapa:
                  ancla="c", alto=22)
         else:
             chip(sup, nombre, (x, y + 32), c["papel"], c["texto"], None, 12, ancla="c", alto=22)
-        gente = residentes(p.red, z) if z in (self.hover, j.zona) else []
+        gente = []
         n = len(gente)
         for k, v in enumerate(gente):
             est = p.estado_ciudadano(v)
@@ -337,7 +358,7 @@ class VistaMapa:
             globos.append(("", c["mango"], c["texto"], "search"))
         # En estas zonas los globitos van a la izquierda del edificio, para no caer sobre el
         # nombre de la zona que les queda arriba a la derecha.
-        derecha = z in ("ESTADIO", "HOSPITAL", "PLAZA", "ALCALDIA")
+        derecha = z in ZONAS_IZQ
         bx = x - 34 if derecha else x + 34
         for s_, fondo, color, icono in (reversed(globos) if derecha else globos):
             r = chip(sup, s_, (bx, y - 48), fondo, color, icono, 12, ancla="mr" if derecha else "ml", alto=24)
@@ -366,7 +387,8 @@ class VistaMapa:
         texto(sup, recortar(f"{len(gente)} vecinos, {creen} creen algo falso. Tensión {p.tension(z)}.", 13, ancho,
                             700), (r.x + 84, r.y + 30), 13, c["tinta2"], peso=700)
         if charla:
-            tarea, col = f"Puedes convencer a {len(charla)} vecinos engañados.", c["bueno"]
+            tarea, col = (f"Puedes convencer a {len(charla)} vecinos engañados." if len(charla) > 1 else
+                          "Puedes convencer a 1 vecino engañado."), c["bueno"]
         elif hecho:
             tarea, col = f"Verifica aquí «{hecho.titulo}»: falta en el Archivo.", c["aviso"]
         elif creen:
@@ -387,8 +409,7 @@ class VistaMapa:
                 tooltip(sup, motivo, self.btn_conversar.rect.midtop, 240)
         elif not aqui and puedo:
             if z in destinos:
-                msg, col = f"Clic para ir: {int(destinos[z])} de tus {j.minutos} min", c["bueno"]
+                msg, col = f"Clic para caminar hasta aquí por la ruta más corta ({int(destinos[z])} min).", c["bueno"]
             else:
-                dist = p.mapa.camino_mas_corto(j.zona, z)[0]
-                msg, col = f"Queda a {int(dist)} min y te quedan {j.minutos}: no alcanzas este turno", c["malo"]
+                msg, col = "Ya caminaste en este turno.", c["tinta2"]
             parrafo(sup, msg, derecha.x, derecha.y + 4, derecha.w, 13, col, peso=900, max_lineas=3, interlineado=3)

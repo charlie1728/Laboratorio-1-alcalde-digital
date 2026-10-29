@@ -16,7 +16,7 @@ from .tema import TEMA
 from .vista_arbol import VistaArbol
 from .vista_mapa import VistaMapa
 from .vista_red import VistaRed
-from .widgets import Boton, barra, chip, circulo, parrafo, recortar, sticker, texto, titulo, tooltip
+from .widgets import Boton, barra, chip, parrafo, recortar, sticker, texto, titulo, tooltip
 
 ICONO_IND = dict(info_verificada="shield-check", confianza="handshake", convivencia="heart-handshake",
                  bienestar="heart-pulse", desinformacion="cloud-fog", conflictos="zap")
@@ -27,8 +27,6 @@ FRASES = {
 }
 CORTOS = dict(info_verificada="Info. verificada", confianza="Confianza", convivencia="Convivencia",
               bienestar="Bienestar", desinformacion="Desinformación", conflictos="Conflictos")
-VISTA_TRAS = dict(compartir="red", alertar="red", amplificar="red", desmentir="red", rastrear="arbol",
-                  reportar="arbol", borrar="arbol")
 
 
 class PantallaJuego:
@@ -83,7 +81,6 @@ class PantallaJuego:
         self.ronda_vista = p.ronda
         self.turno_visto = (p.ronda, p.turno_idx)
         self.fin_mostrado = False
-        self._feed_cache = (None, [])
         self._esperando_verif = None
         self._resaltado_visto = None
         self._auto_seleccionar()
@@ -125,61 +122,20 @@ class PantallaJuego:
             return e
         return "neutral"
 
-    # ------------------------------------------------------------------ feed y selección
-    def feed(self):
-        clave = (id(self.p), self.p.total_mensajes(), self.p.turno_idx, len(self.p.casos))
-        if self._feed_cache[0] == clave:
-            return self._feed_cache[1]
-        p = self.p
-        yo = self.yo().nombre
-        items = []
-        for caso in p.casos_abiertos():
-            for n in caso.arbol.preorden():
-                tag, puntaje = "", n.alcance - n.profundidad * 2
-                if n.autor == yo:
-                    tag, puntaje = "Tuya", puntaje + 10
-                elif caso.receptores.get(yo) == n.id:
-                    tag, puntaje = "Te llegó", puntaje + 100
-                elif n.autor in p.red and p.red.tiene_arista(n.autor, yo):
-                    tag, puntaje = "La sigues", puntaje + 60
-                elif not n.entregado and not n.inmune:
-                    tag, puntaje = "Circulando", puntaje + 30
-                if n.viral:
-                    tag, puntaje = "Viral", puntaje + 90
-                if n.verificado:
-                    puntaje -= 25
-                items.append((puntaje, caso, n, tag))
-        items.sort(key=lambda x: -x[0])
-        feed = [(c, n, t) for _, c, n, t in items[:14]]
-        self._feed_cache = (clave, feed)
-        return feed
-
+    # ------------------------------------------------------------------ la publicación del turno
     def nodo_sel(self):
-        if not self.sel:
-            return None
-        caso = self.p.caso_por_id(self.sel[0])
-        if caso is None or not caso.abierto:
-            return None
-        return caso.arbol.buscar(self.sel[1])
+        """La publicación que el juego le repartió al jugador de este turno."""
+        return self.p.publicacion_turno()[1]
 
     def caso_sel(self):
-        return self.p.caso_por_id(self.sel[0]) if self.sel else None
+        return self.p.publicacion_turno()[0]
 
     def seleccionar(self, caso_id, nodo_id):
+        """Resalta una publicación en el árbol (no cambia la del turno)."""
         self.sel = (caso_id, nodo_id)
         self.arbol.seleccionado = nodo_id
         if self.arbol_caso is not None and self.arbol_caso != caso_id:
             self.arbol_caso = caso_id
-
-    def mover_seleccion(self, d):
-        feed = self.feed()
-        if not feed:
-            return
-        ids = [(c.id, n.id) for c, n, _ in feed]
-        k = ids.index(self.sel) if self.sel in ids else 0
-        k = max(0, min(len(ids) - 1, k + d))
-        self.seleccionar(*ids[k])
-        self.app.sonar("pop")
 
     def seleccionar_de_autor(self, nombre, caso_id=None):
         casos = [self.p.caso_por_id(caso_id)] if caso_id else self.p.casos_abiertos()
@@ -193,13 +149,9 @@ class PantallaJuego:
         return False
 
     def _auto_seleccionar(self):
-        if self.nodo_sel() is None:
-            feed = self.feed()
-            if feed:
-                c, n, _ = feed[0]
-                self.seleccionar(c.id, n.id)
-            else:
-                self.sel = None
+        caso, n = self.p.publicacion_turno()
+        if n is not None:
+            self.seleccionar(caso.id, n.id)
 
     def cambiar_vista(self, v):
         self.vista = v
@@ -211,13 +163,6 @@ class PantallaJuego:
             return
         if not self.puedo_actuar():
             self.app.toasts.agregar(self.motivo_espera() or "Ahora no puedes actuar.", "info")
-            return
-        if clave == "compartir" and not n.verificado and not n.es_correccion:
-            k = self.p.red.grado_salida(self.p.jugador_actual.nombre)
-            self.modal = ModalConfirmar(
-                self, f"Todavía no verificas esta publicación y le llegaría a tus {k} seguidores. "
-                      "Compartir sin verificar es como se riegan los rumores.",
-                "Compartir igual", "Verificar", lambda: self._ejecutar("compartir"), lambda: self._ejecutar("verificar"))
             return
         self._ejecutar(clave)
 
@@ -231,10 +176,6 @@ class PantallaJuego:
         msgs = self.ctrl.accion(caso.id, n.id, clave)
         if msgs and len(msgs) == 1 and msgs[0].tipo == "malo" and not self.ctrl.en_red:
             self.app.toasts.agregar(msgs[0].texto, "malo")
-        if clave in VISTA_TRAS:
-            self.vista = VISTA_TRAS[clave]
-            if self.vista == "red":
-                self.red.caso_id = caso.id
         self._sincronizar()
 
     def mover(self, zona):
@@ -355,7 +296,7 @@ class PantallaJuego:
             self.ronda_vista = p.ronda
             noche = [m for m in nuevos]
             self.modal = SecuenciaNoche(self, dia, noche)
-            self.vista = "red"
+            self.vista = "mapa"
             self.red.caso_id = None
             self.banner = None
             self.turno_visto = (p.ronda, p.turno_idx)
@@ -397,10 +338,6 @@ class PantallaJuego:
                 self.terminar_turno()
             elif pygame.K_1 <= e.key <= pygame.K_6:
                 self.celular.tecla(e.key - pygame.K_1)
-            elif e.key in (pygame.K_LEFT, pygame.K_UP):
-                self.mover_seleccion(-1)
-            elif e.key in (pygame.K_RIGHT, pygame.K_DOWN):
-                self.mover_seleccion(1)
             elif e.key == pygame.K_a:
                 self.abrir_archivo()
             return
@@ -539,7 +476,7 @@ class PantallaJuego:
             self.btn_fin.etiqueta = f"Turno de {recortar(self.p.jugador_actual.nombre, 18, 160, 600)}"
         else:
             self.btn_fin.etiqueta = "Terminar turno"
-        if self.puedo_actuar() and self.p.jugador_actual.atencion == 0:
+        if self.puedo_actuar() and (self.p.turno.get("decidio") or self.nodo_sel() is None):
             pul = 3 + 2 * math.sin(pygame.time.get_ticks() / 160)
             pygame.draw.rect(sup, c["mango"], self.btn_fin.rect.inflate(10 + pul, 10 + pul), 5, border_radius=18)
         self.btn_fin.dibujar(sup)
@@ -610,18 +547,21 @@ class PantallaJuego:
               peso=700, fam="titulo")
         nombre_rol = recortar(j.candidato, 12, r.right - x - 48, 800) if j.candidato else j.info_rol["nombre"]
         chip(sup, nombre_rol, (x, r.y + 44), c["mango2"], c["texto"], ICONO_ROL[j.rol], 12)
-        y = r.y + 86
-        texto(sup, "Atención", (x, y), 12, c["tinta2"], peso=900)
-        for k in range(3):
-            lleno = k < j.atencion
-            cx = x + 70 + k * 30
-            circulo(sup, (cx, y + 8), 12, c["mango"] if lleno else c["papel2"], c["borde"], 2)
-            sup.blit(recursos.icono("zap", 14, c["texto"] if lleno else c["tenue"], 2.6), (cx - 7, y + 1))
-        y += 32
-        texto(sup, "Caminar", (x, y), 12, c["tinta2"], peso=900)
-        barra(sup, (x + 70, y + 2, 50, 12), 100 * j.minutos / 15, c["acento"])
-        texto(sup, f"{j.minutos} min", (r.right - 12, y), 12, c["texto"], peso=900, ancla="tr")
-        y += 30
+        # Los pasos del turno, con su casilla marcada cuando ya se hicieron.
+        y = r.y + 78
+        t = p.turno
+        for hecho, etiqueta in ((t.get("verifico"), "Verificar (si quieres)"),
+                                (bool(t.get("decidio")), "Decidir qué hacer"),
+                                (t.get("camino"), "Caminar (si quieres)")):
+            caja = pygame.Rect(x, y, 18, 18)
+            pygame.draw.rect(sup, c["bueno"] if hecho else c["papel"], caja, border_radius=5)
+            pygame.draw.rect(sup, c["borde"], caja, 2, border_radius=5)
+            if hecho:
+                pygame.draw.lines(sup, c["sobre_color"], False, [(caja.x + 4, caja.centery), (caja.x + 8, caja.bottom - 5),
+                                                                 (caja.right - 4, caja.y + 4)], 3)
+            texto(sup, etiqueta, (x + 26, y + 9), 13, c["tinta2"] if hecho else c["texto"], peso=800, ancla="ml")
+            y += 25
+        y += 8
         sup.blit(recursos.icono("star", 22, c["logro"], 2.6), (x, y + 2))
         titulo(sup, f"{j.puntos}", (x + 28, y - 2), 26, c["texto"])
         texto(sup, "puntos", (x + 30 + recursos.fuente(26, 700, "titulo").size(str(j.puntos))[0], y + 12), 12,

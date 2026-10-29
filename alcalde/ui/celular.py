@@ -1,4 +1,4 @@
-"""El celular con la app Civitas: historias, la publicación elegida y los botones de acción."""
+"""El celular con la app Civitas: la publicación que te tocó este turno y qué hacer con ella."""
 
 import pygame
 
@@ -9,8 +9,28 @@ from .juego_comun import cara, color_caso, color_estado, estado_nodo
 from .tema import TEMA
 from .widgets import Boton, chip, circulo, forma_estado, parrafo, recortar, sticker, texto
 
-ICONOS = dict(verificar="search", compartir="share-2", reportar="flag", ignorar="eye-off", borrar="trash-2")
 NOMBRE_ESTADO = dict(nada="Sin verificar", veraz="Verdadera", falso="Falsa", correccion="Desmentido")
+ESPECIALES = ("alertar", "rastrear", "amplificar", "desmentir")
+CORTO = dict(alertar="Alertar", rastrear="Rastrear", amplificar="Amplificar", desmentir="Desmentir")
+
+
+def veredicto(resultado):
+    """(tipo, título, explicación) para contar qué pasó con la decisión del jugador."""
+    veraz, d = resultado["veraz"], resultado["decision"]
+    frenar = d == "reportar" or d in ESPECIALES
+    if not veraz and frenar:
+        return "bueno", "¡Bien hecho!", "Era falsa y la frenaste."
+    if not veraz and d == "ignorar":
+        return "regular", "Más o menos", "Era falsa. No la alimentaste, pero reportarla la habría frenado."
+    if not veraz:
+        return "malo", "¡Uy!", "Era falsa y la ayudaste a circular."
+    if d == "compartir":
+        return "bueno", "¡Bien hecho!", "Era verdadera y la compartiste."
+    if d == "ignorar":
+        return "regular", "Más o menos", "Era verdadera: valía la pena compartirla."
+    if d == "rastrear":
+        return "regular", "Era verdadera", "El rastreo mostró que nadie la torció."
+    return "malo", "¡Uy!", "Era verdadera y la trataste como falsa."
 
 
 class Celular:
@@ -19,63 +39,41 @@ class Celular:
         self.rect = pygame.Rect(rect)
         self.pantalla = self.rect.inflate(-18, -18)
         s = self.pantalla
-        self.r_historias = pygame.Rect(s.x + 10, s.y + 70, s.w - 20, 56)
-        self.r_post = pygame.Rect(s.x + 10, s.y + 134, s.w - 20, s.h - 134 - 222)
-        self.r_acciones = pygame.Rect(s.x + 10, s.bottom - 214, s.w - 20, 200)
-        self.historias = []
-        self.botones = []
-        self.b_prev = Boton((0, 0, 30, 28), "", "prev", icono="chevron-left", sombra=0, radio=10)
-        self.b_next = Boton((0, 0, 30, 28), "", "next", icono="chevron-right", sombra=0, radio=10)
-        self.hover_accion = None
-        self._armar_botones()
+        self.r_post = pygame.Rect(s.x + 10, s.y + 96, s.w - 20, 262)
+        a = pygame.Rect(s.x + 10, self.r_post.bottom + 12, s.w - 20, s.bottom - self.r_post.bottom - 30)
+        self.r_acciones = a
+        w = (a.w - 8) // 2
+        self.b_verificar = Boton((a.x, a.y, a.w, 50), "Verificar (cuesta 3 puntos)", "verificar", icono="search",
+                                 estilo="primario", tam=17)
+        y = a.y + 92
+        self.botones = [
+            Boton((a.x, y, w, 50), "Compartir", "compartir", icono="share-2", tam=17, sombra=3),
+            Boton((a.x + w + 8, y, w, 50), "Reportar", "reportar", icono="flag", tam=17, sombra=3),
+            Boton((a.x, y + 58, w, 50), "Ignorar", "ignorar", icono="eye-off", tam=17, sombra=3),
+            Boton((a.x + w + 8, y + 58, w, 50), "Especial", "especial", icono="sparkles", tam=15,
+                  estilo="especial", sombra=3),
+        ]
+        for b in [self.b_verificar] + self.botones:
+            b.clave_real = b.clave
 
     @property
     def p(self):
         return self.j.p
 
-    def _armar_botones(self):
-        a = self.r_acciones
-        w = (a.w - 8) // 2
-        y = a.y + 30
-        self.botones = [
-            Boton((a.x, y, w, 46), "Verificar", "verificar", icono="search", tam=17, sombra=3),
-            Boton((a.x + w + 8, y, w, 46), "Compartir", "compartir", icono="share-2", tam=17, sombra=3),
-            Boton((a.x, y + 54, w, 46), "Reportar", "reportar", icono="flag", tam=17, sombra=3),
-            Boton((a.x + w + 8, y + 54, w, 46), "Ignorar", "ignorar", icono="eye-off", tam=17, sombra=3),
-            Boton((a.x, y + 108, a.w, 48), "Especial", "especial", icono="sparkles", tam=16,
-                  estilo="especial", sombra=3),
-            Boton((a.right - 52, y + 108, 52, 48), "", "borrar", icono="trash-2", sombra=3),
-        ]
-        for b in self.botones:
-            b.clave_real = b.clave
-
     # ------------------------------------------------------------------ eventos
     def evento(self, e):
         if e.type == pygame.MOUSEBUTTONDOWN and e.button == 1:
-            for r, caso_id, nodo_id in self.historias:
-                if r.collidepoint(e.pos):
-                    self.j.seleccionar(caso_id, nodo_id)
-                    self.j.app.sonar("pop")
-                    return True
-            if self.b_prev.clic(e.pos):
-                self.j.mover_seleccion(-1)
-                return True
-            if self.b_next.clic(e.pos):
-                self.j.mover_seleccion(1)
-                return True
-            for b in self.botones:
-                if b.clic(e.pos):
+            for b in [self.b_verificar] + self.botones:
+                if b.visible and b.clic(e.pos):
                     self.j.accion(b.clave_real)
                     return True
             return self.rect.collidepoint(e.pos)
-        if e.type == pygame.MOUSEWHEEL and self.rect.collidepoint(pygame.mouse.get_pos()):
-            self.j.mover_seleccion(-1 if e.y > 0 else 1)
-            return True
         return False
 
     def tecla(self, k):
-        if 0 <= k < 6:
-            b = self.botones[k]
+        botones = [self.b_verificar] + self.botones
+        if 0 <= k < len(botones):
+            b = botones[k]
             if b.visible and b.activo:
                 self.j.accion(b.clave_real)
                 return True
@@ -97,103 +95,50 @@ class Celular:
         pygame.draw.rect(sup, c["texto"], bat, 2, border_radius=3)
         pygame.draw.rect(sup, c["bueno"], bat.inflate(-6, -6), border_radius=1)
         pygame.draw.rect(sup, c["texto"], (bat.right, bat.y + 4, 2, 4))
-        # encabezado de la app
-        civi = personajes.civi("feliz", 40)
-        sup.blit(civi, (s.x + 14, s.y + 26))
+        sup.blit(personajes.civi("feliz", 40), (s.x + 14, s.y + 26))
         texto(sup, "Civitas", (s.x + 46, s.y + 48), 24, c["acento"], peso=700, fam="titulo", ancla="ml")
-        feed = self.j.feed()
-        chip(sup, f"Para ti ({len(feed)})", (s.right - 14, s.y + 48), c["acento2"], c["acento"], None, 12, ancla="mr")
-        self._historias(sup, feed)
-        n, caso = self.j.nodo_sel(), self.j.caso_sel()
+        jugador = p.jugador_actual
+        titulo = "Te llegó esta publicación" if self.j.puedo_actuar() or not self.j.en_red() else \
+            f"Le llegó a {jugador.nombre}"
+        texto(sup, recortar(titulo, 14, s.w - 30, 900), (s.x + 16, s.y + 80), 14, c["tinta2"], peso=900, ancla="ml")
+        caso, n = p.publicacion_turno()
+        resultado = p.turno.get("resultado")
         if n is None:
             r = self.r_post
-            parrafo(sup, "Tu feed está tranquilo. Revisa el mapa: quizá hay vecinos con los que conversar.",
-                    r.x + 10, r.y + 40, r.w - 20, 15, c["tinta2"], peso=700, centrado=True)
+            sticker(sup, r, c["papel2"], 18, 0, 2)
+            parrafo(sup, "Hoy no te llegó ninguna publicación nueva. Camina por la ciudad o termina tu turno.",
+                    r.x + 16, r.y + 90, r.w - 32, 15, c["tinta2"], peso=700, centrado=True)
         else:
-            self._post(sup, n, caso, feed)
-        self._acciones(sup, n, caso)
+            self._post(sup, n, caso)
+        if resultado and caso is not None:
+            self._resultado(sup, resultado, caso)
+        else:
+            self._acciones(sup, n, caso)
         pygame.draw.rect(sup, c["tinta"], (s.centerx - 50, s.bottom - 10, 100, 5), border_radius=3)
 
-    def _historias(self, sup, feed):
-        c = TEMA.c
-        p = self.p
-        self.historias = []
-        sel = self.j.sel
-        r = self.r_historias
-        tam = 42
-        paso = 48
-        visibles = feed[:6]
-        if sel and sel not in [(cs.id, n.id) for cs, n, _ in visibles]:
-            for k, (cs, n, tag) in enumerate(feed):
-                if (cs.id, n.id) == sel:
-                    visibles = feed[max(0, k - 5):k + 1]
-                    break
-        for i, (cs, n, tag) in enumerate(visibles):
-            x = r.x + 4 + i * paso
-            y = r.y + 4
-            elegido = sel == (cs.id, n.id)
-            col = color_caso(cs.id)
-            pygame.draw.circle(sup, col, (x + tam // 2, y + tam // 2), tam // 2 + 3)
-            if elegido:
-                pygame.draw.circle(sup, c["tinta"], (x + tam // 2, y + tam // 2), tam // 2 + 6, 3)
-            img = cara(self.p, n.autor, tam - 4, borde=c["papel"], grosor=2)
-            sup.blit(img, (x + 2, y + 2))
-            forma_estado(sup, estado_nodo(n), (x + tam - 4, y + tam - 4), 5)
-            if n.viral:
-                circulo(sup, (x + 6, y + 6), 8, c["mango"], c["borde"], 2)
-                sup.blit(recursos.icono("flame", 11, c["texto"], 2.6), (x + 1, y + 1))
-            self.historias.append((pygame.Rect(x, y, tam, tam), cs.id, n.id))
-        if not feed:
-            texto(sup, "Sin publicaciones nuevas", r.center, 13, c["tenue"], peso=800, ancla="c")
-
-    def _post(self, sup, n, caso, feed):
+    def _post(self, sup, n, caso):
         c = TEMA.c
         p = self.p
         r = self.r_post
         sticker(sup, r, c["papel2"], 18, 0, 2)
-        x, y = r.x + 12, r.y + 12
-        sup.blit(cara(p, n.autor, 42), (x, y))
-        texto(sup, recortar(str(n.autor), 16, 150, 900), (x + 50, y + 2), 16, c["texto"], peso=900)
-        sub = "Publicó primero" if n.es_raiz else f"Reenvío de {n.padre.autor}"
-        texto(sup, recortar(sub, 12, 150, 700), (x + 50, y + 23), 12, c["tinta2"], peso=700)
-        idx = next((k for k, (cs, m, _) in enumerate(feed) if m is n), 0)
-        self.b_prev.rect.topleft = (r.right - 72, y + 6)
-        self.b_next.rect.topleft = (r.right - 38, y + 6)
-        self.b_prev.activo = idx > 0
-        self.b_next.activo = idx < len(feed) - 1
-        self.b_prev.dibujar(sup)
-        self.b_next.dibujar(sup)
-        texto(sup, f"{idx + 1} de {len(feed)}", (r.right - 38, y + 44), 11, c["tinta2"], peso=800, ancla="c")
-        y += 50
-        tag = next((t for cs, m, t in feed if m is n), "")
-        circulo(sup, (x + 6, y + 9), 6, color_caso(caso.id))
-        texto(sup, recortar(f"{caso.hecho.titulo}", 12, r.w - 40, 800), (x + 18, y + 1), 12, c["tinta2"], peso=800)
-        y += 22
-        est = estado_nodo(n)
-        col = color_estado(est)
-        forma_estado(sup, est, (x + 8, y + 12), 7)
-        rr = chip(sup, NOMBRE_ESTADO[est], (x + 22, y), col if est != "nada" else c["papel"],
-                  c["sobre_color"] if est != "nada" else c["texto"], None, 13)
-        xx = rr.right + 6
-        if tag:
-            rr = chip(sup, tag, (xx, y), c["acento2"], c["acento"], None, 12)
-            xx = rr.right + 6
-        if n.inmune and not n.es_correccion:
-            rr = chip(sup, "Contenida", (xx, y), c["bueno2"], c["bueno"], "shield-check", 12)
-            xx = rr.right + 6
-        if n.viral:
-            chip(sup, "Viral", (xx, y), c["mango"], c["texto"], "flame", 12)
-        y += 34
-        tam = 17 if TEMA.op["texto_grande"] else 15
-        inter = 4 if TEMA.op["texto_grande"] else 6
-        lineas_max = max(2, (r.bottom - 34 - y) // (tam + inter))
-        parrafo(sup, n.afirmacion.texto(), x, y, r.w - 24, tam, c["texto"], interlineado=inter, peso=600,
+        x, y = r.x + 14, r.y + 14
+        sup.blit(cara(p, n.autor, 48), (x, y))
+        texto(sup, recortar(str(n.autor), 17, r.w - 90, 900), (x + 58, y + 4), 17, c["texto"], peso=900)
+        sub = "Publicó primero" if n.es_raiz else f"Lo reenvió de {n.padre.autor}"
+        texto(sup, recortar(sub, 12, r.w - 90, 700), (x + 58, y + 27), 12, c["tinta2"], peso=700)
+        y += 60
+        circulo(sup, (x + 6, y + 8), 6, color_caso(caso.id))
+        texto(sup, recortar(caso.hecho.titulo, 12, r.w - 44, 800), (x + 18, y), 12, c["tinta2"], peso=800)
+        y += 24
+        if n.verificado:
+            est = estado_nodo(n)
+            forma_estado(sup, est, (x + 8, y + 12), 7)
+            chip(sup, NOMBRE_ESTADO[est], (x + 22, y), color_estado(est), c["sobre_color"], None, 13)
+            y += 32
+        tam = 18 if TEMA.op["texto_grande"] else 16
+        lineas_max = max(2, (r.bottom - 14 - y) // (tam + 6))
+        parrafo(sup, n.afirmacion.texto(), x, y, r.w - 28, tam, c["texto"], interlineado=6, peso=600,
                 max_lineas=lineas_max)
-        yb = r.bottom - 26
-        sup.blit(recursos.icono("eye", 15, c["tinta2"], 2.4), (x, yb))
-        t1 = texto(sup, f"le llegó a {n.alcance}", (x + 20, yb + 7), 12, c["tinta2"], peso=800, ancla="ml")
-        sup.blit(recursos.icono("repeat-2", 15, c["tinta2"], 2.4), (t1.right + 14, yb))
-        texto(sup, f"{len(n.hijos)} reenvíos", (t1.right + 34, yb + 7), 12, c["tinta2"], peso=800, ancla="ml")
 
     def _vista_previa(self, clave, n, caso):
         p = self.p
@@ -202,32 +147,21 @@ class Celular:
             return ""
         if clave == "verificar":
             if caso.hecho.id in p.archivo:
-                return "Busca el hecho en el Archivo (árbol AVL) y te muestra qué cambió."
+                return "Te dice si es verdadera o falsa y qué le cambiaron. ¿Te acuerdas de esta historia? Ahórrate los puntos."
             if j.rol == "periodista":
-                return "Ese hecho no está en el Archivo: como periodista lo investigas y lo registras."
+                return "No está en el Archivo, pero como periodista lo investigas."
             if j.zona == caso.hecho.lugar:
-                return "No está en el Archivo, pero estás en el lugar: lo compruebas y lo registras."
-            return f"Ese hecho no está en el Archivo. Ve a {nombre_zona(caso.hecho.lugar)} o pídele ayuda a un periodista."
+                return "No está en el Archivo, pero estás en el lugar: lo compruebas en persona."
+            return f"Este hecho no está en el Archivo: ve a {nombre_zona(caso.hecho.lugar)} para verificarlo."
         if clave == "compartir":
             k = p.red.grado_salida(j.nombre) if j.nombre in p.red else 0
-            extra = "" if (n.verificado or n.es_correccion) else " Ojo: aún no la verificas."
-            return f"Le llega a tus {k} seguidores.{extra}"
+            return f"Se la mandas a tus {k} seguidores. Gana si es verdadera."
         if clave == "reportar":
-            alc = caso.arbol.agregar(lambda m: m.alcance, n)[n.id]
-            tam = len(list(caso.arbol.preorden(n)))
-            return f"Retira esta y {tam - 1} reenvíos (le llegaron a {alc} personas)."
+            return "Civitas la borra con sus reenvíos. Gana si es falsa."
         if clave == "ignorar":
-            return "La dejas pasar sin alimentarla."
-        if clave == "alertar":
-            return f"Avisa a tus {len(p.red.contactos(j.nombre))} contactos de la red."
-        if clave == "rastrear":
-            return f"Sube {n.profundidad} saltos hasta el origen y expone al paciente cero."
-        if clave == "amplificar":
-            return "Corrige a quienes están a uno o dos saltos de ti y contiene la rama."
-        if clave == "desmentir":
-            return "Convence a quien confía en ti por algún camino de la red."
-        if clave == "borrar":
-            return "Quitas tu publicación, pero sus reenvíos siguen circulando."
+            return "No haces nada con ella."
+        if clave in ESPECIALES:
+            return j.info_rol["descripcion"] + " Solo sirve si es falsa."
         return ""
 
     def _acciones(self, sup, n, caso):
@@ -236,23 +170,21 @@ class Celular:
         j = p.jugador_actual
         a = self.r_acciones
         acciones = {x["clave"]: x for x in p.acciones_para(n)}
-        esp_clave, esp_nombre, esp_costo = j.info_rol["especial"]
+        esp_clave, esp_nombre, _ = j.info_rol["especial"]
         puedo = self.j.puedo_actuar()
         raton = pygame.mouse.get_pos()
         hint, hint_col = "", c["tinta2"]
-        for b in self.botones:
+        texto(sup, "¿Qué haces con ella?", (a.x + 2, a.y + 66), 14, c["texto"], peso=900)
+        for b in [self.b_verificar] + self.botones:
             clave = esp_clave if b.clave == "especial" else b.clave
             b.clave_real = clave
             info = acciones.get(clave)
-            b.visible = info is not None or b.clave != "borrar"
             if b.clave == "especial":
-                b.etiqueta = esp_nombre
+                b.etiqueta = CORTO.get(esp_clave, esp_nombre)
                 b.icono = ICONO_ROL[j.rol]
-                b.costo = esp_costo
-                b.rect.w = a.w - (60 if "borrar" in acciones else 0)
-            if not b.visible:
-                continue
             b.activo = bool(info and info["ok"]) and puedo
+            if b is self.b_verificar:
+                b.etiqueta = "Ya está verificada" if (n is not None and n.verificado) else "Verificar (cuesta 3 puntos)"
             if b.rect.collidepoint(raton):
                 if not puedo:
                     hint, hint_col = self.j.motivo_espera(), c["aviso"]
@@ -264,8 +196,28 @@ class Celular:
         if not hint:
             if not puedo:
                 hint, hint_col = self.j.motivo_espera(), c["aviso"]
-            elif j.atencion == 0:
-                hint, hint_col = "Sin atención: termina tu turno.", c["aviso"]
             else:
-                hint = "Cada acción gasta 1 rayo de atención." + (f" La especial gasta {esp_costo}." if esp_costo > 1 else "")
-        parrafo(sup, hint, a.x + 2, a.y - 2, a.w, 12, hint_col, peso=800, max_lineas=2, interlineado=2)
+                hint = "Si no te acuerdas si es verdad, verifícala primero."
+        parrafo(sup, hint, a.x + 2, self.botones[-1].rect.bottom + 10, a.w, 12, hint_col, peso=800, max_lineas=2,
+                interlineado=2)
+
+    def _resultado(self, sup, resultado, caso):
+        c = TEMA.c
+        a = self.r_acciones
+        tipo, titulo, cuerpo = veredicto(resultado)
+        col = {"bueno": c["bueno"], "malo": c["malo"]}.get(tipo, c["aviso"])
+        fondo = {"bueno": c["bueno2"], "malo": c["malo2"]}.get(tipo, c["mango2"])
+        r = pygame.Rect(a.x, a.y, a.w, a.h - 4)
+        sticker(sup, r, fondo, 18, 3, 3)
+        circulo(sup, (r.x + 32, r.y + 32), 20, col, c["borde"], 2)
+        icono = {"bueno": "check", "malo": "x"}.get(tipo, "info")
+        sup.blit(recursos.icono(icono, 24, c["sobre_color"], 3), (r.x + 20, r.y + 20))
+        texto(sup, titulo, (r.x + 62, r.y + 14), 20, c["texto"], peso=700, fam="titulo")
+        pts = resultado["puntos"]
+        texto(sup, f"{pts:+d} puntos", (r.right - 14, r.y + 20), 15, col, peso=900, ancla="tr")
+        y = parrafo(sup, cuerpo, r.x + 62, r.y + 42, r.w - 76, 14, c["texto"], peso=800, max_lineas=3) + 6
+        texto(sup, "Para recordar, el hecho real:", (r.x + 16, y), 12, c["tinta2"], peso=900)
+        parrafo(sup, caso.hecho.afirmacion_real().texto(), r.x + 16, y + 18, r.w - 32, 13, c["tinta2"], peso=700,
+                max_lineas=4)
+        texto(sup, "Puedes caminar por la ciudad o terminar tu turno.", (r.centerx, r.bottom - 16), 12, c["texto"],
+              peso=900, ancla="c")
