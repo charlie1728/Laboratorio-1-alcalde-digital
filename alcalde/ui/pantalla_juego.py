@@ -550,9 +550,8 @@ class PantallaJuego:
         # Los pasos del turno, con su casilla marcada cuando ya se hicieron.
         y = r.y + 78
         t = p.turno
-        for hecho, etiqueta in ((t.get("verifico"), "Verificar (si quieres)"),
-                                (bool(t.get("decidio")), "Decidir qué hacer"),
-                                (t.get("camino"), "Caminar (si quieres)")):
+        for hecho, etiqueta in ((t.get("camino"), "1. Camina (si quieres)"),
+                                (bool(t.get("decidio")), "2. Decide qué hacer")):
             caja = pygame.Rect(x, y, 18, 18)
             pygame.draw.rect(sup, c["bueno"] if hecho else c["papel"], caja, border_radius=5)
             pygame.draw.rect(sup, c["borde"], caja, 2, border_radius=5)

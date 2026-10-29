@@ -48,7 +48,7 @@ La dirección visual es **«pegatina de campaña en una ciudad caribeña a pleno
 
 ![El celular de Civitas con la publicación y sus botones](img/v2/verificacion.png)
 
-- **Un turno simple.** El juego te da una publicación en el celular. Puedes verificarla (cuesta 3 puntos) y luego decides qué hacer con ella. Al decidir, todos ven si era verdadera o falsa: quien se acuerda se ahorra las verificaciones de los próximos turnos. El panel del jugador muestra los tres pasos del turno con casillas.
+- **Un turno simple, en dos pasos.** 1) Si quieres, caminas a otra zona del mapa: te llega una publicación de allí. 2) Decides qué hacer con la publicación del celular. Puedes verificarla (cuesta 3 puntos) y luego decides qué hacer con ella. Al decidir, todos ven si era verdadera o falsa: quien se acuerda se ahorra las verificaciones de los próximos turnos. El panel del jugador muestra los dos pasos con casillas.
 - **Vista previa de la consecuencia.** Al pasar el mouse por un botón se ve qué hace: «Se la mandas a tus 6 seguidores. Gana si es verdadera» o «Este hecho no está en el Archivo: ve al Hospital para verificarlo». Si un botón está apagado, se explica por qué.
 - **El resultado se explica.** Después de decidir, el celular dice si acertaste, cuántos puntos ganaste o perdiste y cuál es el hecho real, para que todos lo recuerden.
 - **Al verificar se ve la diferencia exacta** entre la publicación y el hecho oficial, con un sello de Falsa, Verdadera o Sin datos. Por ejemplo: *Cifra inflada. Dice: «durante 30 días». Oficial: «durante 3 días».*

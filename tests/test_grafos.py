@@ -10,6 +10,7 @@ from alcalde.estructuras.archivo_avl import ArchivoHechosAVL
 from alcalde.estructuras.grafo import Grafo
 from alcalde.modelo.mapa import CALLES, ZONAS, crear_mapa
 from alcalde.modelo.partida import Partida
+from alcalde.modelo.red_social import residentes
 from alcalde.modelo.serializacion import partida_a_dict, partida_desde_dict
 
 JUGADORES = [("Ana", "ciudadano", (0, 0, 0)), ("Beto", "periodista", (0, 0, 0)),
@@ -134,6 +135,33 @@ class TestMapa(unittest.TestCase):
             p.terminar_turno()
             if p.evento_viral:
                 p.resolver_viral(None)
+
+
+    def test_caminar_trae_publicacion_de_la_zona(self):
+        p = Partida(JUGADORES, semilla=7)
+        j = p.jugador_actual
+        otra = max((z for z in ZONAS if z != j.zona), key=p.publicaciones_en)
+        self.assertGreater(p.publicaciones_en(otra), 0)
+        p.mover(otra)
+        caso, nodo = p.publicacion_turno()
+        self.assertEqual(p.zona_de(nodo), otra)          # llega una de la zona nueva
+        p.ejecutar("verificar", caso, nodo)
+        p.terminar_turno()
+
+    def test_frenar_rumor_corrige_su_zona(self):
+        for semilla in range(30):
+            p = Partida(JUGADORES, semilla=semilla)
+            caso, nodo = p.publicacion_turno()
+            zona = p.zona_de(nodo)
+            if nodo.es_veraz or zona not in ZONAS:
+                continue
+            engañados = [v for v in residentes(p.red, zona) if caso.creencia.get(v) == "falso"]
+            if not engañados:
+                continue
+            p.ejecutar("reportar", caso, nodo)
+            self.assertTrue(all(caso.creencia.get(v) != "falso" for v in engañados))
+            return
+        self.skipTest("ninguna semilla dio un rumor con vecinos engañados en su zona")
 
 
 class TestVerificarEnTerreno(unittest.TestCase):

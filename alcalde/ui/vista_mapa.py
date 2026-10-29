@@ -18,6 +18,8 @@ ICONO_EVENTO = dict(falsa="triangle-alert", rumor="message-square-warning", verd
                     vecino="house")
 # En estas zonas los globitos van a la izquierda del edificio y las caras a la derecha.
 ZONAS_IZQ = ("ESTADIO", "HOSPITAL", "PLAZA", "ALCALDIA")
+# La Terminal también los pone a la izquierda: a su derecha caen los del Estadio.
+GLOBOS_IZQ = ZONAS_IZQ + ("TERMINAL",)
 RIO = [(0.67, -0.06), (0.63, 0.10), (0.69, 0.27), (0.77, 0.36), (1.06, 0.34)]
 
 
@@ -342,23 +344,23 @@ class VistaMapa:
         return charla, hecho
 
     def _insignias(self, sup, z, pos):
-        """Globitos sobre el edificio: vecinos para convencer, vecinos engañados, hecho por verificar aquí."""
+        """Globitos sobre el edificio: publicaciones que circulan aquí, vecinos para convencer y
+        hecho por verificar aquí."""
         c = TEMA.c
         p = self.p
         charla, hecho = self.tareas(z)
         x, y = pos
         globos = []
+        n = p.publicaciones_en(z)
+        if n:
+            globos.append((str(n), c["acento"], c["sobre_color"], "smartphone"))
         if charla:
             globos.append((str(len(charla)), c["bueno"], c["sobre_color"], "message-circle"))
-        else:
-            engañados = sum(1 for v in residentes(p.red, z) if p.estado_ciudadano(v) == "falso")
-            if engañados:
-                globos.append((str(engañados), c["malo"], c["sobre_color"], "frown"))
         if hecho:
             globos.append(("", c["mango"], c["texto"], "search"))
         # En estas zonas los globitos van a la izquierda del edificio, para no caer sobre el
         # nombre de la zona que les queda arriba a la derecha.
-        derecha = z in ZONAS_IZQ
+        derecha = z in GLOBOS_IZQ
         bx = x - 34 if derecha else x + 34
         for s_, fondo, color, icono in (reversed(globos) if derecha else globos):
             r = chip(sup, s_, (bx, y - 48), fondo, color, icono, 12, ancla="mr" if derecha else "ml", alto=24)
@@ -384,8 +386,14 @@ class VistaMapa:
         if self.j.en_red() and not puedo and aqui:
             titulo = f"{j.nombre} está en {nombre_zona(j.zona)}"
         texto(sup, recortar(titulo, 16, ancho, 900), (r.x + 84, r.y + 8), 16, c["texto"], peso=900)
-        texto(sup, recortar(f"{len(gente)} vecinos, {creen} creen algo falso. Tensión {p.tension(z)}.", 13, ancho,
-                            700), (r.x + 84, r.y + 30), 13, c["tinta2"], peso=700)
+        n = p.publicaciones_en(z)
+        _, mia = p.publicacion_turno()
+        if aqui and mia is not None and p.zona_de(mia) == z:
+            linea = "Tu publicación de hoy es de aquí."
+        else:
+            circulan = "Sin publicaciones" if not n else "1 publicación" if n == 1 else f"{n} publicaciones"
+            linea = f"{circulan} · {creen} vecinos engañados"
+        texto(sup, recortar(linea, 13, ancho, 700), (r.x + 84, r.y + 30), 13, c["tinta2"], peso=700)
         if charla:
             tarea, col = (f"Puedes convencer a {len(charla)} vecinos engañados." if len(charla) > 1 else
                           "Puedes convencer a 1 vecino engañado."), c["bueno"]
@@ -408,8 +416,10 @@ class VistaMapa:
                 from .widgets import tooltip
                 tooltip(sup, motivo, self.btn_conversar.rect.midtop, 240)
         elif not aqui and puedo:
-            if z in destinos:
-                msg, col = f"Clic para caminar hasta aquí por la ruta más corta ({int(destinos[z])} min).", c["bueno"]
+            if z in destinos and (p.turno.get("verifico") or p.turno.get("decidio")):
+                msg, col = f"Clic para caminar hasta aquí ({int(destinos[z])} min por la ruta más corta).", c["bueno"]
+            elif z in destinos:
+                msg, col = "Clic para ir: te llegará una publicación de aquí.", c["bueno"]
             else:
                 msg, col = "Ya caminaste en este turno.", c["tinta2"]
             parrafo(sup, msg, derecha.x, derecha.y + 4, derecha.w, 13, col, peso=900, max_lineas=3, interlineado=3)

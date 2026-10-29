@@ -178,6 +178,7 @@ class Partida:
         self._recalcular()
         self.ciudad.historial = [dict(self.ciudad.v)]
         self.log("Día 1: circulan las primeras publicaciones en Civitas.", "evento")
+        self.turno = self._turno_vacio()
         self.repartir()
 
     # ------------------------------------------------------------------ utilidades
@@ -397,25 +398,37 @@ class Partida:
         return dict(caso=None, nodo=None, verifico=False, decidio=None, resultado=None, camino=False,
                     converso=False)
 
-    def repartir(self) -> None:
-        """El juego le reparte al jugador del turno UNA publicación que nadie ha revelado todavía.
+    def zona_de(self, nodo: NodoMutacion) -> Optional[str]:
+        """Una publicación circula en la zona donde vive quien la publicó."""
+        dato = self.ciudadano(nodo.autor)
+        return dato.zona if dato is not None else None
 
-        Se prefieren las que le llegaron por la red social y las que siguen circulando. Una
-        publicación que ya se decidió no vuelve a salir.
+    def _pendiente(self, n: NodoMutacion) -> bool:
+        return not (n.id in self.repartidos or n.verificado or n.inmune or n.es_correccion)
+
+    def publicaciones_en(self, zona: str) -> int:
+        """Cuántas publicaciones sin revelar circulan en una zona (lo que muestra el mapa)."""
+        return sum(1 for c in self.casos_abiertos() for n in c.arbol.preorden()
+                   if self._pendiente(n) and self.zona_de(n) == zona)
+
+    def repartir(self) -> None:
+        """Le reparte al jugador del turno UNA publicación que nadie ha revelado todavía.
+
+        Sale de la zona del mapa donde está el jugador o, si allí no circula nada, de la zona
+        más cercana (recorrido por niveles en el grafo de la ciudad). Una publicación que ya se
+        decidió no vuelve a salir.
         """
         j = self.jugador_actual
-        self.turno = self._turno_vacio()
+        _, nivel, _ = self.mapa.bfs(j.zona)
         for intento in range(2):
             opciones = []
             for c in self.casos_abiertos():
                 for n in c.arbol.preorden():
-                    if n.id in self.repartidos or n.verificado or n.inmune or n.autor == j.nombre:
+                    if not self._pendiente(n) or n.autor == j.nombre:
                         continue
-                    if n.es_correccion:
-                        continue
-                    valor = self.rng.random() * 3
+                    valor = self.rng.random() * 3 - 10 * nivel.get(self.zona_de(n), 9)
                     if c.receptores.get(j.nombre) == n.id:
-                        valor += 4
+                        valor += 2
                     if not n.entregado:
                         valor += 2
                     opciones.append((valor, c, n))
@@ -427,6 +440,7 @@ class Partida:
             if intento == 0 and not self.terminada:
                 self._nuevo_caso(falso=self.rng.random() < 0.6)
                 self._recalcular()
+        self.turno.update(caso=None, nodo=None)
 
     def publicacion_turno(self) -> tuple[Optional[Caso], Optional[NodoMutacion]]:
         caso = self.caso_por_id(self.turno.get("caso")) if self.turno.get("caso") else None
@@ -475,6 +489,7 @@ class Partida:
         self.ultimo_resaltado = {}
         getattr(self, "_a_" + clave)(j, caso, nodo)
         if clave in DECISIONES:
+            self._efecto_en_zona(j, caso, nodo, clave)
             # Decidir revela la verdad frente a todos: los demás tienen que acordarse.
             nodo.verificado = True
             self.repartidos.add(nodo.id)
@@ -496,6 +511,26 @@ class Partida:
             self.log(f"La historia '{caso.hecho.titulo}' fue retirada de Civitas.", "evento")
         self._recalcular()
         return self.mensajes[antes:]
+
+    def _efecto_en_zona(self, j: Jugador, caso: Caso, nodo: NodoMutacion, clave: str) -> None:
+        """Lo que se decide con una publicación se nota en la zona donde circula."""
+        zona = self.zona_de(nodo)
+        if zona not in ZONAS:
+            return
+        frenar = clave == "reportar" or clave in ("alertar", "rastrear", "amplificar", "desmentir")
+        if not nodo.es_veraz and frenar:
+            vecinos = [v for v in residentes(self.red, zona) if caso.creencia.get(v) == "falso"]
+            corregidos, _ = self._corregir(caso, vecinos)
+            self.tension_extra[zona] = max(0.0, self.tension_extra[zona] - 10)
+            if corregidos:
+                j.stats["corregidos"] += len(corregidos)
+                self.animar(t="charla", zona=zona, a=corregidos, jugador=self.indice_de(j))
+                self.log(f"En {nombre_zona(zona)}, {len(corregidos)} vecinos dejaron de creerlo.", "bueno")
+        elif not nodo.es_veraz and clave == "compartir":
+            self.tension_extra[zona] += 12
+            self.log(f"{nombre_zona(zona)} se agitó: más vecinos discuten por el rumor.", "malo")
+        elif nodo.es_veraz and clave == "compartir":
+            self.tension_extra[zona] = max(0.0, self.tension_extra[zona] - 5)
 
     def _en_vano(self, j: Jugador, que: str) -> bool:
         """Usar un desmentido sobre algo verdadero: no había nada que corregir."""
@@ -810,6 +845,10 @@ class Partida:
         self.ultimo_resaltado = {"ruta": ruta}
         self.animar(t="mover", jugador=self.indice_de(j), ruta=ruta)
         self.log(f"{j.nombre} caminó hasta {nombre_zona(zona)}.", "info")
+        if not self.turno.get("verifico") and not self.turno.get("decidio"):
+            if self.turno.get("nodo") is not None:
+                self.repartidos.discard(self.turno["nodo"])
+            self.repartir()
         clave = (self.ronda, j.nombre, zona)
         if j.candidato and clave not in self._visitas:
             self._visitas.add(clave)

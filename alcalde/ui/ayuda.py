@@ -29,14 +29,18 @@ SECCIONES = [
          "cómo tus decisiones cambian la ciudad y hasta el resultado de la elección."),
     ]),
     ("Cómo se juega", "list", [
-        ("item", "smartphone", "Te llega una publicación", "En cada turno el juego te da una publicación de "
-                                                          "Civitas. Puede ser verdadera o falsa."),
+        ("item", "smartphone", "Te llega una publicación", "En cada turno te llega una publicación de la zona "
+                                                          "donde estás. Puede ser verdadera o falsa."),
+        ("item", "map", "Camina (si quieres)", "Antes de decidir puedes caminar a otra zona: te llegará una "
+                                              "publicación de allí. Los globitos morados del mapa dicen cuántas "
+                                              "hay en cada zona."),
         ("item", "search", "Verificar o recordar", "Verificar te dice la verdad pero cuesta 3 puntos. Cuando "
                                                   "alguien decide, todos ven si era verdad: si te acuerdas, te "
                                                   "ahorras la verificación."),
-        ("item", "check", "Decide", "Comparte lo verdadero y reporta lo falso. Solo hay una decisión por turno."),
-        ("item", "map", "Camina (si quieres)", "Haz clic en una zona para ir. Donde haya un globito verde puedes "
-                                              "conversar con vecinos que creen un rumor."),
+        ("item", "check", "Decide", "Comparte lo verdadero y reporta lo falso. Si frenas un rumor, los vecinos "
+                                   "de su zona dejan de creerlo; si lo compartes, esa zona se agita."),
+        ("item", "message-circle", "Conversa", "Donde haya un globito verde puedes conversar con vecinos que "
+                                              "creen un rumor y convencerlos."),
         ("item", "moon", "La noche", "Cuando todos juegan llega la noche: las publicaciones viajan por la red "
                                     "social (una ola), algunas mutan y ocurre un evento al azar."),
         ("item", "flame", "Publicaciones virales", "A veces algo se vuelve viral y hay que decidir contra "

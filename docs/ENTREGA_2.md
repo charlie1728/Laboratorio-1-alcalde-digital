@@ -61,6 +61,8 @@ El enunciado pide que la ciudad y el personaje del jugador se vean, y que las ac
 
 - Cada hecho pasó en una zona (`Hecho.lugar`) y cada ciudadano vive en una zona.
 - Cada jugador está en una zona y puede **caminar una vez por turno** a cualquier zona, por la ruta más corta.
+- **Cada publicación circula en la zona de quien la publicó.** La que le llega al jugador sale de su zona o, si allí no hay, de la más cercana: se mide con un **BFS sobre el grafo de la ciudad** (nivel = número de calles). Si camina antes de verificar o decidir, le llega una de la zona nueva.
+- **Decidir tiene efecto local:** frenar un rumor (reportar o usar el poder especial) corrige a los vecinos de esa zona que lo creían y baja su tensión; compartir un rumor la sube. Eso conecta el grafo de la ciudad con la red social y con el árbol del rumor.
 - **En persona** se pueden hacer cosas que no se pueden hacer desde el celular:
   - **Verificar en terreno.** Si el hecho no está en el Archivo AVL, quien esté en el lugar de los hechos lo comprueba y lo **inserta** en el AVL (antes solo podía el periodista).
   - **Conversar con los vecinos.** Convence a los residentes de tu zona que creen un rumor que ya se descubrió falso.
@@ -175,7 +177,7 @@ Esta es una de las preguntas de la sustentación. Cuando una discusión **elimin
   - **Grados**: muestra el top 3 de seguidores.
   - **Confianza**: dibuja el camino de máxima confianza con el producto de los pesos.
 
-**Vista Ciudad** (`alcalde/ui/vista_mapa.py`): debajo de cada edificio están las caras de sus vecinos, con su estado. Cuando una publicación viaja, se ve pasar de cara en cara por la ciudad. Al pasar el mouse por una zona se dibuja la ruta de Dijkstra y la tarjeta dice sus minutos; al hacer clic el personaje camina por esa ruta. Sobre las zonas con tensión alta aparecen nubes de tormenta.
+**Vista Ciudad** (`alcalde/ui/vista_mapa.py`): debajo de cada edificio están las caras de sus vecinos, con su estado. Cuando una publicación viaja, se ve pasar de cara en cara por la ciudad. Cada zona muestra un globito morado con cuántas publicaciones circulan allí. Al pasar el mouse por una zona se dibuja la ruta de Dijkstra y la tarjeta dice sus minutos; al hacer clic el personaje camina por esa ruta. Sobre las zonas con tensión alta aparecen nubes de tormenta.
 
 | | |
 |---|---|

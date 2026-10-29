@@ -2,7 +2,7 @@
 
 import pygame
 
-from ..modelo.mapa import nombre_zona
+from ..modelo.mapa import ZONAS, nombre_zona
 from . import personajes, recursos
 from .ayuda import ICONO_ROL
 from .juego_comun import cara, color_caso, color_estado, estado_nodo
@@ -98,10 +98,12 @@ class Celular:
         sup.blit(personajes.civi("feliz", 40), (s.x + 14, s.y + 26))
         texto(sup, "Civitas", (s.x + 46, s.y + 48), 24, c["acento"], peso=700, fam="titulo", ancla="ml")
         jugador = p.jugador_actual
-        titulo = "Te llegó esta publicación" if self.j.puedo_actuar() or not self.j.en_red() else \
-            f"Le llegó a {jugador.nombre}"
-        texto(sup, recortar(titulo, 14, s.w - 30, 900), (s.x + 16, s.y + 80), 14, c["tinta2"], peso=900, ancla="ml")
         caso, n = p.publicacion_turno()
+        zona = p.zona_de(n) if n is not None else None
+        desde = f" desde {nombre_zona(zona)}" if zona in ZONAS else ""
+        titulo = f"Te llegó{desde}" if self.j.puedo_actuar() or not self.j.en_red() else \
+            f"Le llegó a {jugador.nombre}{desde}"
+        texto(sup, recortar(titulo, 14, s.w - 30, 900), (s.x + 16, s.y + 80), 14, c["tinta2"], peso=900, ancla="ml")
         resultado = p.turno.get("resultado")
         if n is None:
             r = self.r_post

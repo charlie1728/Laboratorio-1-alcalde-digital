@@ -9,7 +9,7 @@ Ciudad Nova elige alcalde y todos hablan en **Civitas**, su red social. Ahí cir
 
 No hay preguntas de trivia: se aprende verificando antes de compartir, descubriendo dónde se torció una historia y viendo las consecuencias.
 
-**Cómo es un turno:** el juego te da una publicación. Puedes verificarla (cuesta 3 puntos) y luego decides qué hacer: compartirla, reportarla, ignorarla o usar el poder de tu personaje. Al decidir, todos ven si era verdadera o falsa, así que conviene acordarse: quien recuerda lo que ya se descubrió se ahorra las verificaciones y saca más puntos. Si quieres, también caminas a otra zona para conversar con los vecinos engañados.
+**Cómo es un turno:** te llega una publicación de la zona del mapa donde estás; si prefieres otra, caminas a otra zona y te llega una de allí (los globitos del mapa dicen cuántas circulan en cada zona). Puedes verificarla (cuesta 3 puntos) y luego decides qué hacer: compartirla, reportarla, ignorarla o usar el poder de tu personaje. Al decidir, todos ven si era verdadera o falsa, así que conviene acordarse: quien recuerda lo que ya se descubrió se ahorra las verificaciones y saca más puntos. Lo que decides se nota en esa zona: si frenas un rumor, sus vecinos dejan de creerlo; si lo compartes, la zona se agita.
 
 | | |
 |---|---|
