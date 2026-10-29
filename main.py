@@ -1,5 +1,6 @@
-"""Alcalde Digital — El árbol de mutaciones.
-Ejecutar:  python main.py
+"""Alcalde Digital.
+Ejecutar:  python main.py           (partida aleatoria)
+           python main.py 42        (semilla fija: la partida se repite igual)
 """
 import sys
 

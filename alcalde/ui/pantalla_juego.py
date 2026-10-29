@@ -1,605 +1,746 @@
 import math
+import random
 
 import pygame
 
-from ..modelo.afirmacion import DISTORSIONES
 from ..modelo.ciudad import NEGATIVOS, NOMBRES
+from . import personajes, recursos
+from .ayuda import ICONO_ROL
+from .celular import Celular
+from .efectos import EFECTOS, acercar
+from .escena import cielo
+from .guia import Guia
+from .juego_comun import cara, color_caso
+from .modales import BannerTurno, HojaVerificacion, ModalArchivo, ModalConfirmar, ModalViral, SecuenciaNoche
 from .tema import TEMA
 from .vista_arbol import VistaArbol
-from .vista_avl import dibujar_avl
-from .widgets import Boton, panel, parrafo, texto, envolver
+from .vista_mapa import VistaMapa
+from .vista_red import VistaRed
+from .widgets import Boton, barra, chip, circulo, parrafo, recortar, sticker, texto, titulo, tooltip
 
-SONIDO_POR_TIPO = {"bueno": "bueno", "malo": "malo", "logro": "logro", "evento": "evento"}
+ICONO_IND = dict(info_verificada="shield-check", confianza="handshake", convivencia="heart-handshake",
+                 bienestar="heart-pulse", desinformacion="cloud-fog", conflictos="zap")
+FRASES = {
+    "bueno": ["¡Bien hecho!", "Eso ayuda a la ciudad.", "¡Así se hace!", "Un rumor menos."],
+    "malo": ["Uy… eso no salió bien.", "Debí verificar primero.", "Eso le hizo daño a la ciudad."],
+    "logro": ["¡Logro desbloqueado!", "¡Lo logramos!"],
+}
+CORTOS = dict(info_verificada="Info. verificada", confianza="Confianza", convivencia="Convivencia",
+              bienestar="Bienestar", desinformacion="Desinformación", conflictos="Conflictos")
+VISTA_TRAS = dict(compartir="red", alertar="red", amplificar="red", desmentir="red", rastrear="arbol",
+                  reportar="arbol", borrar="arbol")
+
 
 class PantallaJuego:
-    def __init__(self, app, partida):
+    toasts_propios = True
+
+    def __init__(self, app, ctrl, guia=True):
         self.app = app
-        self.p = partida
-        self.caso_idx = 0
-        self.sel = None                                        
-        self.vista = VistaArbol((274, 106, 690, 440))
-        self.leidos = 0
-        self.ronda_vista = partida.ronda
-        self.banner_t0 = pygame.time.get_ticks()
-        self.mostrar_avl = False
-        self.avl_ruta = []
-        self.viral_t0 = None
-        self.ultimo_tick = -1
-        self.ind_prev = dict(partida.ciudad.v)
-        self.modo_profesor = False
-        self._casos_turno = set()
-        self._turno_actual_id = None
-
-        self.botones_acc = []
-        self.btn_fin = Boton((988, 700, 268, 40), "Terminar turno  (Enter)", tam=15)
-        self.botones_rec = []
-        x = 274
-        for clave, nombre, w in (("pre", "Preorden", 110), ("post", "Postorden", 110),
-                                 ("bfs", "Por niveles", 116), ("camino", "Camino a raíz", 132),
-                                 ("avl", "Archivo AVL", 128)):
-            self.botones_rec.append(Boton((x, 554, w, 38), nombre, clave, tam=14))
-            x += w + 8
-        self.btn_ayuda = Boton((1000, 12, 84, 32), "Ayuda", tam=13)
-        self.btn_contraste = Boton((1090, 12, 96, 32), "Contraste", tam=13)
-        self.btn_sonido = Boton((1192, 12, 76, 32), "Sonido", tam=13)
-        self.tabs = []
-        self._procesar_mensajes()
-
-    @property
-    def caso(self):
-        abiertos = self.p.casos_abiertos()
-        if not abiertos:
-            return None
-        self.caso_idx %= len(abiertos)
-        return abiertos[self.caso_idx]
-
-    @property
-    def arbol(self):
-        return self.caso.arbol if self.caso else None
-
-    def _cambiar_caso(self, idx):
-        self.caso_idx = idx
+        self.ctrl = ctrl
+        self.celular = Celular(self, (12, 74, 322, 636))
+        self.r_tabs = pygame.Rect(346, 74, 590, 42)
+        self.r_centro = pygame.Rect(346, 124, 590, 584)
+        self.r_jugador = pygame.Rect(948, 74, 320, 222)
+        self.r_ciudad = pygame.Rect(948, 306, 320, 262)
+        self.r_jugadores = pygame.Rect(948, 578, 320, 62)
+        self.btn_fin = Boton((948, 650, 320, 58), "Terminar turno", "fin", icono="skip-forward",
+                             estilo="primario", tam=19)
+        self.mapa = VistaMapa(self, self.r_centro)
+        self.red = VistaRed(self, self.r_centro)
+        self.arbol = VistaArbol(pygame.Rect(self.r_centro.x + 8, self.r_centro.y + 52, self.r_centro.w - 16,
+                                            self.r_centro.h - 128))
+        self.vista = "mapa"
+        w = (self.r_tabs.w - 16) // 3
+        self.tabs = [Boton((self.r_tabs.x + i * (w + 8), self.r_tabs.y, w, 42), nombre, clave, icono=ic, tam=16,
+                           estilo="suave", sombra=3)
+                     for i, (clave, nombre, ic) in enumerate((("mapa", "Ciudad", "map"), ("red", "Red social", "share-2"),
+                                                              ("arbol", "Árbol del rumor", "git-fork")))]
+        self.b_ayuda = Boton((1012, 12, 56, 42), "", "ayuda", icono="circle-help", sombra=3)
+        self.b_acc = Boton((1076, 12, 56, 42), "", "acc", icono="accessibility", sombra=3)
+        self.b_snd = Boton((1140, 12, 56, 42), "", "snd", icono="volume-2", sombra=3)
+        self.b_menu = Boton((1204, 12, 56, 42), "", "menu", icono="log-out", sombra=3)
+        x = self.r_centro.x + 12
+        self.b_rec = []
+        for clave, nombre, ic, ancho in (("pre", "Preorden", "list", 112), ("post", "Postorden", "list", 116),
+                                         ("bfs", "Por niveles", "waypoints", 124), ("camino", "A la raíz", "footprints", 110),
+                                         ("avl", "Archivo", "archive", 96)):
+            self.b_rec.append(Boton((x, self.r_centro.bottom - 54, ancho, 42), nombre, clave, icono=ic, tam=14,
+                                    estilo="suave", sombra=3))
+            x += ancho + 6
+        self.chips_arbol = []
+        self.arbol_caso = None
         self.sel = None
-        self.vista.olvidar()
-        self.vista.seleccionado = None
+        self.modal = None
+        self.banner = None
+        self.expr = ("neutral", 0)
+        self.burbuja = None
+        p = self.p
+        self.msg_vistos = p.total_mensajes()
+        self.anim_vistos = p._seq
+        self.ind_vista = {k: float(v) for k, v in p.ciudad.v.items()}
+        self.deltas = {}
+        self.puntos = {j.nombre: j.puntos for j in p.jugadores}
+        self.ronda_vista = p.ronda
+        self.turno_visto = (p.ronda, p.turno_idx)
+        self.fin_mostrado = False
+        self._feed_cache = (None, [])
+        self._esperando_verif = None
+        self._resaltado_visto = None
+        self._auto_seleccionar()
+        if guia and TEMA.op["guia"]:
+            self.modal = Guia(self)
+        else:
+            self._banner_turno()
 
-    def _procesar_mensajes(self):
-        nuevos = self.p.mensajes[self.leidos:]
-        self.leidos = len(self.p.mensajes)
+    # ------------------------------------------------------------------ acceso
+    @property
+    def p(self):
+        return self.ctrl.partida
+
+    def en_red(self):
+        return self.ctrl.en_red
+
+    def yo(self):
+        p = self.p
+        if self.ctrl.en_red and self.ctrl.indice is not None and 0 <= self.ctrl.indice < len(p.jugadores):
+            return p.jugadores[self.ctrl.indice]
+        return p.jugador_actual
+
+    def puedo_actuar(self):
+        return self.ctrl.es_mi_turno() and self.p.evento_viral is None and not (self.modal and self.modal.bloquea)
+
+    def motivo_espera(self):
+        p = self.p
+        if p.evento_viral:
+            return "Primero hay que atender la publicación viral."
+        if getattr(self.ctrl, "esperando", False):
+            return "Esperando al servidor…"
+        if self.ctrl.en_red and p.turno_idx != self.ctrl.indice:
+            return f"Es el turno de {p.jugador_actual.nombre}. Puedes mirar el mapa, la red y el árbol."
+        return ""
+
+    def expresion_de(self, j):
+        e, t0 = self.expr
+        if j is self.p.jugador_actual and pygame.time.get_ticks() - t0 < 2600:
+            return e
+        return "neutral"
+
+    # ------------------------------------------------------------------ feed y selección
+    def feed(self):
+        clave = (id(self.p), self.p.total_mensajes(), self.p.turno_idx, len(self.p.casos))
+        if self._feed_cache[0] == clave:
+            return self._feed_cache[1]
+        p = self.p
+        yo = self.yo().nombre
+        items = []
+        for caso in p.casos_abiertos():
+            for n in caso.arbol.preorden():
+                tag, puntaje = "", n.alcance - n.profundidad * 2
+                if n.autor == yo:
+                    tag, puntaje = "Tuya", puntaje + 10
+                elif caso.receptores.get(yo) == n.id:
+                    tag, puntaje = "Te llegó", puntaje + 100
+                elif n.autor in p.red and p.red.tiene_arista(n.autor, yo):
+                    tag, puntaje = "La sigues", puntaje + 60
+                elif not n.entregado and not n.inmune:
+                    tag, puntaje = "Circulando", puntaje + 30
+                if n.viral:
+                    tag, puntaje = "Viral", puntaje + 90
+                if n.verificado:
+                    puntaje -= 25
+                items.append((puntaje, caso, n, tag))
+        items.sort(key=lambda x: -x[0])
+        feed = [(c, n, t) for _, c, n, t in items[:14]]
+        self._feed_cache = (clave, feed)
+        return feed
+
+    def nodo_sel(self):
+        if not self.sel:
+            return None
+        caso = self.p.caso_por_id(self.sel[0])
+        if caso is None or not caso.abierto:
+            return None
+        return caso.arbol.buscar(self.sel[1])
+
+    def caso_sel(self):
+        return self.p.caso_por_id(self.sel[0]) if self.sel else None
+
+    def seleccionar(self, caso_id, nodo_id):
+        self.sel = (caso_id, nodo_id)
+        self.arbol.seleccionado = nodo_id
+        if self.arbol_caso is not None and self.arbol_caso != caso_id:
+            self.arbol_caso = caso_id
+
+    def mover_seleccion(self, d):
+        feed = self.feed()
+        if not feed:
+            return
+        ids = [(c.id, n.id) for c, n, _ in feed]
+        k = ids.index(self.sel) if self.sel in ids else 0
+        k = max(0, min(len(ids) - 1, k + d))
+        self.seleccionar(*ids[k])
+        self.app.sonar("pop")
+
+    def seleccionar_de_autor(self, nombre, caso_id=None):
+        casos = [self.p.caso_por_id(caso_id)] if caso_id else self.p.casos_abiertos()
+        for caso in casos:
+            if caso is None:
+                continue
+            for n in caso.arbol.preorden():
+                if n.autor == nombre:
+                    self.seleccionar(caso.id, n.id)
+                    return True
+        return False
+
+    def _auto_seleccionar(self):
+        if self.nodo_sel() is None:
+            feed = self.feed()
+            if feed:
+                c, n, _ = feed[0]
+                self.seleccionar(c.id, n.id)
+            else:
+                self.sel = None
+
+    def cambiar_vista(self, v):
+        self.vista = v
+
+    # ------------------------------------------------------------------ jugadas
+    def accion(self, clave):
+        n, caso = self.nodo_sel(), self.caso_sel()
+        if n is None or caso is None:
+            return
+        if not self.puedo_actuar():
+            self.app.toasts.agregar(self.motivo_espera() or "Ahora no puedes actuar.", "info")
+            return
+        if clave == "compartir" and not n.verificado and not n.es_correccion:
+            k = self.p.red.grado_salida(self.p.jugador_actual.nombre)
+            self.modal = ModalConfirmar(
+                self, f"Todavía no verificas esta publicación y le llegaría a tus {k} seguidores. "
+                      "Compartir sin verificar es como se riegan los rumores.",
+                "Compartir igual", "Verificar", lambda: self._ejecutar("compartir"), lambda: self._ejecutar("verificar"))
+            return
+        self._ejecutar(clave)
+
+    def _ejecutar(self, clave):
+        n, caso = self.nodo_sel(), self.caso_sel()
+        if n is None or caso is None:
+            return
+        self.app.sonar("click")
+        if clave == "verificar":
+            self._esperando_verif = (caso.id, n.id)
+        msgs = self.ctrl.accion(caso.id, n.id, clave)
+        if msgs and len(msgs) == 1 and msgs[0].tipo == "malo" and not self.ctrl.en_red:
+            self.app.toasts.agregar(msgs[0].texto, "malo")
+        if clave in VISTA_TRAS:
+            self.vista = VISTA_TRAS[clave]
+            if self.vista == "red":
+                self.red.caso_id = caso.id
+        self._sincronizar()
+
+    def mover(self, zona):
+        msgs = self.ctrl.mover(zona)
+        if msgs and msgs[0].tipo == "malo" and not self.ctrl.en_red:
+            self.app.toasts.agregar(msgs[0].texto, "malo")
+        self.app.sonar("paso")
+        self._sincronizar()
+
+    def conversar(self):
+        if not self.puedo_actuar():
+            return
+        self.ctrl.conversar()
+        self._sincronizar()
+
+    def terminar_turno(self):
+        if not self.puedo_actuar():
+            if self.ctrl.en_red:
+                self.app.toasts.agregar(self.motivo_espera(), "info")
+            return
+        self.ctrl.terminar_turno()
+        self._sincronizar()
+
+    def resolver_viral(self, clave):
+        ev = self.p.evento_viral
+        if ev is None:
+            return
+        if clave == "verificar":
+            self._esperando_verif = (ev.caso.id, ev.nodo.id)
+        self.seleccionar(ev.caso.id, ev.nodo.id)
+        self.ctrl.resolver_viral(clave)
+        if isinstance(self.modal, ModalViral):
+            self.modal = None
+        self._sincronizar()
+
+    def cerrar_modal(self):
+        self.modal = None
+        self._sincronizar()
+
+    def abrir_archivo(self):
+        r = self.p.ultimo_resaltado or {}
+        self.modal = ModalArchivo(self, r.get("avl_ruta", []), r.get("avl_nuevo"),
+                                  volver=self.modal if isinstance(self.modal, HojaVerificacion) else None)
+
+    def terminar_noche(self):
+        self.modal = None
+        self.vista = "mapa"
+        if self.p.terminada:
+            self.fin_mostrado = True
+            self.app.fin_partida(self.ctrl)
+            return
+        self._sincronizar()
+        if self.modal is None:
+            self._banner_turno()
+
+    # ------------------------------------------------------------------ sincronización con el modelo
+    def _sincronizar(self):
+        p = self.p
+        nuevos = p.mensajes_desde(self.msg_vistos)
+        self.msg_vistos = p.total_mensajes()
         sonado = False
+        hay_noche = (p.ronda != self.ronda_vista or (p.terminada and not self.fin_mostrado))
         for m in nuevos:
+            if hay_noche and m.tipo in ("evento", "info"):
+                continue
+            if m.texto.startswith("Turno de") or m.texto.startswith("Día "):
+                continue
             if m.tipo != "info" or "Verific" in m.texto or "compart" in m.texto:
                 self.app.toasts.agregar(m.texto, m.tipo)
-            if not sonado and m.tipo in SONIDO_POR_TIPO:
-                self.app.snd.play(SONIDO_POR_TIPO[m.tipo])
+            if m.tipo in FRASES:
+                self.expr = ({"bueno": "feliz", "malo": "preocupado", "logro": "sorprendido"}[m.tipo],
+                             pygame.time.get_ticks())
+                self.burbuja = (random.choice(FRASES[m.tipo]), pygame.time.get_ticks(), m.tipo)
+            if m.tipo == "logro":
+                EFECTOS.confeti(self.r_jugador.centerx, self.r_jugador.y + 40, 70)
+                self.app.sonar("logro")
                 sonado = True
-
-    def _aplicar_resaltado(self):
-        r = self.p.ultimo_resaltado
-        self.vista.resaltar(camino=r.get("camino", []), mutacion=r.get("mutacion", []),
-                            inmunes=r.get("inmunes", []))
-        if "avl_ruta" in r:
-            self.avl_ruta = r["avl_ruta"]
-        if "podados" in r:
-            self.app.snd.play("rama")
-
-    def _accion(self, clave):
-        if self.sel is None or self.caso is None or self.sel.id not in self.arbol:
-            return
-            
-        caso_id_actual = self.caso.id
-        
-        self.p.ejecutar(clave, self.caso, self.sel)
-        self._aplicar_resaltado()
-        
-        if self.arbol is None or self.sel.id not in self.arbol:
-            self._casos_turno.add(caso_id_actual)
+            elif not sonado and m.tipo in ("bueno", "malo"):
+                self.app.sonar(m.tipo)
+                if m.tipo == "malo":
+                    EFECTOS.sacudir()
+                sonado = True
+        for ev in p.anim:
+            if ev["seq"] < self.anim_vistos:
+                continue
+            self.red.animar(ev)
+            self.mapa.animar(ev)
+            if ev.get("t") == "vertice_fuera":
+                self.red.fantasmas.append((ev["v"], *self.red.pos.get(ev["v"], (0, 0)), pygame.time.get_ticks()))
+        self.anim_vistos = p._seq
+        r = p.ultimo_resaltado or {}
+        clave_r = repr(sorted((k, str(v)) for k, v in r.items()))
+        if clave_r != self._resaltado_visto:
+            self._resaltado_visto = clave_r
+            self.arbol.resaltar(camino=r.get("camino", []), mutacion=r.get("mutacion", []),
+                                inmunes=r.get("inmunes", []))
+            if "podados" in r:
+                self.app.sonar("rama")
+        for j in p.jugadores:
+            d = j.puntos - self.puntos.get(j.nombre, j.puntos)
+            if d:
+                self.puntos[j.nombre] = j.puntos
+                x, y = (self.r_jugador.right - 60, self.r_jugador.y + 150) if j is p.jugador_actual else \
+                    self._pos_mini(p.jugadores.index(j))
+                EFECTOS.flotante(x, y, f"{d:+d}", TEMA.c["bueno"] if d > 0 else TEMA.c["malo"], 26)
+        if self._esperando_verif and "verificacion" in r:
+            caso = p.caso_por_id(self._esperando_verif[0])
+            nodo = caso.arbol.buscar(r["verificacion"].get("nodo")) if caso else None
+            if nodo is not None and not (self.ctrl.en_red and getattr(self.ctrl, "esperando", False)):
+                self._esperando_verif = None
+                if not isinstance(self.modal, (SecuenciaNoche, ModalViral)):
+                    self.modal = HojaVerificacion(self, caso, nodo, r["verificacion"])
+        elif self._esperando_verif and not getattr(self.ctrl, "esperando", False):
+            self._esperando_verif = None
+        if (p.ronda != self.ronda_vista or (p.terminada and not self.fin_mostrado)) and \
+                not isinstance(self.modal, SecuenciaNoche):
+            dia = self.ronda_vista
+            self.ronda_vista = p.ronda
+            noche = [m for m in nuevos]
+            self.modal = SecuenciaNoche(self, dia, noche)
+            self.vista = "red"
+            self.red.caso_id = None
+            self.banner = None
+            self.turno_visto = (p.ronda, p.turno_idx)
             self.sel = None
-            self.vista.seleccionado = None
-                                                                                    
-        elif clave == "verificar":
-            pass                                                         
-                                                                            
-        elif not self.modo_profesor:
-            self._casos_turno.add(caso_id_actual)
+            self._auto_seleccionar()
+            return
+        if isinstance(self.modal, SecuenciaNoche):
+            return
+        if p.evento_viral and not isinstance(self.modal, ModalViral):
+            self.modal = ModalViral(self)
+            self.seleccionar(p.evento_viral.caso.id, p.evento_viral.nodo.id)
+            return
+        if (p.ronda, p.turno_idx) != self.turno_visto:
+            self.turno_visto = (p.ronda, p.turno_idx)
             self.sel = None
-            self.vista.seleccionado = None
-        self._procesar_mensajes()
+            self._banner_turno()
+        self._auto_seleccionar()
 
-    def _terminar_turno(self):
-        self.ind_prev = dict(self.p.ciudad.v)
-        self.p.terminar_turno()
-        self.sel = None
-        self.vista.seleccionado = None
-        self.vista.secuencia = []
-        if self.p.ronda != self.ronda_vista:
-            self.ronda_vista = self.p.ronda
-            self.banner_t0 = pygame.time.get_ticks()
-        self._procesar_mensajes()
-        if self.p.evento_viral:
-            self.viral_t0 = pygame.time.get_ticks()
-            self.app.snd.play("viral")
-                                                    
-            abiertos = self.p.casos_abiertos()
-            if self.p.evento_viral.caso in abiertos:
-                self._cambiar_caso(abiertos.index(self.p.evento_viral.caso))
-        if self.p.terminada:
-            self.app.fin_partida(self.p)
-
-    def _recorrido(self, clave):
-        a = self.arbol
-        if clave == "avl":
-            self.mostrar_avl = True
+    def _banner_turno(self):
+        p = self.p
+        if p.terminada:
             return
-        if a is None or a.raiz is None:
-            return
-        if clave == "pre":
-            self.vista.animar_recorrido("Preorden", [n.id for n in a.preorden()])
-        elif clave == "post":
-            self.vista.animar_recorrido("Postorden", [n.id for n in a.postorden()])
-        elif clave == "bfs":
-            self.vista.animar_recorrido("Por niveles", [n.id for nivel in a.por_niveles() for n in nivel])
-        elif clave == "camino":
-            if self.sel is None:
-                self.app.toasts.agregar("Selecciona un nodo para ver su camino a la raíz.", "info")
-                return
-            self.vista.animar_recorrido("Camino a raíz", [n.id for n in a.camino_a_raiz(self.sel.id)])
-        self.app.snd.play("click")
+        propio = None
+        if self.ctrl.en_red:
+            propio = p.turno_idx == self.ctrl.indice
+        self.banner = BannerTurno(self, p.jugador_actual, propio)
 
+    # ------------------------------------------------------------------ eventos
     def evento(self, e):
-        if self.p.evento_viral:
-            return self._evento_viral(e)
-        if self.mostrar_avl:
-            if (e.type == pygame.KEYDOWN and e.key == pygame.K_ESCAPE) or \
-                    (e.type == pygame.MOUSEBUTTONDOWN and e.button == 1):
-                self.mostrar_avl = False
+        if self.modal is not None and self.modal.bloquea:
+            self.modal.evento(e)
             return
-        if e.type == pygame.MOUSEMOTION:
-            if self.modo_profesor:
-                self.vista.hover = self.vista.nodo_en(self.arbol, e.pos)
-        elif e.type == pygame.MOUSEBUTTONDOWN and e.button == 1:
-            if self.modo_profesor:
-                n = self.vista.nodo_en(self.arbol, e.pos)
-                if n is not None:
-                    self.sel = n
-                    self.vista.seleccionado = n.id
-                    self.app.snd.play("click")
-                    return
-            for b in self.botones_acc:
-                if b.clic(e.pos):
-                    self._accion(b.clave)
-                    return
-            if self.modo_profesor:
-                for i, (r, _) in enumerate(self.tabs):
-                    if r.collidepoint(e.pos):
-                        self._cambiar_caso(i)
-                        return
-                for b in self.botones_rec:
-                    if b.clic(e.pos):
-                        self._recorrido(b.clave)
-                        return
-            if self.btn_fin.clic(e.pos):
-                self._terminar_turno()
-            elif self.btn_ayuda.clic(e.pos):
-                self.app.mostrar_ayuda = True
-            elif self.btn_contraste.clic(e.pos):
-                TEMA.alternar_contraste()
-            elif self.btn_sonido.clic(e.pos):
-                self.app.snd.activo = not self.app.snd.activo
-        elif e.type == pygame.KEYDOWN:
+        if e.type == pygame.KEYDOWN:
             if e.key == pygame.K_TAB:
-                self.modo_profesor = not self.modo_profesor
-                self.app.snd.play("click")
-            elif e.key == pygame.K_RIGHT and self.modo_profesor and self.p.casos_abiertos():
-                self._cambiar_caso((self.caso_idx + 1) % len(self.p.casos_abiertos()))
-            elif e.key == pygame.K_LEFT and self.modo_profesor and self.p.casos_abiertos():
-                self._cambiar_caso((self.caso_idx - 1) % len(self.p.casos_abiertos()))
-            elif e.key == pygame.K_RETURN:
-                self._terminar_turno()
+                orden = ["mapa", "red", "arbol"]
+                self.vista = orden[(orden.index(self.vista) + 1) % 3]
+                self.app.sonar("click")
+            elif e.key in (pygame.K_RETURN, pygame.K_KP_ENTER):
+                self.terminar_turno()
             elif pygame.K_1 <= e.key <= pygame.K_6:
-                i = e.key - pygame.K_1
-                if i < len(self.botones_acc) and self.botones_acc[i].activo:
-                    self._accion(self.botones_acc[i].clave)
-
-    def _evento_viral(self, e):
+                self.celular.tecla(e.key - pygame.K_1)
+            elif e.key in (pygame.K_LEFT, pygame.K_UP):
+                self.mover_seleccion(-1)
+            elif e.key in (pygame.K_RIGHT, pygame.K_DOWN):
+                self.mover_seleccion(1)
+            elif e.key == pygame.K_a:
+                self.abrir_archivo()
+            return
         if e.type == pygame.MOUSEBUTTONDOWN and e.button == 1:
-            for b in self._botones_viral():
+            self.banner = None
+            for b in self.tabs:
                 if b.clic(e.pos):
-                    self._resolver_viral(b.clave)
+                    self.vista = b.clave
+                    self.app.sonar("click")
+                    return
+            if self.b_ayuda.clic(e.pos):
+                return self.app.abrir(self.app.ayuda)
+            if self.b_acc.clic(e.pos):
+                return self.app.abrir(self.app.accesibilidad)
+            if self.b_snd.clic(e.pos):
+                return self.app.alternar_sonido()
+            if self.b_menu.clic(e.pos):
+                self.modal = ModalConfirmar(self, "Si sales al menú, esta partida se termina para ti.",
+                                            "Salir al menú", "Seguir jugando", self.salir, lambda: None)
+                self.modal.b_si.icono, self.modal.b_no.icono = "log-out", "play"
+                return
+            if self.btn_fin.clic(e.pos):
+                return self.terminar_turno()
+        if self.celular.evento(e):
+            return
+        if self.vista == "mapa":
+            self.mapa.evento(e)
+        elif self.vista == "red":
+            self.red.evento(e)
+        else:
+            self._evento_arbol(e)
 
-    def _botones_viral(self):
-        bs = []
-        x = 640 - 255
-        for clave, nombre in (("verificar", "VERIFICAR"), ("compartir", "COMPARTIR"),
-                              ("reportar", "REPORTAR"), ("ignorar", "IGNORAR")):
-            bs.append(Boton((x, 478, 120, 44), nombre, clave, tam=15))
-            x += 130
-        return bs
+    def _evento_arbol(self, e):
+        caso = self._caso_arbol()
+        if e.type == pygame.MOUSEMOTION:
+            self.arbol.hover = self.arbol.nodo_en(caso.arbol if caso else None, e.pos)
+        elif e.type == pygame.MOUSEBUTTONDOWN and e.button == 1:
+            for r, cid in self.chips_arbol:
+                if r.collidepoint(e.pos):
+                    self.arbol_caso = cid
+                    self.app.sonar("click")
+                    return
+            for b in self.b_rec:
+                if b.clic(e.pos):
+                    self._recorrido(b.clave, caso)
+                    return
+            n = self.arbol.nodo_en(caso.arbol if caso else None, e.pos)
+            if n is not None:
+                self.seleccionar(caso.id, n.id)
+                self.app.sonar("pop")
 
-    def _resolver_viral(self, clave):
-        ev = self.p.evento_viral
-        self.sel = ev.nodo
-        self.vista.seleccionado = ev.nodo.id
-        self.p.resolver_viral(clave)
-        self._aplicar_resaltado()
-        self.viral_t0 = None
-        if self.arbol is None or self.sel.id not in self.arbol:
-            self.sel = None
-            self.vista.seleccionado = None
-        self._procesar_mensajes()
+    def _recorrido(self, clave, caso):
+        if clave == "avl":
+            return self.abrir_archivo()
+        if caso is None or caso.arbol.raiz is None:
+            return
+        a = caso.arbol
+        if clave == "pre":
+            self.arbol.animar_recorrido("Preorden (raíz, luego hijos): orden en que se leyó el hilo",
+                                        [n.id for n in a.preorden()])
+        elif clave == "post":
+            self.arbol.animar_recorrido("Postorden (hijos, luego raíz): así se suma el alcance de abajo hacia arriba",
+                                        [n.id for n in a.postorden()])
+        elif clave == "bfs":
+            self.arbol.animar_recorrido("Por niveles (con cola): cada nivel es una ola de propagación",
+                                        [n.id for nivel in a.por_niveles() for n in nivel])
+        elif clave == "camino":
+            n = self.nodo_sel()
+            if n is None or n.id not in a:
+                self.app.toasts.agregar("Elige una publicación de este árbol para ver su camino a la raíz.", "info")
+                return
+            self.arbol.animar_recorrido("Camino a la raíz: de dónde salió esta versión",
+                                        [m.id for m in a.camino_a_raiz(n.id)])
+        self.app.sonar("click")
 
+    def _caso_arbol(self):
+        p = self.p
+        cid = self.arbol_caso if self.arbol_caso is not None else (self.sel[0] if self.sel else None)
+        caso = p.caso_por_id(cid) if cid else None
+        if caso is None or not caso.abierto:
+            abiertos = p.casos_abiertos()
+            caso = abiertos[0] if abiertos else None
+        return caso
+
+    def salir(self):
+        self.ctrl.cerrar()
+        self.app.ir_menu()
+
+    def cerrar(self):
+        self.ctrl.cerrar()
+
+    # ------------------------------------------------------------------ actualización
     def actualizar(self):
-                                                       
-        turno_id = id(self.p.jugador_actual)
-        if turno_id != self._turno_actual_id:
-            self._turno_actual_id = turno_id
-            self._casos_turno.clear()
+        nuevo, otros = self.ctrl.actualizar()
+        for m in otros:
+            if m.get("t") == "aviso":
+                self.app.toasts.agregar(m.get("texto", ""), m.get("tipo", "info"))
+        if nuevo:
+            self._sincronizar()
+        if self.modal is not None and hasattr(self.modal, "actualizar"):
+            self.modal.actualizar()
+        if self.banner is not None and not self.banner.vivo():
+            self.banner = None
+        for k, v in self.p.ciudad.v.items():
+            antes = self.ind_vista.get(k, v)
+            if round(antes) != v and k not in self.deltas:
+                self.deltas[k] = (v - round(antes), pygame.time.get_ticks())
+            self.ind_vista[k] = acercar(antes, v, 0.08) if not TEMA.op["menos_movimiento"] else v
+        ahora = pygame.time.get_ticks()
+        self.deltas = {k: d for k, d in self.deltas.items() if ahora - d[1] < 4000}
 
-        if self.p.evento_viral:
-            if self.viral_t0 is None:
-                self.viral_t0 = pygame.time.get_ticks()
-            restante = self.p.evento_viral.segundos - (pygame.time.get_ticks() - self.viral_t0) / 1000
-            if int(restante) != self.ultimo_tick:
-                self.ultimo_tick = int(restante)
-                self.app.snd.play("tick")
-            if restante <= 0:
-                self._resolver_viral(None)
-        cid = self.caso.id if self.caso else None
-        if cid != getattr(self, "_caso_visto", None):
-            self._caso_visto = cid
-            self.vista.olvidar()
+    actualizar_red = actualizar
 
-        if not self.modo_profesor and self.sel is None:
-            abiertos = self.p.casos_abiertos()
-            
-            casos_bloqueados = getattr(self, "_casos_turno", set())
-            disponibles = [c for c in abiertos if c.id not in casos_bloqueados]
-            
-            if not disponibles and self.p.jugador_actual.atencion > 0:
-                self.p._nuevo_caso(falso=self.p.rng.random() < 0.6)
-                self.p._recalcular()
-                abiertos = self.p.casos_abiertos()
-
-            nombre_jugador = self.p.jugador_actual.nombre
-            mejor = None
-            for i in range(len(abiertos)):
-                idx = (self.caso_idx + i) % len(abiertos)
-                caso_temp = abiertos[idx]
-                                                           
-                if caso_temp.id in self._casos_turno:
-                    continue
-                if not caso_temp.arbol or caso_temp.arbol.raiz is None:
-                    continue
-                for nivel in caso_temp.arbol.por_niveles():
-                    for nodo in nivel:
-                        if nodo.inmune or nodo.verificado:
-                            continue
-                        if nodo.autor == nombre_jugador:
-                            continue
-                        mejor = (idx, nodo)
-                        break
-                    if mejor:
-                        break
-                if mejor:
-                    break
-            if mejor:
-                self.caso_idx = mejor[0]
-                self.sel = mejor[1]
-                self.vista.seleccionado = mejor[1].id
-
-        self.vista.calcular_layout(self.arbol)
-
+    # ------------------------------------------------------------------ dibujo
     def dibujar(self, sup):
         c = TEMA.c
-        sup.fill(c["fondo"])
+        dx, dy = EFECTOS.desfase()
+        cielo(sup)
         self._barra_superior(sup)
-        self._panel_ciudad(sup)
-        
-        if self.modo_profesor:
-            self._tabs(sup)
-            self.vista.dibujar(sup, self.arbol)
-            self._leyenda(sup)
-            self._barra_recorridos(sup)
-            self._registro(sup, 274, 600, 690, 150)
-            self._panel_publicacion(sup)
+        self.celular.dibujar(sup)
+        for b in self.tabs:
+            b.seleccionado = b.clave == self.vista
+            b.dibujar(sup)
+        sticker(sup, self.r_centro, c["papel"], 20, 5, 3)
+        if self.vista == "mapa":
+            self.mapa.dibujar(sup)
+        elif self.vista == "red":
+            self.red.dibujar(sup)
         else:
-            self._dibujar_celular(sup)
-            self._registro(sup, 840, 66, 420, 614)
-            self.btn_fin.rect.topleft = (988, 700)
-            self.btn_fin.seleccionado = self.p.jugador_actual.atencion == 0
-            self.btn_fin.dibujar(sup)
-
-        self.app.toasts.dibujar(sup, 574, 506, 382, abajo=True)
-        self._banner_ronda(sup)
-        if self.mostrar_avl:
-            dibujar_avl(sup, self.p.archivo, pygame.Rect(60, 50, 1160, 660), self.avl_ruta, self.p.hechos)
-        if self.p.evento_viral:
-            self._modal_viral(sup)
+            self._dibujar_arbol(sup)
+        self._panel_jugador(sup)
+        self._panel_ciudad(sup)
+        self._panel_jugadores(sup)
+        self.btn_fin.activo = self.puedo_actuar()
+        if self.ctrl.en_red and not self.ctrl.es_mi_turno() and not self.p.evento_viral:
+            self.btn_fin.etiqueta = f"Turno de {recortar(self.p.jugador_actual.nombre, 18, 160, 600)}"
+        else:
+            self.btn_fin.etiqueta = "Terminar turno"
+        if self.puedo_actuar() and self.p.jugador_actual.atencion == 0:
+            pul = 3 + 2 * math.sin(pygame.time.get_ticks() / 160)
+            pygame.draw.rect(sup, c["mango"], self.btn_fin.rect.inflate(10 + pul, 10 + pul), 5, border_radius=18)
+        self.btn_fin.dibujar(sup)
+        alto_toast = 96 if self.vista == "mapa" else 64
+        if (self.vista == "red" and self.red.herr) or (self.vista == "arbol" and self.arbol.secuencia):
+            alto_toast = 140
+        self.app.toasts.dibujar(sup, self.r_centro.x + 18, self.r_centro.bottom - alto_toast, self.r_centro.w - 36,
+                                abajo=True)
+        if self.banner is not None:
+            self.banner.dibujar(sup)
+        if self.modal is not None:
+            self.modal.dibujar(sup)
+        if dx or dy:
+            copia = sup.copy()
+            sup.fill(c["tinta"])
+            sup.blit(copia, (dx, dy))
 
     def _barra_superior(self, sup):
         c = TEMA.c
-        pygame.draw.rect(sup, c["panel"], (0, 0, 1280, 56))
-        pygame.draw.line(sup, c["borde"], (0, 56), (1280, 56))
-        texto(sup, "ALCALDE DIGITAL", (16, 8), 22, c["texto"], True)
-        texto(sup, "Civitas · Ciudad Nova", (18, 33), 13, c["acento"])
-        texto(sup, f"RONDA {min(self.p.ronda, self.p.rondas_totales)} / {self.p.rondas_totales}",
-              (330, 18), 18, c["texto"], True)
-        j = self.p.jugador_actual
-        x = 500
-        pygame.draw.circle(sup, j.color, (x + 16, 28), 16)
-        texto(sup, j.info_rol["simbolo"], (x + 16, 28), 16, (10, 12, 20), True, centro=True)
-        texto(sup, f"Turno de {j.nombre}", (x + 42, 9), 17, c["texto"], True)
-        texto(sup, j.info_rol["nombre"] + (f" · {j.candidato}" if j.candidato else ""),
-              (x + 42, 31), 13, c["tenue"])
-        texto(sup, "Atención", (800, 10), 12, c["tenue"])
-        for i in range(3):
-            lleno = i < j.atencion
-            pygame.draw.circle(sup, c["aviso"] if lleno else c["panel2"], (812 + i * 26, 38), 9)
-            pygame.draw.circle(sup, c["aviso"], (812 + i * 26, 38), 9, 1)
-        self.btn_ayuda.dibujar(sup)
-        self.btn_contraste.seleccionado = TEMA.alto_contraste
-        self.btn_contraste.dibujar(sup)
-        self.btn_sonido.etiqueta = "Sonido" if self.app.snd.activo else "Mudo"
-        self.btn_sonido.dibujar(sup)
+        p = self.p
+        sup.blit(personajes.civi("feliz", 54), (14, 6))
+        titulo(sup, "Alcalde Digital", (56, 8), 24, c["texto"])
+        texto(sup, "Ciudad Nova va a elegir alcalde", (58, 38), 13, c["tinta2"], peso=800)
+        dia = min(p.ronda, p.rondas_totales)
+        x0 = 352
+        titulo(sup, f"Día {dia} de {p.rondas_totales}", (x0, 10), 22, c["texto"])
+        faltan = p.rondas_totales - dia
+        texto(sup, "Mañana es la elección" if faltan == 0 else
+              ("Falta 1 día para votar" if faltan == 1 else f"Faltan {faltan} días para votar"),
+              (x0 + 2, 40), 13, c["tinta2"], peso=800)
+        xp = x0 + 170
+        for k in range(1, p.rondas_totales + 1):
+            r = pygame.Rect(xp + (k - 1) * 34, 22, 28, 22)
+            col = c["acento"] if k < dia else (c["mango"] if k == dia else c["papel"])
+            sticker(sup, r, col, 8, 2, 2)
+            if k == dia:
+                texto(sup, str(k), r.center, 12, c["texto"], peso=900, ancla="c")
+        xu = xp + p.rondas_totales * 34
+        sticker(sup, (xu, 16, 36, 34), c["papel"], 10, 3, 2)
+        sup.blit(recursos.icono("vote", 22, c["acento"], 2.4), (xu + 7, 22))
+        if self.ctrl.en_red:
+            yo = self.yo()
+            chip(sup, f"Eres {yo.nombre}", (xu + 50, 33), yo.color, c["sobre_color"], "user", 13, ancla="ml")
+        self.b_snd.icono = "volume-2" if self.app.snd.activo else "volume-x"
+        for b in (self.b_ayuda, self.b_acc, self.b_snd, self.b_menu):
+            b.dibujar(sup)
+        for b, t in ((self.b_ayuda, "Ayuda (H)"), (self.b_acc, "Accesibilidad"), (self.b_snd, "Sonido (M)"),
+                     (self.b_menu, "Salir al menú")):
+            if b.hover:
+                tooltip(sup, t, (b.rect.centerx, b.rect.bottom + 34), 150)
+
+    def _panel_jugador(self, sup):
+        c = TEMA.c
+        p = self.p
+        j = p.jugador_actual
+        r = self.r_jugador
+        ahora = pygame.time.get_ticks()
+        sticker(sup, r, c["papel"], 20, 5, 3)
+        foco = pygame.Rect(r.x + 10, r.y + 10, 124, r.h - 20)
+        pygame.draw.rect(sup, j.color, foco, border_radius=16)
+        pygame.draw.circle(sup, (255, 255, 255), (foco.centerx, foco.y + 70), 48)
+        bob = math.sin(ahora / 420) * 2 if not TEMA.op["menos_movimiento"] else 0
+        img = personajes.cuerpo(j.look, j.rol, self.expresion_de(j), alto=186, parpadeo=(ahora % 4300) < 130,
+                                color_extra=(58, 110, 230))
+        sup.blit(img, (foco.centerx - img.get_width() // 2, foco.bottom - 190 + bob))
+        x = r.x + 146
+        texto(sup, recortar(j.nombre, 21, r.right - x - 12, 700, "titulo"), (x, r.y + 12), 21, c["texto"],
+              peso=700, fam="titulo")
+        nombre_rol = recortar(j.candidato, 12, r.right - x - 48, 800) if j.candidato else j.info_rol["nombre"]
+        chip(sup, nombre_rol, (x, r.y + 44), c["mango2"], c["texto"], ICONO_ROL[j.rol], 12)
+        y = r.y + 86
+        texto(sup, "Atención", (x, y), 12, c["tinta2"], peso=900)
+        for k in range(3):
+            lleno = k < j.atencion
+            cx = x + 70 + k * 30
+            circulo(sup, (cx, y + 8), 12, c["mango"] if lleno else c["papel2"], c["borde"], 2)
+            sup.blit(recursos.icono("zap", 14, c["texto"] if lleno else c["tenue"], 2.6), (cx - 7, y + 1))
+        y += 32
+        texto(sup, "Caminar", (x, y), 12, c["tinta2"], peso=900)
+        barra(sup, (x + 70, y + 2, 50, 12), 100 * j.minutos / 15, c["acento"])
+        texto(sup, f"{j.minutos} min", (r.right - 12, y), 12, c["texto"], peso=900, ancla="tr")
+        y += 30
+        sup.blit(recursos.icono("star", 22, c["logro"], 2.6), (x, y + 2))
+        titulo(sup, f"{j.puntos}", (x + 28, y - 2), 26, c["texto"])
+        texto(sup, "puntos", (x + 30 + recursos.fuente(26, 700, "titulo").size(str(j.puntos))[0], y + 12), 12,
+              c["tinta2"], peso=800)
+        y += 36
+        texto(sup, "Reputación", (x, y), 12, c["tinta2"], peso=900)
+        barra(sup, (x + 70, y + 2, 50, 12), j.reputacion, c["bueno"] if j.reputacion >= 50 else c["malo"])
+        texto(sup, str(j.reputacion), (r.right - 12, y), 12, c["texto"], peso=900, ancla="tr")
+        if self.burbuja:
+            s, t0, tipo = self.burbuja
+            e = ahora - t0
+            if e > 2600:
+                self.burbuja = None
+            else:
+                caja = pygame.Rect(0, 0, 176, 54)
+                caja.topright = (r.x - 8, r.y + 30)
+                col = {"bueno": c["bueno2"], "malo": c["malo2"]}.get(tipo, c["mango2"])
+                sticker(sup, caja, col, 16, 3, 3)
+                pygame.draw.polygon(sup, col, [(caja.right - 3, caja.y + 14), (caja.right + 12, caja.y + 22),
+                                               (caja.right - 3, caja.y + 30)])
+                pygame.draw.lines(sup, c["tinta"], False, [(caja.right - 1, caja.y + 13), (caja.right + 13, caja.y + 22),
+                                                           (caja.right - 1, caja.y + 31)], 3)
+                parrafo(sup, s, caja.x + 12, caja.y + 8, caja.w - 22, 14, c["texto"], peso=800, max_lineas=2)
 
     def _panel_ciudad(self, sup):
         c = TEMA.c
-        r = pygame.Rect(12, 66, 250, 684)
-        panel(sup, r)
-        texto(sup, "CIUDAD NOVA", (26, 78), 15, c["acento"], True)
-        salud = self.p.ciudad.salud()
-        texto(sup, str(salud), (246, 72), 30, c["bueno"] if salud >= 55 else c["malo"], True, derecha=True)
-        texto(sup, "salud", (246, 106), 11, c["tenue"], derecha=True)
-        y = 124
-        for k, v in self.p.ciudad.v.items():
-            negativo = k in NEGATIVOS
-            texto(sup, NOMBRES[k], (26, y), 13)
-            texto(sup, str(v), (246, y), 13, c["texto"], True, derecha=True)
-            d = v - self.ind_prev.get(k, v)
-            if d:
-                bueno = (d < 0) if negativo else (d > 0)
-                texto(sup, f"{d:+d}", (212, y), 12, c["bueno"] if bueno else c["malo"], True, derecha=True)
-            pygame.draw.rect(sup, c["panel2"], (26, y + 19, 220, 8), border_radius=4)
-            col = c["malo"] if negativo else c["acento"]
-            pygame.draw.rect(sup, col, (26, y + 19, int(220 * v / 100), 8), border_radius=4)
-            if negativo:                                                                
-                for xx in range(26, 26 + int(220 * v / 100), 7):
-                    pygame.draw.line(sup, c["fondo"], (xx, y + 26), (xx + 5, y + 19), 1)
-            y += 42
-        y += 6
-        pygame.draw.line(sup, c["borde"], (24, y), (250, y))
-        texto(sup, "JUGADORES", (26, y + 10), 15, c["acento"], True)
-        y += 36
-        for i, j in enumerate(self.p.jugadores):
-            actual = i == self.p.turno_idx
-            box = pygame.Rect(20, y - 4, 234, 58)
+        p = self.p
+        r = self.r_ciudad
+        sticker(sup, r, c["papel"], 20, 5, 3)
+        titulo(sup, "Ciudad Nova", (r.x + 16, r.y + 12), 21, c["texto"])
+        texto(sup, "Salud de la ciudad", (r.x + 18, r.y + 40), 12, c["tinta2"], peso=800)
+        salud = p.ciudad.salud()
+        col = c["bueno"] if salud >= 60 else c["aviso"] if salud >= 45 else c["malo"]
+        cara_ic = "smile" if salud >= 60 else "meh" if salud >= 45 else "frown"
+        sup.blit(recursos.icono(cara_ic, 34, col, 2.6), (r.right - 104, r.y + 14))
+        titulo(sup, str(salud), (r.right - 16, r.y + 10), 34, col, ancla="tr")
+        y = r.y + 64
+        ahora = pygame.time.get_ticks()
+        raton = pygame.mouse.get_pos()
+        for k in ("info_verificada", "confianza", "convivencia", "bienestar", "desinformacion", "conflictos"):
+            neg = k in NEGATIVOS
+            v = self.ind_vista.get(k, p.ciudad.v[k])
+            fila = pygame.Rect(r.x + 10, y - 2, r.w - 20, 30)
+            sup.blit(recursos.icono(ICONO_IND[k], 18, c["malo"] if neg else c["acento"], 2.4), (r.x + 16, y + 3))
+            texto(sup, CORTOS[k], (r.x + 42, y + 1), 13, c["texto"], peso=800)
+            barra(sup, (r.x + 154, y + 6, 92, 12), v, c["malo"] if neg else c["acento"], rayas=neg)
+            texto(sup, str(p.ciudad.v[k]), (r.right - 12, y + 1), 14, c["texto"], peso=900, ancla="tr")
+            if k in self.deltas:
+                d, t0 = self.deltas[k]
+                bueno = (d < 0) if neg else (d > 0)
+                chip(sup, f"{d:+d}", (r.x + 200, y + 12), c["bueno"] if bueno else c["malo"], c["sobre_color"], None,
+                     11, ancla="c", alto=20)
+            if fila.collidepoint(raton):
+                from .ayuda import SECCIONES
+                desc = next(b[3] for b in SECCIONES[5][2] if b[0] == "item" and b[2] == NOMBRES[k])
+                tooltip(sup, desc, (fila.x + 90, fila.y), 240)
+            y += 32
+
+    def _pos_mini(self, i):
+        n = len(self.p.jugadores)
+        paso = (self.r_jugadores.w - 20) / n
+        return self.r_jugadores.x + 10 + paso * i + paso / 2, self.r_jugadores.centery
+
+    def _panel_jugadores(self, sup):
+        c = TEMA.c
+        p = self.p
+        r = self.r_jugadores
+        sticker(sup, r, c["papel"], 18, 4, 3)
+        for i, j in enumerate(p.jugadores):
+            x, y = self._pos_mini(i)
+            actual = j is p.jugador_actual
+            img = cara(p, j.nombre, 36, borde=c["borde"], grosor=2)
+            if i in getattr(self.ctrl, "desconectados", []):
+                img = img.copy()
+                img.set_alpha(90)
             if actual:
-                pygame.draw.rect(sup, c["panel2"], box, border_radius=8)
-                pygame.draw.rect(sup, j.color, box, 2, border_radius=8)
-            pygame.draw.circle(sup, j.color, (40, y + 16), 13)
-            texto(sup, j.info_rol["simbolo"], (40, y + 16), 14, (10, 12, 20), True, centro=True)
-            texto(sup, j.nombre, (60, y), 14, c["texto"], True)
-            texto(sup, f"{j.puntos} pts", (246, y), 14, c["aviso"], True, derecha=True)
-            texto(sup, f"Reputación {j.reputacion}", (60, y + 18), 12, c["tenue"])
-            texto(sup, f"{len(j.logros)} logros", (246, y + 18), 12, c["logro"], derecha=True)
-            pygame.draw.rect(sup, c["panel2"], (60, y + 37, 186, 5), border_radius=3)
-            pygame.draw.rect(sup, j.color, (60, y + 37, int(186 * j.reputacion / 100), 5), border_radius=3)
-            y += 64
+                pygame.draw.circle(sup, j.color, (x - 22, y), 23, 4)
+            sup.blit(img, (x - 40, y - 18))
+            ancho = (self.r_jugadores.w - 20) / len(p.jugadores) - 44
+            texto(sup, recortar(j.nombre, 12, ancho, 900), (x - 1, y - 14), 12, c["texto"], peso=900)
+            texto(sup, f"{j.puntos} pts", (x - 1, y + 2), 12, c["tinta2"], peso=800)
 
-    def _tabs(self, sup):
+    def _dibujar_arbol(self, sup):
         c = TEMA.c
-        self.tabs = []
-        x = 274
-        abiertos = self.p.casos_abiertos()
-        ancho = min(228, (690 - 8 * (len(abiertos) - 1)) // max(1, len(abiertos)))
-        for i, caso in enumerate(abiertos):
-            r = pygame.Rect(x, 66, ancho, 34)
-            sel = caso is self.caso
-            pygame.draw.rect(sup, c["panel2"] if sel else c["panel"], r, border_radius=8)
-            pygame.draw.rect(sup, c["acento"] if sel else c["borde"], r, 2 if sel else 1, border_radius=8)
-            t = f"Caso {caso.id} · {caso.hecho.titulo}"
-            while TEMA.fuente(13, True).size(t)[0] > ancho - 44 and len(t) > 8:
-                t = t[:-2]
-            texto(sup, t if t.endswith(caso.hecho.titulo) else t + "…", (x + 10, 75), 13,
-                  c["texto"] if sel else c["tenue"], True)
-            texto(sup, str(len(caso.arbol)), (r.right - 10, 75), 13, c["aviso"], True, derecha=True)
-            self.tabs.append((r, caso))
-            x += ancho + 8
-
-    def _leyenda(self, sup):
-        c = TEMA.c
-        x, y = 290, 524
-        from .widgets import poligono_regular
-        items = [("sin verificar", "c", c["n_desconocido"]), ("verdadero", "s", c["n_veraz"]),
-                 ("falso", "t", c["n_falso"]), ("desmentido", "d", c["n_correccion"])]
-        for nombre, forma, col in items:
-            if forma == "c":
-                pygame.draw.circle(sup, col, (x, y), 6)
-            elif forma == "s":
-                pygame.draw.rect(sup, col, (x - 6, y - 6, 12, 12), border_radius=2)
-            elif forma == "t":
-                pygame.draw.polygon(sup, col, poligono_regular((x, y + 1), 8, 3, -math.pi / 2))
-            else:
-                pygame.draw.polygon(sup, col, poligono_regular((x, y), 8, 4))
-            r = texto(sup, nombre, (x + 12, y - 8), 12, c["tenue"])
-            x = r.right + 18
-        if self.arbol and self.arbol.raiz:
-            e = self.arbol.estadisticas()
-            texto(sup, f"{e['nodos']} nodos · altura {e['altura']} · {e['olas']} olas · "
-                       f"{e['alcance']} personas", (950, y - 8), 12, c["tenue"], derecha=True)
-
-    def _barra_recorridos(self, sup):
-        for b in self.botones_rec:
-            b.activo = not (b.clave == "camino" and self.sel is None)
-            b.dibujar(sup)
-
-    def _registro(self, sup, x, y_pos, w, h):
-        c = TEMA.c
-        r = pygame.Rect(x, y_pos, w, h)
-        panel(sup, r)
-        y = r.y + 8
-        v = self.vista
+        p = self.p
+        caso = self._caso_arbol()
+        self.chips_arbol = []
+        x, y = self.r_centro.x + 14, self.r_centro.y + 14
+        for cs in p.casos_abiertos():
+            sel = caso is not None and cs.id == caso.id
+            r = chip(sup, recortar(cs.hecho.titulo, 13, 160, 800), (x, y), color_caso(cs.id) if sel else c["papel"],
+                     c["sobre_color"] if sel else c["texto"], None, 13, punto=None if sel else color_caso(cs.id))
+            self.chips_arbol.append((r, cs.id))
+            x = r.right + 8
+        if caso is None:
+            texto(sup, "No hay historias abiertas.", self.r_centro.center, 16, c["tinta2"], peso=800, ancla="c")
+            return
+        if self.arbol._arbol_id != caso.id:
+            self.arbol.olvidar()
+            self.arbol._arbol_id = caso.id
+        self.arbol.calcular_layout(caso.arbol)
+        n = self.nodo_sel()
+        self.arbol.seleccionado = n.id if n is not None and n.id in caso.arbol else None
+        self.arbol.dibujar(sup, caso.arbol, p)
+        e = caso.arbol.estadisticas()
+        texto(sup, f"{e['nodos']} publicaciones, altura {e['altura']}, {e['olas']} olas, le llegó a {e['alcance']} "
+                   "personas", (self.r_centro.right - 14, self.r_centro.bottom - 70), 12, c["tinta2"], peso=800,
+              ancla="br")
+        v = self.arbol
         if v.secuencia:
             paso = v.paso_actual()
             nombres = []
             for nid in v.secuencia[:paso]:
-                n = self.arbol.buscar(nid) if self.arbol else None
-                nombres.append(n.autor.split()[0] if n else "?")
-            lineas = envolver(f"{v.sec_nombre}: " + " → ".join(nombres), 13, r.w - 24, True)
-            for l in lineas[-2:]:
-                texto(sup, l, (r.x + 12, y), 13, c["aviso"], True)
-                y += 18
-            y += 4
-        texto(sup, "REGISTRO", (r.right - 12, r.y + 8), 11, c["tenue"], True, derecha=True)
-        colores = {"bueno": c["bueno"], "malo": c["malo"], "logro": c["logro"], "evento": c["acento"]}
-        restantes = (r.bottom - y - 4) // 18
-        for m in self.p.mensajes[-restantes:] if restantes > 0 else []:
-            t = m.texto
-            while TEMA.fuente(13).size(t)[0] > r.w - 110 and len(t) > 10:
-                t = t[:-4] + "…"
-            texto(sup, t, (r.x + 12, y), 13, colores.get(m.tipo, c["tenue"]))
-            y += 18
-
-    def _panel_publicacion(self, sup):
-        c = TEMA.c
-        r = pygame.Rect(976, 66, 292, 684)
-        panel(sup, r)
-        texto(sup, "PUBLICACIÓN", (990, 78), 15, c["acento"], True)
-        n = self.sel if (self.sel and self.arbol and self.sel.id in self.arbol) else None
-        y = 104
-        if n is None:
-            y = parrafo(sup, "Haz clic en un nodo del árbol para ver la publicación. Pasa el "
-                             "mouse por encima para leerla rápido.", 990, y, 262, 14, c["tenue"])
-        else:
-            estado = ("DESMENTIDO" if n.es_correccion else "SIN VERIFICAR" if not n.verificado
-                      else "VERDADERO" if n.es_veraz else "FALSO")
-            col = {"FALSO": c["n_falso"], "VERDADERO": c["n_veraz"], "DESMENTIDO": c["n_correccion"]}.get(
-                estado, c["n_desconocido"])
-            pygame.draw.rect(sup, col, (990, y, 124, 22), border_radius=5)
-            texto(sup, estado, (1052, y + 11), 12, (10, 12, 20), True, centro=True)
-            if n.inmune:
-                texto(sup, "rama contenida", (1124, y + 3), 12, c["n_inmune"], True)
-            y += 32
-            texto(sup, n.autor, (990, y), 16, c["texto"], True)
-            y += 22
-            texto(sup, ("Publicación original" if n.es_raiz else f"Reenvío · ola {n.profundidad}")
-                  + f" · {n.alcance} personas", (990, y), 12, c["tenue"])
-            y += 24
-            y = parrafo(sup, '"' + n.afirmacion.texto() + '"', 990, y, 262, 15, c["texto"]) + 8
-            if n.verificado and not n.es_veraz:
-                texto(sup, "Distorsiones detectadas:", (990, y), 13, c["malo"], True)
-                y += 20
-                for d in n.afirmacion.distorsiones:
-                    texto(sup, "· " + DISTORSIONES[d], (996, y), 13, c["malo"])
-                    y += 18
-            if n.verificado and n.distorsion and "+" not in n.distorsion:
-                y = parrafo(sup, f"En este reenvío apareció: {DISTORSIONES[n.distorsion]}",
-                            990, y + 4, 262, 12, c["aviso"])
-            if n.hijos:
-                texto(sup, f"{len(n.hijos)} reenvíos directos", (990, y + 4), 12, c["tenue"])
-
-        yb = 440
-        texto(sup, "ACCIONES", (990, yb - 24), 15, c["acento"], True)
-        self.botones_acc = []
-        motivo = ""
-        for i, a in enumerate(self.p.acciones_para(n)):
-            b = Boton((988, yb, 268, 34), f"{i + 1}. {a['nombre']}", a["clave"], a["costo"], tam=14,
-                      color=c["logro"] if a.get("especial") else None)
-            b.activo = a["ok"]
+                m = caso.arbol.buscar(nid)
+                nombres.append(str(m.autor).split()[0] if m else "?")
+            r = pygame.Rect(self.r_centro.x + 12, self.r_centro.bottom - 128, self.r_centro.w - 24, 52)
+            sticker(sup, r, c["mango2"], 14, 3, 2)
+            texto(sup, v.sec_nombre, (r.x + 12, r.y + 7), 12, c["texto"], peso=900)
+            texto(sup, recortar(" › ".join(nombres), 13, r.w - 24, 800), (r.x + 12, r.y + 27), 13, c["tinta2"], peso=800)
+        for b in self.b_rec:
+            b.activo = not (b.clave == "camino" and (n is None or n.id not in caso.arbol))
             b.dibujar(sup)
-            if not a["ok"] and b.rect.collidepoint(pygame.mouse.get_pos()):
-                motivo = a["motivo"]
-            self.botones_acc.append(b)
-            yb += 40
-        if motivo:
-            texto(sup, motivo, (1122, yb + 2), 12, c["aviso"], centro=True)
-        elif self.p.jugador_actual.atencion == 0:
-            texto(sup, "Sin atención: termina tu turno", (1122, yb + 2), 12, c["aviso"], centro=True)
-        self.btn_fin.seleccionado = self.p.jugador_actual.atencion == 0
-        self.btn_fin.dibujar(sup)
-
-    def _banner_ronda(self, sup):
-        edad = pygame.time.get_ticks() - self.banner_t0
-        if edad > 1600:
-            return
-        c = TEMA.c
-        a = 255 if edad < 1100 else int(255 * (1600 - edad) / 500)
-        capa = pygame.Surface((690, 90), pygame.SRCALPHA)
-        pygame.draw.rect(capa, (*c["panel2"], 230), capa.get_rect(), border_radius=12)
-        texto(capa, f"RONDA {min(self.p.ronda, self.p.rondas_totales)}", (345, 32), 34, c["texto"], True, centro=True)
-        texto(capa, "Ola de propagación completada" if self.p.ronda > 1 else "La campaña comienza",
-              (345, 66), 14, c["acento"], centro=True)
-        capa.set_alpha(a)
-        sup.blit(capa, (274, 280))
-
-    def _modal_viral(self, sup):
-        c = TEMA.c
-        ev = self.p.evento_viral
-        capa = pygame.Surface(sup.get_size(), pygame.SRCALPHA)
-        capa.fill((0, 0, 0, 180))
-        sup.blit(capa, (0, 0))
-        r = pygame.Rect(355, 210, 570, 330)
-        panel(sup, r, c["panel"], 14)
-        pygame.draw.rect(sup, c["aviso"], r, 3, border_radius=14)
-        t = pygame.time.get_ticks()
-        from .widgets import poligono_regular
-        pygame.draw.polygon(sup, c["aviso"], poligono_regular((402, 244), 16 + 2 * math.sin(t / 100), 3, -math.pi / 2))
-        texto(sup, "!", (402, 246), 16, (10, 10, 10), True, centro=True)
-        texto(sup, "INFORMACIÓN VIRAL", (428, 230), 24, c["aviso"], True)
-        texto(sup, f"Decide {ev.jugador.nombre} ({ev.jugador.info_rol['nombre']}) · no gasta atención",
-              (390, 264), 13, c["tenue"])
-        y = parrafo(sup, '"' + ev.nodo.afirmacion.texto() + '"', 390, 292, 500, 17, c["texto"])
-        texto(sup, "Esta publicación está siendo compartida rápidamente.", (390, y + 8), 14, c["tenue"])
-        restante = max(0.0, ev.segundos - (t - (self.viral_t0 or t)) / 1000)
-        texto(sup, f"Tiempo restante: {math.ceil(restante)} s", (390, 426), 15, c["texto"], True)
-        pygame.draw.rect(sup, c["panel2"], (390, 450, 500, 10), border_radius=5)
-        pygame.draw.rect(sup, c["malo"] if restante < 4 else c["aviso"],
-                         (390, 450, int(500 * restante / ev.segundos), 10), border_radius=5)
-        for b in self._botones_viral():
-            b.dibujar(sup)
-
-    def _dibujar_celular(self, sup):
-        c = TEMA.c
-        phone_rect = pygame.Rect(350, 66, 450, 684)
-        pygame.draw.rect(sup, c["panel"], phone_rect, border_radius=30)
-        pygame.draw.rect(sup, c["borde"], phone_rect, 4, border_radius=30)
-        
-        texto(sup, "PRESIONA [TAB] PARA VER MODO PROFESOR (ESTRUCTURAS)", (575, 765), 11, c["tenue"], centro=True)
-        
-        if self.sel is None:
-            texto(sup, "No hay nuevas publicaciones", (575, 300), 20, c["tenue"], True, centro=True)
-            return
-
-        n = self.sel
-        texto(sup, "CIVITAS", (575, 100), 24, c["acento"], True, centro=True)
-        pygame.draw.line(sup, c["borde"], (350, 140), (800, 140), 2)
-        
-        pygame.draw.circle(sup, c["texto"], (400, 180), 20)
-        texto(sup, n.autor[:2].upper(), (400, 182), 16, c["fondo"], True, centro=True)
-        texto(sup, "@" + n.autor.replace(" ", "").lower(), (430, 170), 18, c["texto"], True)
-        texto(sup, "Ola " + str(n.profundidad), (770, 170), 14, c["tenue"], derecha=True)
-        
-        y = parrafo(sup, n.afirmacion.texto(), 380, 230, 390, 20, c["texto"]) + 20
-        
-        if n.verificado:
-            if n.es_veraz:
-                pygame.draw.rect(sup, c["n_veraz"], (455, y, 240, 30), border_radius=8)
-                texto(sup, "VERDADERO", (575, y+15), 16, c["fondo"], True, centro=True)
-            elif n.es_correccion:
-                pygame.draw.rect(sup, c["n_correccion"], (455, y, 240, 30), border_radius=8)
-                texto(sup, "DESMENTIDO OFICIAL", (575, y+15), 16, c["fondo"], True, centro=True)
-            else:
-                pygame.draw.rect(sup, c["n_falso"], (455, y, 240, 30), border_radius=8)
-                texto(sup, "FALSO", (575, y+15), 16, c["fondo"], True, centro=True)
-            y += 45
-
-        self.botones_acc = []
-        yb = 480
-        acciones = self.p.acciones_para(n)
-        for i, a in enumerate(acciones):
-            color = c["logro"] if a.get("especial") else c["panel2"]
-            b = Boton((400, yb, 350, 45), f"{a['nombre'].upper()}", a["clave"], a["costo"], tam=16, color=color)
-            b.activo = a["ok"]
-            b.dibujar(sup)
-            self.botones_acc.append(b)
-            yb += 55
