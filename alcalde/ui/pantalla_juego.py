@@ -586,7 +586,7 @@ class PantallaJuego:
         self.b_snd.icono = "volume-2" if self.app.snd.activo else "volume-x"
         for b in (self.b_ayuda, self.b_acc, self.b_snd, self.b_menu):
             b.dibujar(sup)
-        for b, t in ((self.b_ayuda, "Ayuda (H)"), (self.b_acc, "Accesibilidad"), (self.b_snd, "Sonido (M)"),
+        for b, t in ((self.b_ayuda, "Ayuda (H)"), (self.b_acc, "Accesibilidad"), (self.b_snd, "Quitar o poner sonido (M)"),
                      (self.b_menu, "Salir al menú")):
             if b.hover:
                 tooltip(sup, t, (b.rect.centerx, b.rect.bottom + 34), 150)

@@ -60,11 +60,12 @@ class PantallaMenu:
         self.btn_acc = Boton((x + 204, y + 150, 192, 52), "Accesibilidad", "acc", icono="accessibility", tam=16)
         self.botones = [self.btn_local, self.btn_red, self.btn_ayuda, self.btn_acc]
         self.btn_salir = Boton((1192, 18, 72, 40), "", "salir", icono="log-out", tam=16, sombra=3)
+        self.btn_sonido = Boton((1032, 18, 150, 40), "Sonido", "sonido", icono="volume-2", tam=15, sombra=3)
         self.t0 = pygame.time.get_ticks()
 
     def evento(self, e):
         if e.type == pygame.MOUSEBUTTONDOWN and e.button == 1:
-            for b in self.botones + [self.btn_salir]:
+            for b in self.botones + [self.btn_salir, self.btn_sonido]:
                 if b.clic(e.pos):
                     self.app.sonar("click")
                     self._ir(b.clave)
@@ -84,6 +85,8 @@ class PantallaMenu:
             self.app.abrir(self.app.accesibilidad)
         elif clave == "salir":
             self.app.corriendo = False
+        elif clave == "sonido":
+            self.app.alternar_sonido()
 
     def dibujar(self, sup):
         c = TEMA.c
@@ -106,6 +109,10 @@ class PantallaMenu:
         for b in self.botones:
             b.dibujar(sup)
         self.btn_salir.dibujar(sup)
+        encendido = self.app.snd.activo
+        self.btn_sonido.icono = "volume-2" if encendido else "volume-x"
+        self.btn_sonido.etiqueta = "Sonido sí" if encendido else "Sin sonido"
+        self.btn_sonido.dibujar(sup)
         # Civi saluda
         ala = (math.sin(t * 5) + 1) / 2 if mov else 0
         img = personajes.civi("feliz", 150, parpadeo=int(t * 1.7) % 6 == 0, ala=ala)

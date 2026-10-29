@@ -6,15 +6,15 @@ MINUTOS_POR_TURNO = 15
 
 # pos: coordenadas normalizadas (0-1) para dibujar el mapa; poblacion: votantes de la zona.
 ZONAS = {
-    "NORTE":    dict(nombre="Barrio Norte",       tipo="barrio",   pos=(0.14, 0.17), poblacion=14000),
-    "TERMINAL": dict(nombre="Terminal de buses",  tipo="terminal", pos=(0.47, 0.15), poblacion=8000),
-    "ESTADIO":  dict(nombre="Estadio Municipal",  tipo="estadio",  pos=(0.85, 0.16), poblacion=5000),
-    "COLEGIO":  dict(nombre="Colegio San José",   tipo="colegio",  pos=(0.13, 0.52), poblacion=6000),
-    "PARQUE":   dict(nombre="Parque Central",     tipo="parque",   pos=(0.38, 0.47), poblacion=5000),
-    "HOSPITAL": dict(nombre="Hospital Nova",      tipo="hospital", pos=(0.86, 0.50), poblacion=6000),
-    "PLAZA":    dict(nombre="Plaza de Mercado",   tipo="plaza",    pos=(0.62, 0.60), poblacion=9000),
-    "PRADO":    dict(nombre="Barrio El Prado",    tipo="barrio2",  pos=(0.17, 0.86), poblacion=12000),
-    "ALCALDIA": dict(nombre="Alcaldía",           tipo="alcaldia", pos=(0.50, 0.86), poblacion=7000),
+    "NORTE":    dict(nombre="Barrio Norte",       tipo="barrio",   pos=(0.12, 0.10), poblacion=14000),
+    "TERMINAL": dict(nombre="Terminal de buses",  tipo="terminal", pos=(0.48, 0.09), poblacion=8000),
+    "ESTADIO":  dict(nombre="Estadio Municipal",  tipo="estadio",  pos=(0.87, 0.11), poblacion=5000),
+    "COLEGIO":  dict(nombre="Colegio San José",   tipo="colegio",  pos=(0.10, 0.50), poblacion=6000),
+    "PARQUE":   dict(nombre="Parque Central",     tipo="parque",   pos=(0.40, 0.45), poblacion=5000),
+    "HOSPITAL": dict(nombre="Hospital Nova",      tipo="hospital", pos=(0.89, 0.50), poblacion=6000),
+    "PLAZA":    dict(nombre="Plaza de Mercado",   tipo="plaza",    pos=(0.72, 0.72), poblacion=9000),
+    "PRADO":    dict(nombre="Barrio El Prado",    tipo="barrio2",  pos=(0.16, 0.92), poblacion=12000),
+    "ALCALDIA": dict(nombre="Alcaldía",           tipo="alcaldia", pos=(0.50, 0.92), poblacion=7000),
 }
 
 CALLES = [

@@ -41,7 +41,7 @@ ALTO_CONTRASTE = dict(
 
 OPCIONES_DEFECTO = dict(alto_contraste=False, texto_grande=False, mas_tiempo=False,
                         subtitulos=True, menos_movimiento=False, sonido=True, musica=True,
-                        guia=True, pantalla_completa=True)
+                        guia=True)
 
 _ARCHIVO = Path.home() / ".alcalde_digital.json"
 

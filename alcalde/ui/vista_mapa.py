@@ -30,7 +30,7 @@ class VistaMapa:
     def __init__(self, juego, rect):
         self.j = juego
         self.rect = pygame.Rect(rect)
-        self.area = pygame.Rect(self.rect.x + 58, self.rect.y + 84, self.rect.w - 116, 376)
+        self.area = pygame.Rect(self.rect.x + 62, self.rect.y + 76, self.rect.w - 124, self.rect.h - 220)
         self._fondo = None
         self._fondo_clave = None
         self.tokens = {}
@@ -203,8 +203,7 @@ class VistaMapa:
         if getattr(self, "_etiquetas", None) is None:
             ocupado = []
             for x, y in pts.values():
-                ocupado += [pygame.Rect(x - 46, y - 56, 92, 80), pygame.Rect(x - 80, y + 18, 160, 28),
-                            pygame.Rect(x - 52, y + 44, 104, 26)]
+                ocupado += [pygame.Rect(x - 46, y - 56, 92, 80), pygame.Rect(x - 84, y + 18, 168, 28)]
             puestas = []
             for a, b, minutos in CALLES:
                 (x1, y1), (x2, y2) = pts[a], pts[b]
@@ -260,7 +259,7 @@ class VistaMapa:
                  ancla="c", alto=22)
         else:
             chip(sup, nombre, (x, y + 32), c["papel"], c["texto"], None, 12, ancla="c", alto=22)
-        gente = residentes(p.red, z)
+        gente = residentes(p.red, z) if z in (self.hover, j.zona) else []
         n = len(gente)
         for k, v in enumerate(gente):
             est = p.estado_ciudadano(v)
@@ -307,16 +306,27 @@ class VistaMapa:
         return charla, hecho
 
     def _insignias(self, sup, z, pos):
+        """Globitos sobre el edificio: vecinos para convencer, vecinos engañados, hecho por verificar aquí."""
         c = TEMA.c
+        p = self.p
         charla, hecho = self.tareas(z)
         x, y = pos
-        bx = x + 36
+        globos = []
         if charla:
-            r = chip(sup, str(len(charla)), (bx, y - 46), c["bueno"], c["sobre_color"], "message-circle", 12,
-                     ancla="ml", alto=24)
-            bx = r.right + 4
+            globos.append((str(len(charla)), c["bueno"], c["sobre_color"], "message-circle"))
+        else:
+            engañados = sum(1 for v in residentes(p.red, z) if p.estado_ciudadano(v) == "falso")
+            if engañados:
+                globos.append((str(engañados), c["malo"], c["sobre_color"], "frown"))
         if hecho:
-            chip(sup, "", (bx, y - 46), c["mango"], c["texto"], "search", 12, ancla="ml", alto=24)
+            globos.append(("", c["mango"], c["texto"], "search"))
+        # En estas zonas los globitos van a la izquierda del edificio, para no caer sobre el
+        # nombre de la zona que les queda arriba a la derecha.
+        derecha = z in ("ESTADIO", "HOSPITAL", "PLAZA", "ALCALDIA")
+        bx = x - 34 if derecha else x + 34
+        for s_, fondo, color, icono in (reversed(globos) if derecha else globos):
+            r = chip(sup, s_, (bx, y - 48), fondo, color, icono, 12, ancla="mr" if derecha else "ml", alto=24)
+            bx = r.x - 4 if derecha else r.right + 4
 
     def _tarjeta_zona(self, sup, destinos):
         p = self.p

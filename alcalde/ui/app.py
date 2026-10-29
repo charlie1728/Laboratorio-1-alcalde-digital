@@ -1,5 +1,3 @@
-import os
-
 import pygame
 
 from ..controlador import ControladorLocal
@@ -25,12 +23,15 @@ SUBTITULOS = {
 
 class App:
     def __init__(self, semilla=None, rondas=8):
-        # Al agrandar la ventana, SDL estira la imagen de 1280x720: con "linear" la suaviza
-        # en vez de repetir píxeles (bordes y letras serruchados).
-        os.environ.setdefault("SDL_RENDER_SCALE_QUALITY", "linear")
         pygame.init()
         pygame.display.set_caption("Alcalde Digital")
-        self.pantalla = self._abrir_ventana(TEMA.op["pantalla_completa"])
+        # El juego se dibuja siempre en un lienzo de 1280x720 y se escala a la ventana.
+        # La ventana arranca maximizada; lo que sobra a los lados se rellena con el cielo.
+        self.completa = False
+        self.ventana = self._abrir_ventana()
+        self.pantalla = pygame.Surface((ANCHO, ALTO)).convert()
+        self._escala = (1.0, 0, 0)
+        self._instalar_raton()
         try:
             pygame.display.set_icon(civi("feliz", 64))
         except pygame.error:
@@ -51,22 +52,65 @@ class App:
         self.actual = PantallaMenu(self)
         self.snd.musica(TEMA.op["musica"] and TEMA.op["sonido"])
 
-    def _abrir_ventana(self, completa):
-        """Pantalla completa escalada (sin franjas en monitores 16:9) o ventana redimensionable."""
-        modos = [pygame.SCALED | pygame.FULLSCREEN] if completa else []
-        modos += [pygame.SCALED | pygame.RESIZABLE, 0]
-        for flags in modos:
+    def _abrir_ventana(self):
+        if self.completa:
             try:
-                return pygame.display.set_mode((ANCHO, ALTO), flags)
+                return pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
             except pygame.error:
-                continue
+                self.completa = False
+        try:
+            escritorio = pygame.display.get_desktop_sizes()[0]
+        except (pygame.error, IndexError, AttributeError):
+            escritorio = (ANCHO, ALTO)
+        tam = (min(ANCHO, escritorio[0] - 80), min(ALTO, escritorio[1] - 120))
+        ventana = pygame.display.set_mode(tam, pygame.RESIZABLE)
+        try:
+            from pygame._sdl2.video import Window
+            Window.from_display_module().maximize()
+        except Exception:
+            pass
+        return pygame.display.get_surface() or ventana
 
     def alternar_pantalla_completa(self):
-        TEMA.cambiar("pantalla_completa", not TEMA.op["pantalla_completa"])
-        try:
-            pygame.display.toggle_fullscreen()
-        except pygame.error:
-            self.pantalla = self._abrir_ventana(TEMA.op["pantalla_completa"])
+        """F11: pantalla completa de verdad, o volver a la ventana maximizada."""
+        self.completa = not self.completa
+        self.ventana = self._abrir_ventana()
+
+    def _instalar_raton(self):
+        """El ratón llega en coordenadas de la ventana; el juego trabaja en las del lienzo."""
+        real = pygame.mouse.get_pos
+        self._raton_real = real
+
+        def en_lienzo():
+            return self.a_lienzo(real())
+        pygame.mouse.get_pos = en_lienzo
+
+    def a_lienzo(self, pos):
+        k, ox, oy = self._escala
+        return (round((pos[0] - ox) / k), round((pos[1] - oy) / k))
+
+    def _convertir(self, e):
+        if hasattr(e, "pos") and e.type in (pygame.MOUSEMOTION, pygame.MOUSEBUTTONDOWN, pygame.MOUSEBUTTONUP):
+            datos = dict(e.__dict__)
+            datos["pos"] = self.a_lienzo(e.pos)
+            return pygame.event.Event(e.type, datos)
+        return e
+
+    def _presentar(self):
+        ventana = pygame.display.get_surface()
+        w, h = ventana.get_size()
+        k = min(w / ANCHO, h / ALTO)
+        dw, dh = round(ANCHO * k), round(ALTO * k)
+        ox, oy = (w - dw) // 2, (h - dh) // 2
+        self._escala = (k, ox, oy)
+        if (dw, dh) == (ANCHO, ALTO):
+            ventana.blit(self.pantalla, (ox, oy))
+        else:
+            # Los márgenes muestran el mismo dibujo muy difuminado, en vez de franjas negras.
+            if ox > 0 or oy > 0:
+                mini = pygame.transform.smoothscale(self.pantalla, (32, 18))
+                ventana.blit(pygame.transform.smoothscale(mini, (w, h)), (0, 0))
+            ventana.blit(pygame.transform.smoothscale(self.pantalla, (dw, dh)), (ox, oy))
 
     # ------------------------------------------------------------------ navegación
     def cambiar(self, pantalla):
@@ -176,7 +220,8 @@ class App:
 
     def ejecutar(self):
         while self.corriendo:
-            self.paso(pygame.event.get())
+            self.paso([self._convertir(e) for e in pygame.event.get()])
+            self._presentar()
             pygame.display.flip()
             self.reloj.tick(60)
         cerrar = getattr(self.actual, "cerrar", None)
