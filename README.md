@@ -42,6 +42,8 @@ python main.py
 
 Con `python main.py 42` la partida es siempre la misma (útil para revisar o sustentar).
 
+En Windows también se puede abrir con **doble clic en `jugar.bat`**. El juego abre en una ventana maximizada; con `F11` pasa a pantalla completa.
+
 ### Jugar en red
 
 Cada jugador en su computador, conectados a la misma red wifi:
