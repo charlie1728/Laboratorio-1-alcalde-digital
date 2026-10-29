@@ -55,7 +55,7 @@ SECCIONES = [
         ("item", "message-circle", "Conversar", "En el mapa: convences a los vecinos de tu zona que creen un "
                                                "rumor ya descubierto."),
         ("item", "keyboard", "Teclas", "1-6 acciones, Enter terminar turno, Tab cambiar de vista, "
-                                      "H ayuda, C contraste, M sonido, Esc cerrar."),
+                                      "H ayuda, C contraste, M sonido, F11 pantalla completa, Esc cerrar."),
     ]),
     ("Personajes", "users", [("roles",)]),
     ("Cómo ganar", "trophy", [

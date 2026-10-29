@@ -1,3 +1,5 @@
+import os
+
 import pygame
 
 from ..controlador import ControladorLocal
@@ -23,6 +25,9 @@ SUBTITULOS = {
 
 class App:
     def __init__(self, semilla=None, rondas=8):
+        # Al agrandar la ventana, SDL estira la imagen de 1280x720: con "linear" la suaviza
+        # en vez de repetir píxeles (bordes y letras serruchados).
+        os.environ.setdefault("SDL_RENDER_SCALE_QUALITY", "linear")
         pygame.init()
         pygame.display.set_caption("Alcalde Digital")
         try:
@@ -114,6 +119,12 @@ class App:
                     continue
                 if e.key == pygame.K_m:
                     self.alternar_sonido()
+                    continue
+                if e.key == pygame.K_F11:
+                    try:
+                        pygame.display.toggle_fullscreen()
+                    except pygame.error:
+                        pass
                     continue
             self.actual.evento(e)
         if hasattr(self.actual, "actualizar") and self.overlay is None:
