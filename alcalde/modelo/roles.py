@@ -1,29 +1,32 @@
-
 ROLES = {
     "ciudadano": dict(
         nombre="Ciudadano", simbolo="C",
         especial=("alertar", "Alertar contactos", 1),
-        pasivo="Pausa consciente: en eventos virales tiene el doble de tiempo.",
-        descripcion="Frena rumores en su círculo cercano: inmuniza el nodo y sus reenvíos directos.",
-        tiempo_viral=20, mult_alcance=1),
+        pasivo="Pausa consciente: en las publicaciones virales tiene el doble de tiempo para decidir.",
+        descripcion="Avisa a sus contactos de la red: quienes creían el rumor dejan de creerlo "
+                    "y los demás quedan prevenidos.",
+        tiempo_viral=20),
     "periodista": dict(
         nombre="Periodista", simbolo="P",
         especial=("rastrear", "Rastrear origen", 2),
-        pasivo="Investiga: si el hecho no está en el Archivo, lo registra al verificar.",
-        descripcion="Sube por el árbol hasta la raíz y señala el reenvío exacto donde se torció la historia.",
-        tiempo_viral=10, mult_alcance=1),
+        pasivo="Investiga: registra en el Archivo los hechos que faltan, esté donde esté.",
+        descripcion="Sube por el árbol hasta el origen, señala dónde se torció la historia "
+                    "y expone al paciente cero ante sus seguidores.",
+        tiempo_viral=10),
     "influencer": dict(
         nombre="Influencer", simbolo="I",
         especial=("amplificar", "Amplificar desmentido", 2),
-        pasivo="Megáfono: lo que comparte llega x4 y genera reenvíos inmediatos.",
-        descripcion="Publica una corrección en el punto de mutación e inmuniza TODA esa rama.",
-        tiempo_viral=10, mult_alcance=4),
+        pasivo="Megáfono: tiene 12 seguidores. Lo que comparte llega lejos, para bien o para mal.",
+        descripcion="Publica la versión correcta donde se torció la historia, contiene esa rama "
+                    "y la corrección viaja dos saltos por su red.",
+        tiempo_viral=10),
     "candidato": dict(
         nombre="Candidato", simbolo="A",
         especial=("desmentir", "Desmentido oficial", 2),
-        pasivo="Los rumores sobre él/ella le restan apoyo cada ronda.",
-        descripcion="Desmiente una versión falsa verificada; si el rumor era sobre sí mismo gana apoyo extra.",
-        tiempo_viral=10, mult_alcance=2),
+        pasivo="Gira: cada zona que visita le suma apoyo. Los rumores sobre su campaña se lo restan.",
+        descripcion="Desmiente una versión falsa: convence a quien confía en él o ella "
+                    "por algún camino de la red.",
+        tiempo_viral=10),
 }
 
 ORDEN_ROLES = ["ciudadano", "periodista", "influencer", "candidato"]

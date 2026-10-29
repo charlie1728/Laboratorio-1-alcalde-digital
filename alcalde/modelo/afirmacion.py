@@ -77,3 +77,21 @@ class Afirmacion:
         if self.sujeto != hecho.sujeto:
             dif.append("atribucion")
         return dif
+
+    def explicar_diferencias(self, hecho) -> list[tuple[str, str, str]]:
+        """(qué cambió, lo que dice la publicación, lo que dice el hecho oficial)."""
+        def cifra(n, tpl):
+            return tpl.format(n=n) if (n is not None and tpl) else "sin cifra"
+        out = []
+        for d in self.comparar_con(hecho):
+            if d == "exageracion":
+                out.append((DISTORSIONES[d], cifra(self.cifra, self.cifra_tpl), cifra(hecho.cifra, hecho.cifra_tpl)))
+            elif d == "sin_contexto":
+                out.append((DISTORSIONES[d], "no dice por qué", hecho.contexto or ""))
+            elif d == "fuente_dudosa":
+                out.append((DISTORSIONES[d], self.fuente, hecho.fuente))
+            elif d == "accion_torcida":
+                out.append((DISTORSIONES[d], f"{self.accion} {self.objeto}", f"{hecho.accion} {hecho.objeto}"))
+            elif d == "atribucion":
+                out.append((DISTORSIONES[d], self.sujeto, hecho.sujeto))
+        return out

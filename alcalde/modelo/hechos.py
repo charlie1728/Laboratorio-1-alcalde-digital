@@ -6,12 +6,18 @@ from typing import Optional
 from .afirmacion import Afirmacion
 
 CANDIDATOS = [
-                                                                  
-    ("Valentina Rondón", (0, 114, 178)),
-    ("Tomás Arrieta", (213, 94, 0)),
-    ("Luz Marina Pacheco", (0, 158, 115)),
-    ("Emilio Sarmiento", (204, 121, 167)),
+    ("Valentina Rondón", (58, 110, 230)),
+    ("Tomás Arrieta", (240, 138, 36)),
+    ("Luz Marina Pacheco", (40, 168, 96)),
+    ("Emilio Sarmiento", (196, 64, 150)),
 ]
+
+LEMAS = {
+    "Valentina Rondón": "Nova conectada",
+    "Tomás Arrieta": "Obras que se ven",
+    "Luz Marina Pacheco": "Primero la gente",
+    "Emilio Sarmiento": "Orden y confianza",
+}
 
 def _cand(i: int) -> str:
     return ("El candidato " if i in (1, 3) else "La candidata ") + CANDIDATOS[i][0]
@@ -20,7 +26,7 @@ def _cand(i: int) -> str:
 class Hecho:
     id: str
     titulo: str
-    lugar: str                                                               
+    lugar: str
     fuente: str
     sujeto: str
     accion: str
@@ -37,8 +43,8 @@ class Hecho:
                           self.objeto, self.cifra, self.cifra_tpl, self.contexto)
 
 def catalogo() -> list[Hecho]:
-        return [
-        Hecho("transporte-tarifa", "Tarifa de buses", "CALLE",
+    return [
+        Hecho("transporte-tarifa", "Tarifa de buses", "TERMINAL",
               "Secretaría de Transporte", "La Secretaría", "ajustará",
               "la tarifa del pasaje", 100, "con un incremento de {n} pesos",
               "por la inflación anual",
@@ -50,7 +56,7 @@ def catalogo() -> list[Hecho]:
               "para sembrar nuevos árboles",
               ["demolerá", "venderá a privados"],
               [_cand(0), _cand(2)]),
-        Hecho("seguridad-policia", "Patrullaje nocturno", "BARRIO",
+        Hecho("seguridad-policia", "Patrullaje nocturno", "NORTE",
               "Policía Metropolitana", "La Policía", "aumentará",
               "el patrullaje nocturno", 2, "con {n} nuevas unidades",
               "en las zonas comerciales",
@@ -68,13 +74,13 @@ def catalogo() -> list[Hecho]:
               "por una laringitis comprobada",
               ["fue expulsada", "llegó ebria a"],
               [_cand(1), "El Alcalde actual"]),
-        Hecho("impuestos-predial", "Descuento en predial", "ALCALDÍA",
+        Hecho("impuestos-predial", "Descuento en predial", "ALCALDIA",
               "Secretaría de Hacienda", "La Alcaldía", "ofrecerá",
               "un descuento en el impuesto predial", 15, "del {n} por ciento",
               "por pronto pago",
               ["subirá", "cobrará doble"],
               [_cand(3)]),
-        Hecho("basuras-horario", "Recolección de basuras", "BARRIO",
+        Hecho("basuras-horario", "Recolección de basuras", "PRADO",
               "Empresa de Aseo", "La Empresa de Aseo", "cambiará",
               "el horario de recolección", None, "",
               "para evitar el tráfico de la mañana",
@@ -86,7 +92,7 @@ def catalogo() -> list[Hecho]:
               "para campañas de vacunación",
               ["cobrará impuestos por", "sacrificará a"],
               [_cand(0), "La Policía"]),
-        Hecho("internet-gratis", "Puntos WiFi", "PLAZA",
+        Hecho("internet-gratis", "Puntos WiFi", "COLEGIO",
               "Ministerio TIC", "El Ministerio", "instalará",
               "puntos de internet gratis", 20, "en {n} parques",
               "para uso de los estudiantes",
@@ -99,13 +105,13 @@ def catalogo() -> list[Hecho]:
               ["venderá", "clausurará por ruina"],
               [_cand(1)]),
 
-        Hecho("alcaldia-auditoria", "Auditoría a la Alcaldía", "ALCALDÍA",
+        Hecho("alcaldia-auditoria", "Auditoría a la Alcaldía", "ALCALDIA",
               "Contraloría de Nova", "La Contraloría", "revisa",
               "las cuentas de la Alcaldía", None, "",
               "en una auditoría de rutina",
               ["encontró un robo en", "congeló"],
               [_cand(1), _cand(0)]),
-        Hecho("barrio-prado-agua", "Corte de agua en El Prado", "BARRIO",
+        Hecho("barrio-prado-agua", "Corte de agua en El Prado", "PRADO",
               "Aguas de Nova", "Aguas de Nova", "cortará",
               "el servicio en el barrio El Prado", 8, "durante {n} horas",
               "para reparar un tubo roto",
@@ -123,7 +129,7 @@ def catalogo() -> list[Hecho]:
               "por la tormenta del martes",
               ["canceló", "prohibió"],
               [_cand(1), _cand(2)]),
-        Hecho("hospital-vacunas", "Jornada de vacunación", "BARRIO",
+        Hecho("hospital-vacunas", "Jornada de vacunación", "NORTE",
               "Hospital Nova", "El Hospital Nova", "vacunará",
               "a los niños del barrio Norte", 300, "con {n} dosis",
               "en jornada gratuita",
@@ -141,12 +147,12 @@ def catalogo() -> list[Hecho]:
               "por el ajuste anual de ley",
               ["triplicará", "cobrará doble"],
               [_cand(2), _cand(3)]),
-        Hecho("propuesta-ciclovia", "Propuesta de ciclovía", "PLAZA",
+        Hecho("propuesta-ciclovia", "Propuesta de ciclovía", "ESTADIO",
               "Campaña Luz Marina Pacheco", _cand(2), "propone ampliar",
               "la ciclovía", 4, "en {n} km", "con fondos nacionales",
               ["exige cobrar peaje para ampliar", "obligará a cerrar calles para ampliar"],
               [_cand(1)], en_archivo=False),
-        Hecho("ruta-12", "Desvío de la ruta 12", "BARRIO",
+        Hecho("ruta-12", "Desvío de la ruta 12", "TERMINAL",
               "Transporte Nova", "Transporte Nova", "desviará",
               "la ruta 12 de bus", 5, "durante {n} días",
               "por obras en la avenida",
