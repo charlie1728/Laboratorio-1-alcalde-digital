@@ -486,7 +486,9 @@ class Partida:
             if not gratis:
                 self.turno["resultado"] = revelado
         elif clave == "verificar" and not gratis:
-            self.turno["verifico"] = True
+            # Si el hecho no estaba en el Archivo no cuenta: puede ir al lugar y verificar allá.
+            if not self.ultimo_resaltado.get("verificacion", {}).get("inconclusa"):
+                self.turno["verifico"] = True
         j.reputacion = max(0, min(100, j.reputacion))
         if caso.arbol.raiz is None and caso.abierto:
             caso.abierto = False

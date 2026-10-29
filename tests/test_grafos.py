@@ -136,6 +136,27 @@ class TestMapa(unittest.TestCase):
                 p.resolver_viral(None)
 
 
+class TestVerificarEnTerreno(unittest.TestCase):
+    def test_verificacion_sin_datos_no_gasta_el_turno(self):
+        for semilla in range(40):
+            p = Partida([("Ana", "ciudadano", (0, 0, 0)), ("Beto", "influencer", (0, 0, 0))], semilla=semilla)
+            caso, nodo = p.publicacion_turno()
+            if nodo is None or caso.hecho.id in p.archivo:
+                continue
+            j = p.jugador_actual
+            if j.zona == caso.hecho.lugar:
+                continue
+            p.ejecutar("verificar", caso, nodo)
+            self.assertFalse(nodo.verificado)
+            self.assertFalse(p.turno["verifico"])          # sin datos: no cuenta
+            p.mover(caso.hecho.lugar)                       # va al lugar de los hechos
+            p.ejecutar("verificar", caso, nodo)
+            self.assertTrue(nodo.verificado)                # ahí sí se verifica
+            self.assertIn(caso.hecho.id, p.archivo)         # y el hecho queda en el AVL
+            return
+        self.skipTest("ninguna semilla repartió un hecho que faltara en el Archivo")
+
+
 class TestIntegracionArbolGrafo(unittest.TestCase):
     def test_arbol_es_el_arbol_bfs_de_la_red(self):
         for semilla in range(6):
