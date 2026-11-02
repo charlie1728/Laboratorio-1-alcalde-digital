@@ -6,7 +6,7 @@ import math
 import pygame
 import pygame.gfxdraw
 
-from ..ui import recursos
+from . import recursos
 
 TINTA = (35, 33, 74)
 TINTA2 = (84, 88, 130)

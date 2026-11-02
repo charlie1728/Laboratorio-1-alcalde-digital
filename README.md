@@ -1,107 +1,110 @@
-# Alcalde Digital
+# Alcalde Digital · Corta la mentira
 
 Videojuego educativo sobre el uso responsable de las redes sociales.
 Estructura de Datos II, Universidad del Norte.
 
-![Alcalde Digital](docs/img/v2/menu.png)
+Ciudad Nova va a elegir alcalde y los rumores vuelan por las redes. Las publicaciones salen disparadas desde los barrios y tú las cortas con el mouse antes de que caigan sobre la gente.
 
-Ciudad Nova elige alcalde y todos hablan en **Civitas**, su red social. Ahí circulan noticias verdaderas, opiniones y rumores, y cada reenvío puede torcer la historia: inflar una cifra, quitar el contexto, inventar la fuente o echarle la culpa a un candidato. De 2 a 4 jugadores (ciudadano, periodista, influencer y candidato) deciden qué hacer con cada publicación, recorren la ciudad conversando con los vecinos y ven cómo sus decisiones cambian la ciudad y el resultado de la elección.
+**La regla cabe en una frase: corta lo falso, deja pasar lo verdadero y cuida la ciudad.**
 
-No hay preguntas de trivia: se aprende verificando antes de compartir, descubriendo dónde se torció una historia y viendo las consecuencias.
+No hay preguntas de trivia. Se aprende jugando: las fuentes oficiales traen el **chulito azul ✓** y las mentiras traen señales (cadena, audio anónimo, cuenta bot, prisa, cifras imposibles). Al cortarlas, el juego te dice el truco que usaban y lo guarda en tu álbum.
 
-**Cómo es un turno:** te llega una publicación de la zona del mapa donde estás; si prefieres otra, caminas a otra zona y te llega una de allí (los globitos del mapa dicen cuántas circulan en cada zona). Puedes verificarla (cuesta 3 puntos) y luego decides qué hacer: compartirla, reportarla, ignorarla o usar el poder de tu personaje. Al decidir, todos ven si era verdadera o falsa, así que conviene acordarse: quien recuerda lo que ya se descubrió se ahorra las verificaciones y saca más puntos. Lo que decides se nota en esa zona: si frenas un rumor, sus vecinos dejan de creerlo; si lo compartes, la zona se agita.
+## Modos de juego
 
-| | |
+| Modo | Qué es |
 |---|---|
-| ![El mapa de Ciudad Nova](docs/img/v2/mapa.png) | ![La red social durante una propagación](docs/img/v2/red_propagacion.png) |
-| ![Verificar: qué cambió frente al hecho oficial](docs/img/v2/verificacion.png) | ![Noche de elecciones](docs/img/v2/eleccion.png) |
+| **Campaña** | Liberas Ciudad Nova barrio por barrio en un mapa. Cada barrio es un nivel con su propia regla, y cada noche el rumor salta a los barrios vecinos. Ganas estrellas y monedas, compras mejoras, llenas el álbum y al final te enfrentas al **Bot Supremo** en la Alcaldía. Después viene la elección. El progreso se guarda solo. |
+| **Fiesta (2 a 4)** | Se turnan el mouse: cada uno juega el mismo barrio y la última ronda es contra el jefe. Gana quien sume más puntos. |
+| **Duelo en red** | Cada jugador en su computador, en la misma red wifi. Todos juegan el mismo barrio al mismo tiempo, ven el marcador en vivo y cada combo de 5 le manda un rumor extra a los rivales. |
 
-## Las estructuras de datos
+## Cómo se juega
 
-| Estructura | Archivo | Para qué la usa el juego |
+- **Cortar:** arrastra el mouse con el botón izquierdo sobre la publicación.
+- **Combos:** corta varias mentiras seguidas. Con 8 seguidas entras en **fiebre** (puntos dobles). Cortar dos o tres de un solo tajo da premio extra.
+- **ORIGEN:** si un rumor marcado como ORIGEN llega arriba sin cortar, sus seguidores lo reenvían y aparecen copias. Si cortas el origen, caen todas las copias de una vez.
+- **Poder del personaje:** se carga cortando mentiras. Se usa con **Espacio** o **clic derecho**.
+  - Ana, Periodista: **Lupa**. Todo va lento y se ve qué es falso.
+  - Beto, Influencer: **Megáfono**. Corta de un grito todo lo falso en pantalla.
+  - Caro, Ciudadana: **Escudo vecinal**. Las próximas 3 mentiras que caigan rebotan.
+  - Dani, Candidato: **Discurso**. El barrio recupera confianza.
+- **Estrellas:** 1 si salvas el barrio, 2 si queda con buena confianza, 3 si además no cortaste ninguna verdad.
+
+### Los barrios
+
+| Barrio | Regla |
+|---|---|
+| Plaza de Mercado | Primer día: las publicaciones vienen marcadas para aprender |
+| Barrio Norte | Cadenas: muchos rumores ORIGEN |
+| Barrio El Prado | Grupo del barrio: llegan de a tres, como en un chat |
+| Colegio San José | Recreo: todo va más rápido |
+| Parque Central | Viento: empuja las publicaciones de lado a lado |
+| Terminal de buses | Buses: algunas publicaciones cruzan la pantalla en bus |
+| Estadio Municipal | Avalancha: muchísimas a la vez, combos dobles |
+| Hospital Nova | Cero tolerancia: cada mentira hace el doble de daño |
+| Alcaldía | Jefe final: el Bot Supremo lanza rumores desde arriba |
+
+## Las estructuras de datos (y para qué sirven en el juego)
+
+| Estructura | Archivo | Uso en el juego |
 |---|---|---|
-| **Árbol de mutaciones** (n-ario con puntero al padre) | `alcalde/estructuras/arbol_mutaciones.py` | La genealogía de cada historia. Rastrear el origen, podar una rama al reportar, encontrar dónde mutó |
-| **Archivo de hechos** (árbol AVL) | `alcalde/estructuras/archivo_avl.py` | Verificar es buscar el hecho oficial; el periodista inserta los hechos que faltan |
-| **Red social** (grafo dirigido y ponderado) | `alcalde/estructuras/grafo.py`, `alcalde/modelo/red_social.py` | Quién sigue a quién y cuánto confía. Cada noche, la publicación avanza un nivel de BFS y ese recorrido **es** el árbol de mutaciones |
-| **Mapa de la ciudad** (grafo no dirigido y ponderado) | `alcalde/estructuras/grafo.py`, `alcalde/modelo/mapa.py` | Moverse por la ruta más corta (Dijkstra), verificar en persona, contagio de conflictos entre zonas y votación por zonas |
+| **Grafo de la ciudad** (no dirigido, con minutos) | `alcalde/estructuras/grafo.py`, `alcalde/modelo/mapa.py` | El mapa de la campaña. Solo se juega en vecinos de un barrio liberado, el rumor se contagia por las calles cada noche (un paso de BFS desde los focos) y los barrios liberados hacen de muro. El mapa marca la ruta más corta desde la Plaza (Dijkstra). |
+| **Grafo social** (dirigido, con confianza) | `alcalde/modelo/red_social.py` | De ahí salen los autores de las publicaciones. Cuando un ORIGEN llega arriba, lo reenvían los seguidores del autor (sus aristas de salida, por confianza). |
+| **Árbol del rumor** (n-ario con puntero al padre) | `alcalde/estructuras/arbol_mutaciones.py` | El ORIGEN es la raíz y cada reenvío es un hijo. Cortar el origen **poda el subárbol**: por eso caen todas las copias. |
+| **Archivo de hechos** (árbol AVL) | `alcalde/estructuras/archivo_avl.py` | Cada noticia verdadera que dejas llegar a la gente se inserta en el AVL. El álbum la muestra en orden alfabético (recorrido en inorden). Se guarda en preorden para reconstruir el árbol con la misma forma. |
 
-Justificación detallada: [Entrega 1, árboles](docs/ENTREGA_1.md) · [Entrega 2, grafos](docs/ENTREGA_2.md) · [Entrega final, producto integrado](docs/ENTREGA_FINAL.md).
+Justificaciones anteriores: [Entrega 1, árboles](docs/ENTREGA_1.md) · [Entrega 2, grafos](docs/ENTREGA_2.md).
+
+## Lo que pide el laboratorio
+
+| Requisito | Dónde está |
+|---|---|
+| Árboles y grafos con función real | Tabla de arriba |
+| Interfaz gráfica: ciudad, personaje, publicaciones, opciones, estado, puntaje, indicadores, resultados | Mapa de la isla, niveles con el barrio de fondo, barra de confianza, estrellas y resumen de cada nivel |
+| Componente aleatorio | Publicaciones, ORIGEN, virales, objetos especiales, viento, buses, focos nuevos de rumor cada noche y el jefe. La misma semilla repite la partida. |
+| Habilidad y decisiones con tiempo limitado | Cortar a tiempo, decidir qué barrio salvar en el mapa y cuándo usar el poder |
+| Roles con habilidades distintas | Los 4 personajes y sus poderes |
+| Puntuación individual y resultado de la ciudad | Puntos, estrellas, monedas, confianza de cada barrio y la elección final |
+| Elección del alcalde | Al vencer al jefe: cada barrio vota según cómo quedó |
+| Multijugador cliente-servidor con sockets | `alcalde/red/sala.py`: servidor TCP con hilos y mensajes JSON por línea |
+| Inclusividad | Opciones: modo tranquilo (todo más lento), menos movimiento, subtítulos de sonido. Las señales llevan ícono además de color. |
+| Ayuda | Botón Ayuda: cómo se juega, atajos para descubrir mentiras, barrios, personajes, mapa, controles y cómo funciona por dentro. Además, la lechuza da consejos durante el juego. |
+| Elementos motivadores | Combos, fiebre, estrellas, tienda de mejoras, álbum para completar, jefe final, efectos y sonidos |
 
 ## Cómo ejecutar
 
 Se necesita **Python 3.10 o superior** ([python.org](https://www.python.org/downloads/); en Windows, marcar «Add Python to PATH» al instalar).
-
-**1. Obtener el proyecto.** Con `git clone https://github.com/charlie1728/Laboratorio-1-alcalde-digital.git`, o descargando el ZIP desde GitHub (**Code › Download ZIP**) y **extrayéndolo por completo** con «Extraer todo» antes de abrir una terminal ahí.
-
-**2. Abrir una terminal en la carpeta del proyecto** (la que tiene `main.py`). En Windows: clic en la barra de direcciones del Explorador, escribir `cmd` y Enter.
-
-**3. Instalar la única dependencia (Pygame) y jugar:**
 
 ```bash
 pip install -r requirements.txt
 python main.py
 ```
 
-Con `python main.py 42` la partida es siempre la misma (útil para revisar o sustentar).
+En Windows también se puede abrir con **doble clic en `jugar.bat`**. La ventana abre maximizada; `F11` pasa a pantalla completa y `M` silencia el sonido. Con `python main.py 42` la partida sale siempre igual.
 
-En Windows también se puede abrir con **doble clic en `jugar.bat`**. El juego abre en una ventana maximizada; con `F11` pasa a pantalla completa.
+### Duelo en red
 
-### Jugar en red
+1. En un computador: **Duelo en red › Crear sala**. Arriba aparece la IP (por ejemplo `192.168.1.20`).
+2. En los demás: **Duelo en red**, escribir esa IP y pulsar **Unirme**.
+3. El anfitrión escoge el barrio y pulsa **¡Empezar duelo!**
 
-Cada jugador en su computador, conectados a la misma red wifi:
+También hay un servidor sin ventana: `python servidor.py`.
 
-1. Uno elige **Jugar en red › Crear partida**. Su pantalla muestra la dirección (por ejemplo `192.168.1.20`).
-2. Los demás eligen **Jugar en red**, escriben esa dirección y pulsan **Unirse**.
-3. El anfitrión pulsa **Comenzar partida**.
-
-Para probar en un solo computador, abre el juego dos veces y deja la dirección vacía (se conecta a `127.0.0.1`). También hay un servidor dedicado sin ventana:
-
-```bash
-python servidor.py --puerto 5050
-```
-
-Si Windows pregunta por el firewall, hay que permitir el acceso en redes privadas.
-
-### Pruebas automáticas
+## Pruebas
 
 ```bash
 python -m unittest discover -s tests -v
 ```
 
-Son 34 pruebas: árboles, grafos, su integración y una partida completa en red con sockets reales.
+Prueban los árboles, el AVL, el grafo y el mapa, cada barrio del juego, el árbol del rumor y la poda, el contagio por el mapa, la tienda, el guardado de la campaña y un duelo real con un servidor y dos clientes.
 
-## Controles
-
-| Acción | Cómo |
-|---|---|
-| Verificar la publicación del turno | Botón del celular o tecla `1` (cuesta 3 puntos) |
-| Decidir: compartir, reportar, ignorar o especial | Botones del celular o teclas `2` a `5` |
-| Caminar por la ciudad | Clic en una zona del mapa (una vez por turno) |
-| Conversar con los vecinos | Botón «Conversar» en la tarjeta de tu zona |
-| Cambiar de vista (ciudad, red, árbol) | Pestañas o `Tab` |
-| Terminar el turno | Botón o `Enter` |
-| Archivo AVL | Botón «Archivo» en el árbol, o tecla `A` |
-| Ayuda, alto contraste, sonido | `H`, `C`, `M` |
-
-## Estructura del proyecto
+## Organización del código
 
 ```
-main.py                   # el juego
-servidor.py               # servidor dedicado (opcional)
-alcalde/
-  estructuras/            # árbol de mutaciones, AVL y grafo: no dependen del juego
-  modelo/                 # lógica sin interfaz: partida, red social, mapa, elección, serialización
-  red/                    # protocolo, servidor y cliente (sockets TCP)
-  controlador.py          # la interfaz pide jugadas a un controlador local o en red
-  ui/                     # interfaz en Pygame: pantallas, vistas, personajes, edificios, sonido
-assets/                   # fuentes (OFL), iconos (Lucide, ISC) y sonidos generados
-tools/generar_audio.py    # sintetiza los efectos y la música
-tests/                    # pruebas de árboles, grafos y red
-docs/                     # justificación de cada entrega y capturas
+main.py                     arranque
+alcalde/estructuras/        árbol del rumor, AVL y grafo
+alcalde/modelo/             mapa de la ciudad, red social y apariencia de los personajes
+alcalde/corta/              el juego: nivel.py y campana.py (reglas, sin pygame) y las pantallas
+alcalde/red/                duelo en red (servidor y cliente)
+alcalde/ui/                 dibujo, personajes, sonido y opciones
+tests/                      pruebas
 ```
-
-## Estado por entregas
-
-- [x] **Entrega 1:** árbol de mutaciones y árbol AVL con sus operaciones y recorridos, integrados a la mecánica, con interfaz gráfica preliminar.
-- [x] **Entrega 2:** grafo social y grafo de la ciudad con BFS, DFS, componentes conexas, Dijkstra, camino de máxima confianza y grados. La propagación por la red construye el árbol de mutaciones, y los grafos se ven en pantalla con animaciones y herramientas para demostrar cada operación.
-- [x] **Entrega final:** elección del alcalde por zonas, multijugador cliente-servidor con sockets, rediseño visual con personajes ilustrados, accesibilidad, ayuda y guía, sonidos y música, y pruebas de estabilidad.

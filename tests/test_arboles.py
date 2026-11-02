@@ -6,11 +6,7 @@ import unittest
 
 from alcalde.estructuras.arbol_mutaciones import ArbolMutaciones, NodoMutacion
 from alcalde.estructuras.archivo_avl import ArchivoHechosAVL
-from alcalde.modelo.hechos import catalogo
-
-
-def _hecho():
-    return next(h for h in catalogo() if h.id == "parque-fumigacion")
+from alcalde.corta.nivel import Version
 
 
 class TestArbolMutaciones(unittest.TestCase):
@@ -22,16 +18,15 @@ class TestArbolMutaciones(unittest.TestCase):
     """
 
     def setUp(self):
-        h, rng = _hecho(), random.Random(1)
-        real = h.afirmacion_real()
+        real = Version("El parque cierra 3 meses")
         self.R = NodoMutacion(real, "Alcaldía", alcance=10)
         self.t = ArbolMutaciones("prueba", self.R)
         self.A = self.t.insertar(self.R.id, NodoMutacion(real, "Ana", alcance=5))
-        exa = real.mutar("exageracion", h, rng)
+        exa = Version("El parque cierra 30 meses", ("exageracion",))
         self.B = self.t.insertar(self.R.id, NodoMutacion(exa, "Beto", distorsion="exageracion", alcance=7))
         self.C = self.t.insertar(self.A.id, NodoMutacion(real, "Caro", alcance=1))
         self.D = self.t.insertar(self.A.id, NodoMutacion(real, "Dani", alcance=2))
-        sc = exa.mutar("sin_contexto", h, rng)
+        sc = Version("El parque cierra", ("exageracion", "sin_contexto"))
         self.E = self.t.insertar(self.B.id, NodoMutacion(sc, "Eva", distorsion="sin_contexto", alcance=3))
 
     def nombres(self, nodos):
@@ -131,32 +126,3 @@ class TestArchivoAVL(unittest.TestCase):
         for k in ["a", "c", "b"]:          # RL
             avl2.insertar(k, 0)
         self.assertEqual(avl2.raiz.clave, "b")
-
-
-class TestPartida(unittest.TestCase):
-    def test_partida_completa_sin_errores(self):
-        from alcalde.modelo.partida import Partida
-        for semilla in range(5):
-            p = Partida([("A", "ciudadano", (0, 0, 0)), ("B", "periodista", (0, 0, 0)),
-                         ("C", "influencer", (0, 0, 0)), ("D", "candidato", (0, 0, 0))], semilla=semilla)
-            rng = random.Random(semilla)
-            while not p.terminada:
-                for _ in range(3):
-                    casos = p.casos_abiertos()
-                    if not casos:
-                        break
-                    c = rng.choice(casos)
-                    n = rng.choice(list(c.arbol.preorden()))
-                    ok = [a for a in p.acciones_para(n) if a["ok"]]
-                    if ok:
-                        p.ejecutar(rng.choice(ok)["clave"], c, n)
-                if p.evento_viral:
-                    p.resolver_viral(rng.choice([None, "verificar", "reportar", "compartir"]))
-                p.terminar_turno()
-            self.assertTrue(p.archivo.es_avl_valido())
-            for v in p.ciudad.v.values():
-                self.assertTrue(0 <= v <= 100)
-
-
-if __name__ == "__main__":
-    unittest.main()

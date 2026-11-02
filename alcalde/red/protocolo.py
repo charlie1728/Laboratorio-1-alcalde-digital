@@ -1,21 +1,4 @@
-"""Protocolo cliente-servidor: un objeto JSON por línea (UTF-8) sobre TCP.
-
-Cliente -> servidor
-  {"t": "hola", "nombre", "rol", "look", "mas_tiempo"}   unirse al lobby
-  {"t": "perfil", "nombre", "rol", "look", "mas_tiempo"} cambiar el personaje en el lobby
-  {"t": "iniciar", "rondas"}                             solo el anfitrión
-  {"t": "accion", "caso", "nodo", "clave"}               verificar, compartir, reportar...
-  {"t": "mover", "zona"} / {"t": "conversar"} / {"t": "fin_turno"}
-  {"t": "viral", "clave"}                                respuesta a la publicación viral
-  {"t": "reaccion", "emoji"}                             reacción rápida visible para todos
-
-Servidor -> cliente
-  {"t": "bienvenida", "id"}            identificador de la conexión
-  {"t": "lobby", "jugadores", "anfitrion"}
-  {"t": "estado", "tu", "viral", "partida"}   estado completo tras cada jugada
-  {"t": "aviso", "texto", "tipo"}      mensajes del servidor (errores, desconexiones)
-  {"t": "reaccion", "de", "emoji"}
-"""
+"""Protocolo cliente-servidor: un objeto JSON por línea (UTF-8) sobre TCP. Los mensajes del duelo están en sala.py."""
 from __future__ import annotations
 
 import json

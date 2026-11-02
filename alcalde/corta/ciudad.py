@@ -12,7 +12,6 @@ import pygame
 import pygame.gfxdraw
 
 from ..modelo.mapa import ZONAS
-from .partida import ANCHO_BARRIO, BARRIOS
 
 SS = 2
 
@@ -122,58 +121,58 @@ def _barrio(s, tipo, x0, ancho, base, k, enfermo, semilla):
             pygame.draw.rect(s, (255, 240, 170), (x - 8 * k, e.y - 46 * k, 16 * k, 8 * k), border_radius=max(1, round(2 * k)))
 
 
-class Horizonte:
-    """La ciudad al fondo. Cada barrio ocupa una franja del ancho lógico de 1280."""
+class Fondo:
+    """El barrio donde se juega: su edificio en grande al centro y casas de relleno a los lados.
 
-    def __init__(self, U: float, ox: float, ancho_total: int, alto_total: int):
-        self.U, self.ox = U, ox
-        self.base = alto_total - 64 * U            # donde se paran los edificios
-        self.alto = 200 * U
-        self.sano, self.enfermo = {}, {}
-        for i, z in enumerate(BARRIOS):
-            for enf, dic in ((False, self.sano), (True, self.enfermo)):
-                w = round(ANCHO_BARRIO * U)
-                s = pygame.Surface((w * SS, round(self.alto) * SS), pygame.SRCALPHA)
-                _barrio(s, ZONAS[z]["tipo"], 8 * SS * U, (w - 16 * U) * SS, s.get_height() - 2, U * SS, enf, i * 31)
-                dic[z] = pygame.transform.smoothscale(s, (w, round(self.alto))).convert_alpha()
-        # Calle y andén de borde a borde.
-        self.calle = pygame.Surface((ancho_total, round(alto_total - self.base) + 2))
+    Se dibuja dos veces (sano y enfermo) y en el juego se mezclan según la confianza del barrio.
+    """
+
+    def __init__(self, zona: str, ancho: int, alto: int, U: float, semilla: int = 0):
+        self.zona, self.U = zona, U
+        self.base = alto - 70 * U
+        self.alto_fila = round(440 * U)
+        self.sano = self._fila(ancho, False, semilla)
+        self.enfermo = self._fila(ancho, True, semilla)
+        self.calle = pygame.Surface((ancho, round(alto - self.base) + 2))
         self.calle.fill((96, 104, 136))
-        pygame.draw.rect(self.calle, (226, 226, 236), (0, 0, ancho_total, round(14 * U)))
-        for x in range(0, ancho_total, round(60 * U)):
-            pygame.draw.rect(self.calle, (250, 238, 210), (x, round(36 * U), round(30 * U), round(5 * U)))
-        # Edificios de relleno a los lados (pantallas más anchas que 16:9).
-        self.relleno = []
-        rng = random.Random(4)
-        for lado in (-1, 1):
-            x = ox if lado < 0 else ox + ANCHO_BARRIO * len(BARRIOS) * U
-            while (lado < 0 and x > -200 * U) or (lado > 0 and x < ancho_total + 200 * U):
-                w = rng.uniform(70, 120) * U
-                h = rng.uniform(70, 160) * U
-                c = rng.choice([(200, 210, 240), (230, 214, 250), (255, 226, 200), (210, 236, 220)])
-                if lado < 0:
-                    x -= w + 8 * U
-                self.relleno.append((x, w, h, c))
-                if lado > 0:
-                    x += w + 8 * U
+        pygame.draw.rect(self.calle, (226, 226, 236), (0, 0, ancho, round(16 * U)))
+        for x in range(0, ancho, round(60 * U)):
+            pygame.draw.rect(self.calle, (250, 238, 210), (x, round(40 * U), round(30 * U), round(5 * U)))
 
-    def x_barrio(self, z) -> float:
-        return self.ox + (BARRIOS.index(z) + 0.5) * ANCHO_BARRIO * self.U
-
-    def dibujar(self, sup, niveles: dict, t: float, temblor=(0, 0)):
+    def _fila(self, ancho, enfermo, semilla):
         U = self.U
+        h = self.alto_fila
+        s = pygame.Surface((ancho * SS, h * SS), pygame.SRCALPHA)
+        base = h * SS - 2
+        rng = random.Random(semilla)
+        tipo = ZONAS[self.zona]["tipo"]
+        centro_w = 460 * U * SS
+        x_centro = ancho * SS / 2 - centro_w / 2
+        k = U * SS * 2.3
+        # relleno a la izquierda y a la derecha
+        otros = [t for t in ("barrio", "barrio2", "plaza", "terminal", "colegio") if t != tipo]
+        x = x_centro - 20 * U * SS
+        i = 0
+        while x > -200 * U * SS:
+            w = rng.uniform(190, 250) * U * SS
+            _barrio(s, otros[i % len(otros)], x - w, w, base, U * SS * 1.5, enfermo, semilla + i)
+            x -= w + 10 * U * SS
+            i += 1
+        x = x_centro + centro_w + 20 * U * SS
+        while x < ancho * SS + 200 * U * SS:
+            w = rng.uniform(190, 250) * U * SS
+            _barrio(s, otros[(i + 2) % len(otros)], x, w, base, U * SS * 1.5, enfermo, semilla + i)
+            x += w + 10 * U * SS
+            i += 1
+        _barrio(s, tipo, x_centro, centro_w, base, k, enfermo, semilla + 99)
+        return pygame.transform.smoothscale(s, (ancho, h)).convert_alpha()
+
+    def dibujar(self, sup, enfermedad: float, temblor=(0, 0)):
         sx, sy = temblor
-        for x, w, h, c in self.relleno:
-            pygame.draw.rect(sup, c, (x + sx, self.base - h + sy, w, h))
-            pygame.draw.rect(sup, _oscuro(c, 0.9), (x + w * 0.78 + sx, self.base - h + sy, w * 0.22, h))
-        for i, z in enumerate(BARRIOS):
-            x = self.ox + i * ANCHO_BARRIO * U + sx
-            y = self.base - self.alto + sy
-            sup.blit(self.sano[z], (x, y))
-            n = niveles.get(z, 0)
-            if n:
-                img = self.enfermo[z]
-                img.set_alpha(round(255 * min(1, n / 3)))
-                sup.blit(img, (x, y))
-                img.set_alpha(255)
-        sup.blit(self.calle, (0 + sx, self.base + sy))
+        y = self.base - self.alto_fila + sy
+        sup.blit(self.sano, (sx, y))
+        if enfermedad > 0.02:
+            self.enfermo.set_alpha(round(255 * min(1, enfermedad)))
+            sup.blit(self.enfermo, (sx, y))
+            self.enfermo.set_alpha(255)
+        sup.blit(self.calle, (sx, self.base + sy))
