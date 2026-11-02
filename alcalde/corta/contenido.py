@@ -68,6 +68,27 @@ FALSAS = [
     ("@NoticiasYa24", "El Estadio se cae a pedazos", 3, ("bot",), "ESTADIO"),
     ("Encuesta de internet", "Nadie va a votar este domingo", 3, ("absoluto",), None),
     ("@ElPradoLibre", "Van a tumbar las casas de El Prado", 3, ("bot",), "PRADO"),
+    # cosas que les llegan a los niños
+    ("Cadena del recreo", "¡¡Si comes chicle en clase te expulsan!!", 1, ("cadena", "mayusculas"), "COLEGIO"),
+    ("Audio de un niño", "En el Parque vive un monstruo de noche", 1, ("anonimo", "urgente"), "PARQUE"),
+    ("Mensaje reenviado", "Comparte esto y te regalan un videojuego", 1, ("cadena", "regalo"), None),
+    ("Grupo del salón", "La profe dijo que mañana no hay recreo", 1, ("anonimo",), "COLEGIO"),
+    ("Me lo dijo un amigo", "Los perros del Parque muerden a TODOS", 1, ("anonimo", "absoluto"), "PARQUE"),
+    ("Cadena de WhatsApp", "¡Gana 1.000 monedas del juego gratis!", 1, ("cadena", "regalo"), None),
+    ("Audio anónimo", "Si no reenvías esto, se borra tu juego", 1, ("anonimo", "amenaza"), None),
+    ("Dicen en la cancha", "Cancelaron TODOS los partidos del año", 1, ("anonimo", "absoluto"), "ESTADIO"),
+    ("Grupo de la familia", "¡¡Los helados de la Plaza dan fiebre!!", 1, ("anonimo", "mayusculas"), "PLAZA"),
+    ("Cadena de WhatsApp", "Los buses ahora son gratis, ¡corran!", 1, ("cadena", "urgente"), "TERMINAL"),
+    ("Colegio San Jose", "Habrá clases también los domingos", 2, ("impostor",), "COLEGIO"),
+    ("Hospital Nova Info", "Comer zanahoria cura todas las gripas", 2, ("impostor", "absoluto"), "HOSPITAL"),
+    ("Policia Nova", "Montar bicicleta ahora está prohibido", 2, ("impostor",), "NORTE"),
+    ("Parque Central Oficial", "Ya no dejarán entrar mascotas nunca", 2, ("impostor", "absoluto"), "PARQUE"),
+    ("Estadio Nova", "El clásico se juega a las 3 de la mañana", 2, ("impostor",), "ESTADIO"),
+    ("@JuegosGratis_99", "Descarga aquí la app que te da diamantes", 3, ("bot", "regalo"), None),
+    ("@NoticiasYa24", "Encuesta: el 200 % de los niños odia leer", 3, ("bot", "cifra"), None),
+    ("Video recortado", "Tomás Arrieta empuja a una señora", 3, ("recorte", "ataque"), None),
+    ("Foto vieja", "Así quedó la Terminal después del choque", 3, ("recorte",), "TERMINAL"),
+    ("Página sin nombre", "Luz Marina no sabe leer", 3, ("anonimo", "ataque"), None),
 ]
 
 # ------------------------------------------------------------------ publicaciones verdaderas
@@ -100,6 +121,20 @@ VERDADERAS = [
     ("Estadio Municipal", "Abren escuelas de fútbol para niños", "Estadio: escuelas", "ESTADIO"),
     ("Terminal de buses", "Buses cada 10 minutos en hora pico", "Terminal: frecuencia", "TERMINAL"),
     ("Junta del Barrio El Prado", "Minga de limpieza el sábado a las 8", "Prado: minga", "PRADO"),
+    ("Secretaría de Educación", "Vacaciones de mitad de año desde el 20 de junio", "Colegio: vacaciones", "COLEGIO"),
+    ("Colegio San José", "Feria de ciencias el viernes en el patio", "Colegio: feria de ciencias", "COLEGIO"),
+    ("Biblioteca Pública", "Hora del cuento para niños los sábados", "Biblioteca: hora del cuento", None),
+    ("Secretaría de Salud", "Vacunación gratis para mascotas en el Parque", "Parque: vacunación de mascotas", "PARQUE"),
+    ("Alcaldía de Nova", "Nueva ciclovía entre el Norte y el Parque", "Norte: ciclovía", "NORTE"),
+    ("Estadio Municipal", "Entrada gratis para niños al partido del domingo", "Estadio: entrada de niños", "ESTADIO"),
+    ("Terminal de buses", "Los niños menores de 5 años no pagan pasaje", "Terminal: pasaje de niños", "TERMINAL"),
+    ("Hospital Nova", "Charla sobre alimentación sana el miércoles", "Hospital: alimentación sana", "HOSPITAL"),
+    ("Alcaldía de Nova", "Mercado campesino los domingos en la Plaza", "Plaza: mercado campesino", "PLAZA"),
+    ("Registraduría", "Los jurados de votación se escogen por sorteo", "Elección: jurados", None),
+    ("Canal Nova", "Debate de candidatos con preguntas de niños", "Elección: debate infantil", None),
+    ("Defensa Civil", "Curso gratis de primeros auxilios", "Defensa Civil: primeros auxilios", None),
+    ("Empresa de Aguas", "Cierra la llave al cepillarte: ahorras agua", "Agua: ahorro", None),
+    ("Secretaría de Cultura", "Festival de cometas en el Parque en agosto", "Parque: festival de cometas", "PARQUE"),
 ]
 
 # ------------------------------------------------------------------ los barrios (niveles)
@@ -146,4 +181,50 @@ ESPECIALES = {
     "moneda": dict(texto="+5 monedas", icono="coins"),
     "corazon": dict(texto="+15 confianza", icono="heart"),
     "reloj": dict(texto="¡Todo más lento!", icono="hourglass"),
+    "campana": dict(texto="¡Campaña de convivencia!", icono="hand-heart"),
 }
+
+# ------------------------------------------------------------------ misiones del día
+# Un objetivo extra por nivel (da monedas y puntos). id: (texto, ícono, meta)
+MISIONES = {
+    "calmar": ("Calma 2 peleas entre vecinos", "hand-heart", 2),
+    "combo": ("Haz un combo de 6", "flame", 6),
+    "verdades": ("Deja llegar 6 noticias reales", "newspaper", 6),
+    "sin_errores": ("No cortes ninguna verdad", "badge-check", 1),
+    "verificar": ("Verifica antes de decidir en la alerta", "search", 1),
+    "origenes": ("Corta 2 rumores ORIGEN", "git-branch", 2),
+    "dorados": ("Atrapa 2 objetos dorados", "gift", 2),
+    "jefe_rapido": ("Corta 15 rumores del jefe", "bot", 15),
+}
+# Qué misiones pueden salir según la regla del barrio
+MISIONES_POR_REGLA = {
+    "tutorial": ("verdades", "dorados"),
+    "cadenas": ("origenes", "verificar", "calmar"),
+    "jefe": ("jefe_rapido", "sin_errores", "dorados"),
+}
+MISIONES_COMUNES = ("calmar", "combo", "verdades", "sin_errores", "verificar", "dorados")
+
+# ------------------------------------------------------------------ estado de Ciudad Nova
+# id: (nombre, nombre corto, ícono, ¿es mejor que suba?)
+INDICADORES = {
+    "verificada": ("Información verificada", "Verificada", "badge-check", True),
+    "confianza": ("Confianza ciudadana", "Confianza", "heart-handshake", True),
+    "convivencia": ("Convivencia", "Convivencia", "users", True),
+    "bienestar": ("Bienestar digital", "Bienestar", "smile", True),
+    "desinformacion": ("Desinformación", "Desinformación", "cloud-lightning", False),
+    "conflictos": ("Conflictos", "Conflictos", "flame", False),
+}
+INDICADORES_INICIO = dict(verificada=40, confianza=50, convivencia=60, bienestar=55, desinformacion=50, conflictos=35)
+
+# ------------------------------------------------------------------ candidatos a la alcaldía
+# Los tres primeros hacen campaña con propuestas; Emilio hace campaña con cadenas y bots.
+# barrios: donde más lo conocen (ahí se lleva la mayoría de los votos informados).
+CANDIDATOS = [
+    dict(id="valentina", nombre="Valentina Ríos", lema="Parques y colegios", color=(0, 168, 120),
+         barrios=("COLEGIO", "PARQUE", "PRADO")),
+    dict(id="tomas", nombre="Tomás Arrieta", lema="Buses y calles", color=(40, 132, 230),
+         barrios=("TERMINAL", "NORTE", "ESTADIO")),
+    dict(id="luz", nombre="Luz Marina", lema="Salud para todos", color=(255, 150, 30),
+         barrios=("HOSPITAL", "PLAZA", "ALCALDIA")),
+    dict(id="emilio", nombre="Emilio", lema="Campaña de cadenas y bots", color=(232, 72, 72), barrios=(), bot=True),
+]

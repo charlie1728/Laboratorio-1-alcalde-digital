@@ -7,6 +7,11 @@ Campo lógico de 1280 x 720. Las publicaciones salen desde abajo (o en bus, o la
     Archivo de hechos (un árbol AVL) y tranquiliza a la gente.
   * Un ORIGEN que llega arriba sin cortar se reenvía a los seguidores de su autor (aristas de salida
     del grafo social). Esas copias son hijos en el árbol del rumor; cortar el origen poda el subárbol.
+  * Una vez por nivel salta una ALERTA VIRAL: el juego se congela y hay 10 segundos para decidir
+    (verificar, compartir, reportar o ignorar). Se recorre el árbol de decisiones y, si la publicación
+    se comparte, se propaga por el grafo social con un BFS: quiénes la reciben, cuántos y en cuántos saltos.
+  * En la calle hay discusiones entre vecinos (se cortan para calmarlas) y a veces un vecino reporta
+    una mentira por su cuenta. Todo eso mueve los indicadores de la ciudad (``efectos``).
 La misma semilla da el mismo nivel: así dos jugadores en red compiten con lo mismo.
 """
 from __future__ import annotations
@@ -16,8 +21,10 @@ import random
 from dataclasses import dataclass, field
 from typing import Optional
 
+from ..estructuras.arbol_decision import HOJA, PREGUNTA, arbol_viral
 from ..estructuras.arbol_mutaciones import ArbolMutaciones, NodoMutacion
-from .contenido import BARRIOS_JUEGO, ESPECIALES, FALSAS, VERDADERAS
+from .contenido import (BARRIOS_JUEGO, ESPECIALES, FALSAS, INDICADORES, MISIONES, MISIONES_COMUNES,
+                        MISIONES_POR_REGLA, VERDADERAS)
 
 ANCHO, ALTO = 1280, 720
 DURACION = 55.0
@@ -25,6 +32,17 @@ COMBO_SEG = 1.6
 FIEBRE_COMBO = 8
 FIEBRE_SEG = 7.0
 SALUD_MAX = 100
+ALERTA_SEG = 10.0          # tiempo para decidir en la alerta viral
+ALERTA_RESULTADO = 7.0     # cuánto se queda el resultado si nadie pulsa "Seguir"
+DISCUSION_SEG = 6.5
+DISCUSION_Y = ALTO - 140
+PREMIO_MISION = dict(monedas=20, puntos=50)
+
+
+def elegir_mision(zona: str, rng) -> str:
+    """La misión del día de un barrio: sale de las que tienen sentido con su regla."""
+    regla = BARRIOS_JUEGO.get(zona, BARRIOS_JUEGO["PLAZA"])["regla"]
+    return rng.choice(MISIONES_POR_REGLA.get(regla, MISIONES_COMUNES))
 
 
 @dataclass(frozen=True)
@@ -110,7 +128,8 @@ def _parametros(regla: str, infeccion: int) -> dict:
 
 class Nivel:
     def __init__(self, zona: str, jugador: dict, semilla: Optional[int] = None, red=None, mejoras=None,
-                 infeccion: int = 0, duracion: float = DURACION, tranquilo: bool = False):
+                 infeccion: int = 0, duracion: float = DURACION, tranquilo: bool = False, alertas: bool = True,
+                 guia: Optional[int] = None, mision: Optional[str] = None):
         self.zona = zona
         self.regla = BARRIOS_JUEGO.get(zona, BARRIOS_JUEGO["PLAZA"])["regla"]
         self.jugador = dict(jugador)
@@ -155,9 +174,45 @@ class Nivel:
         self._sig = 1
         self._sig_caso = 1
         self._marcadas = 0
+        self.guia = (8 if self.regla == "tutorial" else 0) if guia is None else guia
         self._mazo_f, self._mazo_v = [], []
         self.jefe = dict(hp=100.0, x=ANCHO / 2, y=235.0, fase=1, t=0.0, golpe=0.0, apagon=0.0, prox_apagon=14.0,
                          prox=1.5) if self.regla == "jefe" else None
+        # Estado de la ciudad: cuánto movió este nivel cada indicador (decisiones, discusiones, caídas...).
+        self.efectos = {k: 0 for k in INDICADORES}
+        self.caidas_virales = 0
+        self.caidas_ataque = 0
+        # Alerta viral (árbol de decisiones) y propagación por la red social.
+        self.arbol = arbol_viral()
+        self.alerta: Optional[dict] = None
+        self.decisiones: list[dict] = []
+        nombre = jugador.get("nombre")
+        self.yo = nombre if red is not None and nombre in red and red.dato(nombre).jugador is not None else None
+        nunca = math.inf
+        if alertas and self.regla != "jefe":
+            self.prox_alerta = 24.0 if self.regla == "tutorial" else self.rng.uniform(15, 30)
+        else:
+            self.prox_alerta = nunca
+        # Discusiones en la calle y vecinos que reportan por su cuenta.
+        self.discusion: Optional[dict] = None
+        self.calmadas = 0
+        self.peleas = 0
+        self.reportes_vecinos = 0
+        self.prox_discusion = (30.0 if self.regla == "tutorial" else self.rng.uniform(10, 18)) if alertas else nunca
+        self.prox_reporte = self.rng.uniform(16, 26) if alertas else nunca
+        # Misión del día (con su propio azar, para no cambiar las publicaciones que salen).
+        self.verificadas = 0
+        self.origenes_cortados = 0
+        self.dorados = 0
+        self.del_jefe_cortadas = 0
+        if alertas:
+            mid = mision if mision in MISIONES else elegir_mision(zona, random.Random(self.semilla ^ 0x5EED))
+            if mid == "verificar" and self.regla == "jefe":
+                mid = "sin_errores"
+            texto, icono, meta = MISIONES[mid]
+            self.mision = dict(id=mid, texto=texto, icono=icono, meta=meta, hecha=False, fallida=False)
+        else:
+            self.mision = None
 
     # -------------------------------------------------------------- utilidades
     def evento(self, **kw):
@@ -206,7 +261,7 @@ class Nivel:
             self._mazo_f, FALSAS, lambda c: c[2] <= nmax and (c[4] in (None, self.zona) or self.rng.random() < 0.3))
         viral = self.rng.random() < self.p["viral"]
         origen = not viral and self.rng.random() < self.p["origen"]
-        marca = self.regla == "tutorial" and self._marcadas < 8
+        marca = self._marcadas < self.guia
         p = self._nueva("falsa", x, fuente=f, texto=t, nivel=nivel, senales=senales, vida=3 if viral else 1,
                         viral=viral, origen=origen, marca=marca, **kw)
         self._marcadas += marca
@@ -220,7 +275,7 @@ class Nivel:
     def _lanzar_verdad(self, x=None, **kw):
         f, t, hecho, barrio = self._carta(self._mazo_v, VERDADERAS,
                                           lambda c: c[3] in (None, self.zona) or self.rng.random() < 0.3)
-        marca = self.regla == "tutorial" and self._marcadas < 8
+        marca = self._marcadas < self.guia
         self._marcadas += marca
         return self._nueva("verdad", x, fuente=f, texto=t, hecho=hecho, marca=marca, **kw)
 
@@ -263,10 +318,23 @@ class Nivel:
         p.nivel = max(p.nivel, 2)
         self.evento(t_="ataque_recibido", de=de, x=p.x)
 
+    def recibir_compartida(self, de: str, fuente: str, texto: str, verdad: bool, hecho: str = ""):
+        """En el duelo: un rival compartió en la alerta viral y la publicación te llegó a ti.
+        Si era verdad hay que dejarla pasar; si era mentira, cortarla."""
+        if self.estado != "jugando":
+            return
+        if verdad:
+            p = self._nueva("verdad", fuente=fuente, texto=texto, hecho=hecho, enviado_por=de)
+        else:
+            p = self._nueva("falsa", fuente=fuente, texto=texto, nivel=2, enviado_por=de)
+        self.evento(t_="compartida_recibida", de=de, verdad=verdad, x=p.x)
+
     # -------------------------------------------------------------- cortar
     def cortar(self, a, b) -> int:
-        if self.estado != "jugando":
+        if self.estado != "jugando" or self.alerta is not None:
             return 0
+        if self.discusion and _toca_circulo(a, b, (self.discusion["x"], DISCUSION_Y - 30), 80):
+            self._calmar()
         margen = 6 * self.mejoras.get("filo", 0)
         cortadas = []
         for p in list(self.pubs):
@@ -294,6 +362,7 @@ class Nivel:
     def _cortar(self, p: Pub, direccion):
         self.pubs.remove(p)
         if p.tipo == "especial":
+            self.dorados += 1
             self._usar_especial(p)
             self.evento(t_="corte", pub=p, dir=direccion, bien=True)
             return
@@ -313,6 +382,8 @@ class Nivel:
         base = 10 + 5 * min(self.combo - 1, 10) * self.p["combo_x"] + (30 if p.viral else 0) + 5 * (p.nivel - 1)
         pts = self._sumar(base)
         self.cortadas += 1
+        self.origenes_cortados += p.origen
+        self.del_jefe_cortadas += p.del_jefe
         self.energia = min(1.0, self.energia + 0.12 * (1 + 0.25 * self.mejoras.get("energia", 0)))
         for s in p.senales:
             if s not in self.senales_vistas:
@@ -373,10 +444,19 @@ class Nivel:
             self.salud = min(self.salud_max, self.salud + 15)
         elif e == "reloj":
             self.lento = max(self.lento, 5.0)
+        elif e == "campana":
+            self.salud = min(self.salud_max, self.salud + 8)
+            self._efecto(convivencia=4, bienestar=3)
         self.evento(t_="especial", especial=e, x=p.x, y=p.y)
 
+    def _efecto(self, **cambios):
+        for k, v in cambios.items():
+            self.efectos[k] = self.efectos.get(k, 0) + v
+
     def usar_poder(self) -> bool:
-        if self.estado != "jugando" or self.energia < 1.0:
+        if self.estado != "jugando" or self.alerta is not None:
+            return False
+        if self.energia < 1.0:
             self.evento(t_="sin_poder")
             return False
         self.energia = 0.0
@@ -410,6 +490,8 @@ class Nivel:
                 self.evento(t_="bloqueo", x=p.x)
                 return
             self.caidas += 1
+            self.caidas_virales += p.viral
+            self.caidas_ataque += "ataque" in p.senales
             self.combo = 0
             self._dano(25 if p.viral else self.p["dano"], p.x)
             self.evento(t_="cae", x=p.x, viral=p.viral)
@@ -420,6 +502,195 @@ class Nivel:
                 self.hechos.append(p.hecho)
             self._sumar(3)
             self.evento(t_="salva", x=p.x)
+
+    # -------------------------------------------------------------- alerta viral (árbol de decisiones)
+    def _abrir_alerta(self):
+        """Salta una publicación viral: el juego se congela y hay que decidir antes de que se acabe el tiempo."""
+        falsa = self.rng.random() < 0.6
+        if falsa:
+            f, t, nivel, senales, _ = self._carta(self._mazo_f, FALSAS, lambda c: c[2] >= 2)
+            pub = Pub(0, "falsa", f, t, ANCHO / 2, ALTO / 2, 0, 0, nivel=nivel, senales=senales, viral=True)
+        else:
+            f, t, hecho, _ = self._carta(self._mazo_v, VERDADERAS, lambda c: True)
+            pub = Pub(0, "verdad", f, t, ANCHO / 2, ALTO / 2, 0, 0, hecho=hecho, viral=True)
+        pub.autor, pub.look = self._autor()
+        limite = ALERTA_SEG + (5 if self.tranquilo else 0)
+        self.alerta = dict(pub=pub, nodo=self.arbol.raiz, t=limite, limite=limite, etapa="decidir",
+                           verificado=False, hoja=None, propagacion=None, extra="", por_tiempo=False,
+                           t_res=ALERTA_RESULTADO, compartidos=self.rng.randint(800, 2400))
+        self.evento(t_="alerta", verdad=pub.tipo == "verdad")
+
+    def opciones_alerta(self) -> list:
+        """Los botones que hay que mostrar ahora (hijos del nodo de acción actual del árbol)."""
+        if self.alerta is None or self.alerta["etapa"] == "resultado":
+            return []
+        return self.arbol.opciones(self.alerta["nodo"])
+
+    def decidir(self, clave: str) -> bool:
+        """El jugador pulsó un botón de la alerta: se baja por el árbol de decisiones."""
+        a = self.alerta
+        if a is None or a["etapa"] == "resultado":
+            return False
+        verdad = a["pub"].tipo == "verdad"
+        try:
+            nodo = self.arbol.elegir(a["nodo"], clave)
+        except (KeyError, ValueError):
+            return False
+        nodo = self.arbol.avanzar(nodo, verdad)
+        if nodo.tipo == PREGUNTA:
+            # Verificar: el juego contesta "¿es verdadera?" y se lo muestra al jugador.
+            a["verificado"] = True
+            self.verificadas += 1
+            nodo = self.arbol.responder(nodo, verdad)
+            for s in a["pub"].senales:
+                if s not in self.senales_vistas:
+                    self.senales_vistas.append(s)
+            self.evento(t_="verificado", verdad=verdad)
+        if nodo.tipo == HOJA:
+            self._resolver(nodo)
+        else:
+            a["nodo"] = nodo
+            a["etapa"] = "verificado" if a["verificado"] else "decidir"
+        return True
+
+    def _resolver(self, hoja, por_tiempo=False):
+        a = self.alerta
+        pub = a["pub"]
+        verdad = pub.tipo == "verdad"
+        puntos, efectos, extra = hoja.puntos, dict(hoja.efectos), ""
+        # Cada rol vive la misma decisión de forma distinta.
+        if self.rol == "periodista" and a["verificado"]:
+            puntos += 15
+            extra = "Periodista: verificar te da +15"
+        elif self.rol == "influencer" and hoja.propaga == "jugador":
+            efectos = {k: round(v * 1.5) for k, v in efectos.items()}
+            extra = "Influencer: lo que compartes pesa el doble"
+        elif self.rol == "ciudadano" and hoja.clave in ("v_no_reportar", "r_no"):
+            efectos["convivencia"] = efectos.get("convivencia", 0) + 2
+            efectos["conflictos"] = efectos.get("conflictos", 0) - 2
+            extra = "Ciudadana: reportar cuida la convivencia"
+        elif self.rol == "candidato" and efectos.get("confianza", 0):
+            efectos["confianza"] += 3 if efectos["confianza"] > 0 else -2
+            extra = "Candidato: la gente mira lo que haces"
+        # ¿Por dónde se va la publicación? BFS por el grafo social desde quien la comparte.
+        prop = None
+        if hoja.propaga == "jugador":
+            prop = self._propagar(self.yo or pub.autor, verdad, 1.0)
+        elif hoja.propaga == "autor":
+            prop = self._propagar(pub.autor, verdad, 0.6)
+        elif not verdad:
+            # La frenaste: se calcula a cuántos les habría llegado (y no les llegó).
+            prop = self._propagar(pub.autor, verdad, 1.0)
+            if prop:
+                prop["frenada"] = True
+        if prop and not prop.get("frenada"):
+            if verdad:
+                efectos["verificada"] = efectos.get("verificada", 0) + prop["n"] // 4
+                self.salud = min(self.salud_max, self.salud + min(15, 3 + prop["n"]))
+                if pub.hecho and pub.hecho not in self.hechos:
+                    self.hechos.append(pub.hecho)
+            else:
+                efectos["desinformacion"] = efectos.get("desinformacion", 0) + prop["n"] // 3
+                self._dano(min(20, 4 + prop["n"]), ANCHO / 2)
+        if puntos > 0:
+            pts = self._sumar(puntos)
+        else:
+            pts = puntos
+            self.puntos = max(0, self.puntos + puntos)
+        self._efecto(**efectos)
+        a.update(etapa="resultado", hoja=hoja, propagacion=prop, extra=extra, por_tiempo=por_tiempo, puntos=pts,
+                 efectos=efectos, camino=[n.texto for n in self.arbol.camino(hoja.clave)], t_res=ALERTA_RESULTADO)
+        self.decisiones.append(dict(clave=hoja.clave, bien=hoja.bien, verdad=verdad, por_tiempo=por_tiempo,
+                                    alcance=prop["n"] if prop else 0, texto=pub.texto))
+        self.evento(t_="decision", clave=hoja.clave, bien=hoja.bien, verdad=verdad, puntos=pts,
+                    compartio=hoja.propaga == "jugador", fuente=pub.fuente, texto=pub.texto, hecho=pub.hecho)
+
+    def _propagar(self, origen, verdad: bool, factor: float) -> Optional[dict]:
+        """Quién recibe la publicación: BFS por las aristas de salida (seguidores) del grafo social.
+
+        Cada arista se cruza con una probabilidad que sale de la confianza (peso) y de qué tan crédulo
+        es quien la recibe; la mentira viaja más fácil que la verdad. Devuelve el árbol BFS: el orden,
+        el nivel (salto) de cada persona y de quién la recibió.
+        """
+        red = self.red
+        if red is None or not origen or origen not in red:
+            return None
+        rng = random.Random(self.semilla * 13 + len(self.decisiones))
+
+        def pasa(u, v, arista):
+            d = red.dato(v)
+            if d is None or d.jugador is not None:
+                return False
+            base = 0.75 if verdad else 0.55 + 0.6 * d.credulidad
+            return rng.random() < min(0.95, arista["peso"] * base * factor)
+
+        orden, nivel, padre = red.bfs(origen, max_nivel=4, filtro=pasa)
+        return dict(origen=origen, orden=orden, nivel=nivel, padre=padre, verdad=verdad, n=len(orden) - 1,
+                    saltos=max(nivel.values()) if nivel else 0)
+
+    def cerrar_alerta(self):
+        if self.alerta is not None and self.alerta["etapa"] == "resultado":
+            self.alerta = None
+            self.prox = max(self.prox, 0.8)
+            self.evento(t_="alerta_fin")
+
+    def _actualizar_alerta(self, dt):
+        a = self.alerta
+        if a["etapa"] == "resultado":
+            a["t_res"] -= dt
+            if a["t_res"] <= 0:
+                self.cerrar_alerta()
+            return
+        a["t"] -= dt
+        a["compartidos"] += round(dt * 900)
+        if a["t"] <= 0:
+            # Se acabó el tiempo: nadie la frenó y se siguió compartiendo (como ignorarla).
+            nodo = self.arbol.avanzar(self.arbol.buscar("ignorar"), a["pub"].tipo == "verdad")
+            self._resolver(nodo, por_tiempo=True)
+
+    # -------------------------------------------------------------- la calle: discusiones y vecinos que reportan
+    def _abrir_discusion(self):
+        # Del centro a la derecha: a la izquierda están la lechuza y sus consejos, que la taparían.
+        self.discusion = dict(x=self.rng.uniform(560, ANCHO - 260), t=DISCUSION_SEG)
+        self.evento(t_="discusion", x=self.discusion["x"])
+
+    def _calmar(self):
+        x = self.discusion["x"]
+        self.discusion = None
+        self.calmadas += 1
+        self.salud = min(self.salud_max, self.salud + 5)
+        self._efecto(convivencia=4, conflictos=-3)
+        pts = self._sumar(25)
+        self.prox_discusion = self.rng.uniform(14, 22)
+        self.evento(t_="paces", x=x, puntos=pts)
+
+    def _actualizar_calle(self, dt):
+        if self.discusion:
+            self.discusion["t"] -= dt
+            if self.discusion["t"] <= 0:
+                x = self.discusion["x"]
+                self.discusion = None
+                self.peleas += 1
+                self._efecto(convivencia=-6, conflictos=6)
+                self._dano(6, x)
+                self.prox_discusion = self.rng.uniform(14, 22)
+                self.evento(t_="pelea", x=x)
+        elif self.reloj < self.duracion - 8:
+            self.prox_discusion -= dt
+            if self.prox_discusion <= 0:
+                self._abrir_discusion()
+        self.prox_reporte -= dt
+        if self.prox_reporte <= 0:
+            self.prox_reporte = self.rng.uniform(18, 28)
+            falsas = [p for p in self.pubs if p.tipo == "falsa" and not p.del_jefe and 150 < p.y < ALTO - 60]
+            if falsas and self.red is not None:
+                p = self.rng.choice(falsas)
+                quien, _ = self._autor()
+                self.pubs.remove(p)
+                self.reportes_vecinos += 1
+                self._efecto(desinformacion=-1)
+                self.evento(t_="corte", pub=p, dir=(1, 0), bien=True, cadena=True)
+                self.evento(t_="reporte_vecino", quien=quien, x=p.x, y=p.y)
 
     # -------------------------------------------------------------- jefe final
     def _herir_jefe(self, n):
@@ -467,6 +738,10 @@ class Nivel:
         if self.estado != "jugando":
             return
         dt = min(dt, 0.05)
+        if self.alerta is not None:
+            # La ciudad se congela mientras decides.
+            self._actualizar_alerta(dt)
+            return
         self.tiempo += dt
         self.reloj += dt
         self.fiebre = max(0.0, self.fiebre - dt)
@@ -517,12 +792,46 @@ class Nivel:
             if self.prox_especial <= 0:
                 self._especial()
                 self.prox_especial = self.rng.uniform(9, 14)
+            self._actualizar_calle(dt)
+            if self.reloj < self.duracion - 6:
+                self.prox_alerta -= dt
+                if self.prox_alerta <= 0 and self.salud > 0:
+                    self.prox_alerta = math.inf
+                    self._abrir_alerta()
+        self._revisar_mision()
         if self.salud <= 0:
             self.estado = "perdido"
             self.evento(t_="perdido")
         elif termina and not any(p.tipo != "especial" for p in self.pubs):
             self.estado = "ganado"
             self.evento(t_="ganado")
+        if self.estado == "ganado":
+            self._revisar_mision()
+
+    # -------------------------------------------------------------- misión del día
+    def progreso_mision(self) -> tuple[int, int]:
+        m = self.mision
+        if m is None:
+            return 0, 1
+        actual = {"calmar": self.calmadas, "combo": self.mejor_combo, "verdades": self.salvadas,
+                  "sin_errores": 0 if self.errores else (1 if self.estado == "ganado" else 0),
+                  "verificar": self.verificadas, "origenes": self.origenes_cortados, "dorados": self.dorados,
+                  "jefe_rapido": self.del_jefe_cortadas}[m["id"]]
+        return min(actual, m["meta"]), m["meta"]
+
+    def _revisar_mision(self):
+        m = self.mision
+        if m is None or m["hecha"] or m["fallida"]:
+            return
+        if m["id"] == "sin_errores" and self.errores:
+            m["fallida"] = True
+            self.evento(t_="mision_fallida")
+            return
+        hecho, meta = self.progreso_mision()
+        if hecho >= meta:
+            m["hecha"] = True
+            pts = self._sumar(PREMIO_MISION["puntos"])
+            self.evento(t_="mision", texto=m["texto"], puntos=pts)
 
     # -------------------------------------------------------------- resultado
     def estrellas(self) -> int:
@@ -535,14 +844,42 @@ class Nivel:
             return 2
         return 1
 
+    def efectos_finales(self) -> dict:
+        """Cuánto cambió cada indicador de Ciudad Nova por lo que pasó en este nivel (entre -15 y 15: la ciudad
+        mejora de a poco, así que hay que cuidar varios barrios para llegar arriba)."""
+        estrellas = self.estrellas()
+        frac = self.salud / self.salud_max
+        ef = dict(self.efectos)
+        ef["verificada"] += 2 * min(self.salvadas, 6) - 4 * self.errores
+        ef["confianza"] += round((frac - 0.6) * 15) + estrellas - (6 if self.estado == "perdido" else 0)
+        ef["bienestar"] += 2 * estrellas - 3 * self.caidas_virales - (4 if self.estado == "perdido" else 0)
+        ef["desinformacion"] += 3 * self.caidas - min(self.cortadas, 24) // 3
+        ef["conflictos"] += 2 * self.caidas_ataque
+        return {k: max(-15, min(15, round(v))) for k, v in ef.items()}
+
     def resultado(self) -> dict:
         estrellas = self.estrellas()
         monedas = self.monedas + estrellas * 10 + self.puntos // 60
+        cumplida = bool(self.mision and self.mision["hecha"])
+        if cumplida:
+            monedas += PREMIO_MISION["monedas"]
         monedas = round(monedas * (1 + 0.25 * self.mejoras.get("iman", 0)))
         return dict(zona=self.zona, estado=self.estado, estrellas=estrellas, puntos=self.puntos, monedas=monedas,
                     cortadas=self.cortadas, errores=self.errores, caidas=self.caidas, salvadas=self.salvadas,
                     salud=round(100 * self.salud / self.salud_max), mejor_combo=self.mejor_combo,
-                    senales=list(self.senales_vistas), hechos=list(self.hechos))
+                    senales=list(self.senales_vistas), hechos=list(self.hechos), efectos=self.efectos_finales(),
+                    calmadas=self.calmadas, peleas=self.peleas, decisiones=list(self.decisiones),
+                    mision=dict(texto=self.mision["texto"], icono=self.mision["icono"], cumplida=cumplida)
+                    if self.mision else None)
+
+
+def _toca_circulo(a, b, c, r) -> bool:
+    """¿El trazo a-b pasa a menos de r del punto c?"""
+    (ax, ay), (bx, by), (cx, cy) = a, b, c
+    dx, dy = bx - ax, by - ay
+    largo = dx * dx + dy * dy
+    t = 0.0 if largo == 0 else max(0.0, min(1.0, ((cx - ax) * dx + (cy - ay) * dy) / largo))
+    return math.hypot(ax + t * dx - cx, ay + t * dy - cy) <= r
 
 
 def _toca(a, b, p: Pub, margen: float = 0.0) -> bool:

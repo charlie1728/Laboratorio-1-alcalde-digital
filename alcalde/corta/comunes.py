@@ -5,7 +5,8 @@ import math
 
 import pygame
 
-from ..ui.dibujo import (BLANCO, LILA, MANGO, TINTA, TINTA2, ancho_texto, icono, pildora, rebote, sombra, texto)
+from ..ui.dibujo import (BLANCO, LILA, MANGO, ROJO, TINTA, TINTA2, VERDE, ancho_texto, icono, mezclar, pildora, rebote,
+                         sombra, texto)
 
 ANCHO, ALTO = 1280, 720
 
@@ -115,14 +116,56 @@ def velo(sup, alfa=170, color=(30, 20, 80)):
     sup.blit(s, (0, 0))
 
 
+def estrella(sup, centro, radio, color, borde=None):
+    """Estrella de cinco puntas rellena."""
+    if radio < 1:
+        return
+    cx, cy = centro
+    pts = []
+    for i in range(10):
+        r = radio if i % 2 == 0 else radio * 0.48
+        a = -math.pi / 2 + i * math.pi / 5
+        pts.append((cx + math.cos(a) * r, cy + math.sin(a) * r))
+    pygame.draw.polygon(sup, color, pts)
+    if borde:
+        pygame.draw.polygon(sup, borde, pts, max(1, round(radio * 0.12)))
+
+
 def estrellas(sup, centro, tam, n, total=3, t=None, color_vacia=(220, 222, 236)):
-    """Fila de estrellas (rellenas las ganadas)."""
+    """Fila de estrellas: las ganadas rellenas y doradas (aparecen con rebote si se da ``t``)."""
     x0 = centro[0] - (total - 1) * tam * 0.6
     for i in range(total):
         k = 1.0 if t is None else rebote(min(1, max(0, t - i * 0.35) / 0.35))
-        col = (255, 196, 40) if i < n and k > 0 else color_vacia
-        icono(sup, "star", (x0 + i * tam * 1.2, centro[1]), tam * (k if i < n and t is not None else 1), col,
-              3.2 if i < n else 2.4)
+        c = (x0 + i * tam * 1.2, centro[1])
+        if i < n:
+            estrella(sup, c, tam * 0.58 * k, (255, 196, 40), (214, 140, 0))
+        else:
+            estrella(sup, c, tam * 0.5, color_vacia)
+
+
+def chips_efectos(sup, efectos, x, y, ancho, U, tam=14):
+    """Pastillas con lo que cambió cada indicador de la ciudad: verde si la ciudad mejoró, rojo si empeoró."""
+    from .contenido import INDICADORES
+    cx, cy = x, y
+    alto = 32 * U
+    hubo = False
+    for k, (_, corto, ic, sube_bien) in INDICADORES.items():
+        v = efectos.get(k, 0)
+        if not v:
+            continue
+        hubo = True
+        col = VERDE if (v > 0) == sube_bien else ROJO
+        txt = f"{corto} {'+' if v > 0 else ''}{v}"
+        w = ancho_texto(txt, tam * U, 900) + 46 * U
+        if cx + w > x + ancho and cx > x:
+            cx, cy = x, cy + alto + 8 * U
+        r = pildora(sup, (cx, cy, w, alto), mezclar(col, BLANCO, 0.86), con_sombra=False)
+        icono(sup, ic, (r.x + 18 * U, r.centery), 18 * U, col, 2.6)
+        texto(sup, txt, (r.x + 34 * U, r.centery), tam * U, col, 900, ancla="midleft")
+        cx += w + 8 * U
+    if not hubo:
+        texto(sup, "Sin cambios", (x, y + alto / 2), tam * U, TINTA2, 900, ancla="midleft")
+    return cy + alto
 
 
 def titulo_grande(sup, s, centro, tam, color=BLANCO, sombra_color=(40, 20, 110)):
@@ -130,5 +173,6 @@ def titulo_grande(sup, s, centro, tam, color=BLANCO, sombra_color=(40, 20, 110))
     texto(sup, s, centro, tam, color, 700, "titulo")
 
 
-__all__ = ["Escala", "Boton", "panel", "velo", "estrellas", "titulo_grande", "partir", "parrafo", "ANCHO", "ALTO",
+__all__ = ["Escala", "Boton", "panel", "velo", "estrella", "estrellas", "chips_efectos", "titulo_grande", "partir",
+           "parrafo", "ANCHO", "ALTO",
            "BLANCO", "LILA", "MANGO", "TINTA", "TINTA2"]

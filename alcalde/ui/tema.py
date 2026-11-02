@@ -2,7 +2,8 @@
 import json
 from pathlib import Path
 
-OPCIONES_DEFECTO = dict(sonido=True, musica=True, tranquilo=False, menos_movimiento=False, subtitulos=True)
+OPCIONES_DEFECTO = dict(sonido=True, musica=True, tranquilo=False, menos_movimiento=False, subtitulos=True,
+                        contraste=False, simbolos=False)
 
 _ARCHIVO = Path.home() / ".alcalde_digital.json"
 

@@ -8,12 +8,13 @@ import pygame
 
 from ..modelo.apariencia import look_aleatorio
 from ..ui import personajes
-from ..ui.dibujo import BLANCO, LILA, MANGO, TINTA, TINTA2, ancho_texto, pildora, rebote, texto
+from ..ui.dibujo import BLANCO, LILA, MANGO, TINTA, TINTA2, ancho_texto, circulo, icono, pildora, rebote, texto
 from .campana import Campana
 from .comunes import Boton, Escala, partir, titulo_grande
 from .contenido import PODERES
 from .nivel import Nivel
 from .pantalla_nivel import PantallaNivel
+from .personalizar import Editor, aplicar_looks
 
 _rng = random.Random(8)
 PERSONAJES = [
@@ -27,7 +28,7 @@ PERSONAJES = [
 class MenuPrincipal:
     def __init__(self, app):
         self.app = app
-        nivel = Nivel("ESTADIO", dict(nombre="", rol="periodista"), semilla=21, duracion=10_000)
+        nivel = Nivel("ESTADIO", dict(nombre="", rol="periodista"), semilla=21, duracion=10_000, alertas=False)
         self.fondo = PantallaNivel(app, nivel, demo=True)
         self.t = 0.0
         self.t_paso = 0.0
@@ -36,6 +37,7 @@ class MenuPrincipal:
         self.cuantos = 1
         self.elegidos = []
         self.overlay = None
+        aplicar_looks(PERSONAJES)
         self.guardada = Campana.cargar()
         if self.guardada and self.guardada.terminada:
             self.guardada = None
@@ -44,29 +46,40 @@ class MenuPrincipal:
         self._armar()
 
     def _armar(self):
-        b = []
+        # Fila 1: el juego rápido (lo primero que ve un niño en la feria). Fila 2: la campaña.
+        # Fila 3: los modos de varios jugadores. Fila 4: álbum, ayuda y opciones.
+        jugar = Boton("¡Jugar ya!", "rapido", MANGO, "play")
+        jugar.latir = True
         if self.guardada:
-            b.append(Boton(f"Continuar campaña · día {self.guardada.dia}", "continuar", MANGO, "play"))
-            b.append(Boton("Nueva campaña", "campana", (255, 236, 180), "map"))
+            campana = [Boton(f"Seguir campaña · día {self.guardada.dia}", "continuar", (255, 236, 180), "map"),
+                       Boton("Nueva", "nueva", (255, 246, 214), "rotate-ccw")]
         else:
-            b.append(Boton("Campaña", "campana", MANGO, "map"))
-        b += [Boton("Fiesta (2 a 4 jugadores)", "fiesta", (255, 214, 226), "party-popper"),
-              Boton("Duelo en red", "duelo", (214, 240, 255), "network"),
-              Boton("Álbum", "album", (226, 220, 255), "book-open"),
-              Boton("Ayuda", "ayuda", (226, 220, 255), "circle-help"),
-              Boton("Opciones", "opciones", (226, 220, 255), "settings")]
-        b[0].latir = True
-        self.botones = b
+            campana = [Boton("Campaña por la ciudad", "campana", (255, 236, 180), "map")]
+        varios = [Boton("Fiesta (2 a 4)", "fiesta", (255, 214, 226), "party-popper"),
+                  Boton("Duelo en red", "duelo", (214, 240, 255), "network")]
+        otros = [Boton("Récords", "records", (226, 220, 255), "trophy"),
+                 Boton("Álbum", "album", (226, 220, 255), "book-open"),
+                 Boton("Ayuda", "ayuda", (226, 220, 255), "circle-help"),
+                 Boton("Opciones", "opciones", (226, 220, 255), "settings")]
+        self.filas = [[jugar], campana, varios, otros]
+        self.botones = [b for fila in self.filas for b in fila]
 
     # -------------------------------------------------------------- entrada
     def evento(self, e):
         if self.overlay is not None:
-            if self.overlay.evento(e) == "cerrar":
+            r = self.overlay.evento(e)
+            if r == "si":
+                accion, self.overlay = self.overlay.al_aceptar, None
+                accion()
+            elif r == "cerrar":
                 self.overlay = None
             return
         if e.type == pygame.KEYDOWN and e.key == pygame.K_ESCAPE:
             if self.paso == "inicio":
-                self.app.corriendo = False
+                # En la feria un niño puede pulsar Esc sin querer: se pregunta antes de cerrar.
+                from .paneles import Confirmar
+                self.overlay = Confirmar(self.app, "¿Salir del juego?", "Se cierra la ventana de Corta la mentira.",
+                                         "Sí, salir", self._salir)
             else:
                 self._ir("inicio")
             return
@@ -83,6 +96,9 @@ class MenuPrincipal:
                     if tipo == "cuantos":
                         self.cuantos = valor
                         self._ir("personajes")
+                    elif tipo == "estilo":
+                        self.app.sonar("click")
+                        self.overlay = Editor(self.app, PERSONAJES[valor])
                     elif tipo == "personaje":
                         self._elegir(valor)
                     return
@@ -94,11 +110,23 @@ class MenuPrincipal:
             elif self.paso == "personajes":
                 self._elegir(k)
 
+    def _salir(self):
+        self.app.corriendo = False
+
     def _accion(self, a):
-        from .paneles import Album, Ayuda, Opciones
+        from .paneles import Album, Ayuda, Confirmar, Opciones, Records
         self.app.sonar("click")
-        if a == "continuar":
+        if a == "rapido":
+            self.modo, self.cuantos, self.elegidos = "rapido", 1, []
+            self._ir("personajes")
+        elif a == "continuar":
             self.app.abrir_mapa(self.guardada)
+        elif a == "nueva":
+            self.overlay = Confirmar(self.app, "¿Empezar una campaña nueva?",
+                                     f"Se borra la campaña guardada (día {self.guardada.dia}).", "Sí, empezar de cero",
+                                     lambda: self._accion("campana"))
+        elif a == "records":
+            self.overlay = Records(self.app)
         elif a == "campana":
             self.modo, self.cuantos, self.elegidos = "campana", 1, []
             self._ir("personajes")
@@ -130,6 +158,8 @@ class MenuPrincipal:
             if self.modo == "campana":
                 Campana.borrar()
                 self.app.nueva_campana(elegidos[0])
+            elif self.modo == "rapido":
+                self.app.rapido(elegidos[0])
             else:
                 self.app.fiesta(elegidos)
 
@@ -154,24 +184,28 @@ class MenuPrincipal:
 
     def _pantalla_inicio(self, sup, E, U):
         k = rebote(min(1, self.t / 0.7))
-        titulo_grande(sup, "Corta la mentira", (E.W / 2, 150 * U), 96 * U * k)
+        titulo_grande(sup, "Corta la mentira", (E.W / 2, 128 * U), 90 * U * k)
         sub = "Alcalde Digital · salva Ciudad Nova de los rumores"
         w = ancho_texto(sub, 21 * U, 900) + 50 * U
-        pildora(sup, (E.W / 2 - w / 2, 214 * U, w, 44 * U), MANGO)
-        texto(sup, sub, (E.W / 2, 236 * U), 21 * U, TINTA, 900)
+        pildora(sup, (E.W / 2 - w / 2, 190 * U, w, 44 * U), MANGO)
+        texto(sup, sub, (E.W / 2, 212 * U), 21 * U, TINTA, 900)
         sup.blit(personajes.civi("feliz", round(150 * U), parpadeo=int(self.t * 3) % 9 == 0,
                                  ala=math.sin(self.t * 4) * 0.4), (E.x(70), E.y(470)))
-        principales = [b for b in self.botones if b.accion not in ("album", "ayuda", "opciones")]
-        secundarios = [b for b in self.botones if b.accion in ("album", "ayuda", "opciones")]
-        y = 290
-        for i, b in enumerate(principales):
-            alto = 72 if i == 0 else 58
-            b.dibujar(sup, E.r(640 - 240, y, 480, alto), self.t)
-            y += alto + 14
-        x = 640 - (3 * 150 + 2 * 15) / 2
-        for b in secundarios:
-            b.dibujar(sup, E.r(x, y + 10, 150, 50), self.t)
-            x += 165
+        # Cada fila ocupa 500 de ancho; los botones se reparten el espacio (el de "Nueva" es más angosto).
+        y = 260
+        for i, fila in enumerate(self.filas):
+            alto = 84 if i == 0 else 52 if i == 3 else 60
+            pesos = [0.34 if b.accion == "nueva" else 1.0 for b in fila]
+            sep = 12
+            libre = 500 - sep * (len(fila) - 1)
+            x = 640 - 250
+            for b, peso in zip(fila, pesos):
+                w = libre * peso / sum(pesos)
+                b.dibujar(sup, E.r(x, y, w, alto), self.t)
+                x += w + sep
+            y += alto + (26 if i == 0 else 14)
+        if self.t > 1.2:
+            texto(sup, "Arrastra el mouse para cortar las mentiras", (E.W / 2, 357 * U), 14 * U, BLANCO, 900)
         texto(sup, "M: sonido   ·   F11: pantalla completa   ·   Esc: salir", (E.W / 2, E.H - 24 * U), 15 * U, BLANCO, 800)
 
     def _pantalla_cuantos(self, sup, E, U):
@@ -221,6 +255,14 @@ class MenuPrincipal:
                 pildora(sup, (r.centerx - 70 * U, r.bottom - 46 * U, 140 * U, 32 * U), TINTA)
                 texto(sup, f"Jugador {n}", (r.centerx, r.bottom - 30 * U), 15 * U, BLANCO, 900)
             else:
-                texto(sup, f"Tecla {i + 1}", (r.centerx, r.bottom - 22 * U), 13 * U, TINTA2, 800)
+                b = pygame.Rect(r.centerx - 92 * U, r.bottom - 50 * U, 184 * U, 38 * U)
+                sobre = b.collidepoint(pygame.mouse.get_pos())
+                pildora(sup, b, LILA if sobre else (236, 231, 255), con_sombra=False)
+                icono(sup, "wand-sparkles", (b.x + 26 * U, b.centery), 18 * U, BLANCO if sobre else LILA, 2.6)
+                texto(sup, "Personalizar", (b.x + 44 * U, b.centery), 15 * U, BLANCO if sobre else LILA, 900,
+                      ancla="midleft")
+                self._rects[("estilo", i)] = b
+            circulo(sup, (r.right - 24 * U, cab.centery), 14 * U, BLANCO)
+            texto(sup, str(i + 1), (r.right - 24 * U, cab.centery), 15 * U, TINTA, 900)
             self._rects[("personaje", i)] = r
         texto(sup, "Esc: volver", (E.W / 2, E.H - 24 * U), 15 * U, BLANCO, 800)

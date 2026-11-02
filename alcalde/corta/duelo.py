@@ -6,10 +6,10 @@ import random
 
 import pygame
 
-from ..modelo.mapa import ZONAS, crear_mapa, nombre_zona
-from ..modelo.red_social import generar_red
+from ..modelo.mapa import crear_mapa, nombre_zona
+from ..modelo.red_social import conectar_jugador, generar_red
 from ..red.protocolo import ips_locales
-from ..red.sala import PUERTO_DUELO, Cliente, Servidor
+from ..red.sala import Cliente, Servidor
 from ..ui import personajes
 from ..ui.dibujo import BLANCO, LILA, MANGO, ROJO, TINTA, TINTA2, VERDE, icono, mezclar, pildora, texto
 from ..ui.tema import TEMA
@@ -81,6 +81,9 @@ class PantallaDuelo:
                 self._empezar(m["zona"], m["semilla"])
             elif t == "ataque" and self.juego and self.juego.n.estado == "jugando":
                 self.juego.n.recibir_ataque(m["de"])
+            elif t == "compartida" and self.juego and self.juego.n.estado == "jugando":
+                self.juego.n.recibir_compartida(m["de"], m.get("fuente", ""), m.get("texto", ""), bool(m.get("verdad")),
+                                                m.get("hecho", ""))
             elif t == "aviso":
                 self.avisos.append((m["texto"], self.t))
             elif t == "desconectado":
@@ -91,19 +94,27 @@ class PantallaDuelo:
 
     def _empezar(self, zona, semilla):
         p = PERSONAJES[self.personaje]
-        red = generar_red(random.Random(semilla), crear_mapa(), set())
+        mapa = crear_mapa()
+        red = generar_red(random.Random(semilla), mapa, {p["nombre"]})
+        conectar_jugador(red, mapa, random.Random(semilla + 1), p["nombre"], 0, p["rol"], p["look"], zona)
         n = Nivel(zona, p, semilla=semilla, red=red, infeccion=1, tranquilo=TEMA.op["tranquilo"],
                   **({} if self.app.duracion is None else dict(duracion=self.app.duracion)))
         self.juego = PantallaNivel(self.app, n, self._fin_local, titulo=f"Duelo · {nombre_zona(zona)}")
         self.juego.al_evento = self._evento_juego
         self.terminado = False
         self.estado = "jugando"
+        from .logros import REGISTRO
+        REGISTRO.ganar("en_red")
         pygame.mouse.set_visible(False)
         self.app.sonar("turno")
 
     def _evento_juego(self, ev):
         if ev["t_"] == "ataque" and self.cliente:
             self.cliente.enviar({"t": "ataque"})
+        elif ev["t_"] == "decision" and ev.get("compartio") and self.cliente:
+            # Compartiste en la alerta viral: el servidor se la pasa a los rivales (verdad o mentira).
+            self.cliente.enviar({"t": "compartir", "fuente": ev["fuente"], "texto": ev["texto"], "verdad": ev["verdad"],
+                                 "hecho": ev.get("hecho", "")})
 
     def _fin_local(self, res):
         self.terminado = True

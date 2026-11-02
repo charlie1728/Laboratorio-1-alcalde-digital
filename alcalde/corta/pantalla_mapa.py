@@ -12,16 +12,29 @@ import random
 
 import pygame
 
+from ..modelo.apariencia import look_aleatorio
 from ..modelo.mapa import CALLES, ZONAS, nombre_zona
 from ..ui import personajes
-from ..ui.dibujo import (AZUL, BLANCO, LILA, MANGO, ROJO, TINTA, TINTA2, VERDE, anillo, ancho_texto, circulo, icono,
+from ..ui.dibujo import (BLANCO, LILA, MANGO, ROJO, TINTA, TINTA2, VERDE, anillo, ancho_texto, circulo, icono,
                          mezclar, pildora, rebote, suave, texto)
 from . import geometria as geo
-from .comunes import Boton, estrellas, panel, parrafo, partir, velo
-from .contenido import BARRIOS_JUEGO, SENALES
+from .campana import DIAS as DIAS_TOTAL, FINAL, PARA_EL_JEFE
+from .comunes import Boton, chips_efectos, estrellas, panel, parrafo, velo
+from .contenido import BARRIOS_JUEGO, MISIONES, SENALES
 from .isla import Escenario
 
 DORADO = (255, 200, 40)
+LOOK_CANDIDATO = {"valentina": look_aleatorio(random.Random(41), True),
+                  "tomas": look_aleatorio(random.Random(42), False),
+                  "luz": look_aleatorio(random.Random(43), True),
+                  # Emilio es una persona: el que regala las mentiras es el Bot Supremo, que hace campaña por él.
+                  "emilio": dict(piel=1, pelo="rapado", color_pelo=0, ropa=1, extra="gafas")}
+
+
+def color_indicador(valor, sube_bien):
+    """Verde si a la ciudad le va bien en ese indicador, amarillo si más o menos y rojo si mal."""
+    bueno = valor if sube_bien else 100 - valor
+    return VERDE if bueno >= 60 else MANGO if bueno >= 40 else ROJO
 
 
 class PantallaMapa:
@@ -45,6 +58,7 @@ class PantallaMapa:
                         Boton("Menú", "menu", (236, 238, 248), "log-out")]
         if self.fase == "mapa" and self.c.disponibles():
             self.sel = self.c.disponibles()[0]
+        self.confeti = []
 
     # -------------------------------------------------------------- geometría
     def _preparar(self, sup):
@@ -80,7 +94,8 @@ class PantallaMapa:
             return
         if self.fase == "eleccion":
             if self.btn_seguir.toca(e) and self.fase_t > 3:
-                self.app.ir_menu()
+                from .periodico import PantallaPeriodico
+                self.app.cambiar(PantallaPeriodico(self.app, self.c))
             return
         for b in self.botones:
             if b.toca(e):
@@ -115,7 +130,8 @@ class PantallaMapa:
     def _avanzar(self):
         self.app.sonar("click")
         if self.fase == "resultado":
-            self.fase = "noche" if (self.cambios.get("contagios") or self.cambios.get("focos")) else "mapa"
+            # La noche siempre se muestra (sale el Diario Nova), salvo cuando ya terminó la campaña.
+            self.fase = "mapa" if self.c.terminada else "noche"
             self.fase_t = 0.0
             if self.fase == "noche":
                 self.app.sonar("noche")
@@ -127,13 +143,24 @@ class PantallaMapa:
                 self.fase_t = 0.0
                 self.app.sonar("votos")
             elif self.c.disponibles():
-                self.sel = self.cambios.get("liberada") and self.c.disponibles()[0] or self.c.disponibles()[0]
+                # Se selecciona un barrio que se acaba de abrir (vecino del liberado), si lo hay.
+                lib = self.cambios.get("liberada")
+                nuevos = [z for z in self.c.disponibles() if lib and z in self.c.mapa.vecinos(lib)]
+                self.sel = (nuevos or self.c.disponibles())[0]
 
     def actualizar(self, dt):
         self.t += dt
         self.fase_t += dt
         if self.overlay is not None and hasattr(self.overlay, "actualizar"):
             self.overlay.actualizar(dt)
+        if self.fase == "eleccion" and self.fase_t > 3 and (self.c.eleccion or {}).get("final") != "derrota" \
+                and not self.app.menos_movimiento and random.random() < 0.6:
+            self.confeti.append(dict(x=random.random(), y=-0.05, v=random.uniform(0.15, 0.35), r=random.uniform(0, 6.3),
+                                     c=random.choice([MANGO, ROJO, LILA, VERDE, (96, 190, 255)])))
+        for c in self.confeti:
+            c["y"] += c["v"] * dt
+            c["r"] += dt * 5
+        self.confeti = [c for c in self.confeti if c["y"] < 1.1][-220:]
 
     # -------------------------------------------------------------- dibujo
     def dibujar(self, sup):
@@ -150,13 +177,40 @@ class PantallaMapa:
             self._noche(sup)
         self._barra(sup)
         if self.fase == "mapa":
+            self._indicadores(sup)
             self._tarjeta(sup)
+        elif self.fase == "noche":
+            self._indicadores(sup)
         elif self.fase == "resultado":
             self._resultado(sup)
         elif self.fase == "eleccion":
             self._eleccion(sup)
+        for c in self.confeti:
+            x, y = c["x"] * W, c["y"] * H
+            pygame.draw.polygon(sup, c["c"], [(x + math.cos(c["r"] + a) * 8 * U, y + math.sin(c["r"] + a) * 5 * U)
+                                              for a in (0, 2, 3.5, 5)])
         if self.overlay is not None:
             self.overlay.dibujar(sup)
+
+    def _indicadores(self, sup):
+        """Panel de la izquierda: cómo está Ciudad Nova hoy (los seis indicadores de la ciudad)."""
+        U = self.U
+        filas = self.c.indicadores_lista()
+        r = pildora(sup, (16 * U, 100 * U, 236 * U, (58 + 46 * len(filas)) * U), BLANCO, round(22 * U), alfa=235)
+        icono(sup, "landmark", (r.x + 24 * U, r.y + 26 * U), 22 * U, LILA, 2.6)
+        texto(sup, "Ciudad Nova hoy", (r.x + 44 * U, r.y + 26 * U), 18 * U, TINTA, 700, "titulo", "midleft")
+        for i, (k, nombre, ic, valor, sube_bien) in enumerate(filas):
+            y = r.y + 64 * U + i * 46 * U
+            col = color_indicador(valor, sube_bien)
+            icono(sup, ic, (r.x + 24 * U, y + 8 * U), 20 * U, col, 2.6)
+            texto(sup, nombre, (r.x + 44 * U, y), 13 * U, TINTA2, 900, ancla="midleft")
+            texto(sup, str(valor), (r.right - 16 * U, y), 15 * U, col, 900, ancla="midright")
+            barra = pygame.Rect(r.x + 44 * U, y + 12 * U, r.w - 60 * U, 9 * U)
+            pygame.draw.rect(sup, (232, 234, 246), barra, border_radius=round(5 * U))
+            relleno = barra.copy()
+            relleno.w = round(barra.w * valor / 100)
+            pygame.draw.rect(sup, col, relleno, border_radius=round(5 * U))
+        texto(sup, "Desinformación y conflictos: mejor bajos", (r.centerx, r.bottom + 14 * U), 11 * U, BLANCO, 900)
 
     def _calles(self, sup):
         """Calles del grafo: verdes entre barrios liberados, amarillas hacia los que se pueden jugar."""
@@ -250,7 +304,6 @@ class PantallaMapa:
                                c.personaje.get("rol", "periodista"), "feliz")
         sup.blit(av, (r.x + 8 * U, r.y + 7 * U))
         texto(sup, c.personaje.get("nombre", ""), (r.x + 76 * U, r.y + 22 * U), 17 * U, TINTA, 700, "titulo", "midleft")
-        from .comunes import ANCHO  # noqa: F401
         from .campana import DIAS
         texto(sup, f"Día {min(c.dia, DIAS)} de {DIAS} · faltan {max(0, DIAS - c.dia)} para votar",
               (r.x + 76 * U, r.y + 47 * U), 13 * U, TINTA2, 900, ancla="midleft")
@@ -286,12 +339,26 @@ class PantallaMapa:
             estrellas(sup, (r.x + 250 * U, r.bottom - 26 * U), 16 * U, self.c.estrellas.get(z, 1))
         else:
             txt = ["Sin rumores", "Rumor: poco", "Rumor: mucho", "Rumor: muchísimo"][n]
-            texto(sup, txt + " (más difícil)" if n else txt, (r.x + 136 * U, r.bottom - 26 * U), 15 * U,
-                  ROJO if n else VERDE, 900, ancla="midleft")
+            fin = texto(sup, txt + " (más difícil)" if n else txt, (r.x + 136 * U, r.bottom - 26 * U), 15 * U,
+                        ROJO if n else VERDE, 900, ancla="midleft")
+            if estado == "disponible":
+                texto_m, ic_m, _ = MISIONES[self.c.mision(z)]
+                x = fin.right + 24 * U
+                icono(sup, ic_m, (x + 10 * U, fin.centery), 18 * U, LILA, 2.6)
+                texto(sup, f"Misión: {texto_m}", (x + 26 * U, fin.centery), 15 * U, LILA, 900, ancla="midleft")
         bx = r.right - 300 * U
         if estado == "disponible":
             self.btn_jugar.latir = True
             self.btn_jugar.dibujar(sup, pygame.Rect(bx, r.y + 40 * U, 270 * U, 84 * U), self.t)
+        elif estado == "bloqueada" and z == FINAL and any(v in self.c.liberadas for v in self.c.mapa.vecinos(z)):
+            n = self.c.liberados_sin_jefe()
+            parrafo(sup, f"El Bot Supremo te espera. Libera {PARA_EL_JEFE} barrios para entrar.", bx, r.y + 34 * U,
+                    270 * U, 17 * U, TINTA2, centrado=True)
+            for i in range(PARA_EL_JEFE):
+                lleno = i < n
+                cx = bx + 135 * U + (i - (PARA_EL_JEFE - 1) / 2) * 44 * U
+                circulo(sup, (cx, r.y + 120 * U), 17 * U, VERDE if lleno else (226, 228, 240))
+                icono(sup, "flag" if lleno else "lock", (cx, r.y + 120 * U), 18 * U, BLANCO if lleno else TINTA2, 2.6)
         elif estado == "bloqueada":
             parrafo(sup, "Todavía no llegas. Libera un barrio vecino para abrir el camino.", bx, r.y + 50 * U,
                     270 * U, 17 * U, TINTA2, centrado=True)
@@ -305,39 +372,49 @@ class PantallaMapa:
         W, H = sup.get_size()
         res = self.resultado
         velo(sup, 150)
-        r = panel(sup, (W / 2 - 420 * U, 110 * U, 840 * U, 520 * U), BLANCO, round(32 * U))
+        r = panel(sup, (W / 2 - 440 * U, 84 * U, 880 * U, 580 * U), BLANCO, round(32 * U))
         gano = res["estado"] == "ganado"
-        texto(sup, ("¡Barrio salvado!" if gano else "El rumor ganó esta vez"), (r.centerx, r.y + 56 * U), 40 * U,
+        texto(sup, ("¡Barrio salvado!" if gano else "El rumor ganó esta vez"), (r.centerx, r.y + 46 * U), 40 * U,
               VERDE if gano else ROJO, 700, "titulo")
-        texto(sup, nombre_zona(res["zona"]), (r.centerx, r.y + 96 * U), 18 * U, TINTA2, 900)
-        estrellas(sup, (r.centerx, r.y + 160 * U), 56 * U, res["estrellas"], t=self.fase_t)
+        m = res.get("mision")
+        if m:
+            linea = f"{nombre_zona(res['zona'])} · Misión {'cumplida: +20 monedas' if m['cumplida'] else 'sin cumplir'}"
+            texto(sup, linea, (r.centerx, r.y + 84 * U), 18 * U, VERDE if m["cumplida"] else TINTA2, 900)
+        else:
+            texto(sup, nombre_zona(res["zona"]), (r.centerx, r.y + 84 * U), 18 * U, TINTA2, 900)
+        estrellas(sup, (r.centerx, r.y + 136 * U), 56 * U, res["estrellas"], t=self.fase_t)
         datos = [("scissors", res["cortadas"], "mentiras cortadas"), ("badge-check", res["salvadas"], "verdades salvadas"),
-                 ("circle-x", res["errores"], "verdades cortadas"), ("flame", f"x{res['mejor_combo']}", "mejor combo")]
-        cw = (r.w - 60 * U) / 4
+                 ("circle-x", res["errores"], "verdades cortadas"), ("flame", f"x{res['mejor_combo']}", "mejor combo"),
+                 ("hand-heart", res.get("calmadas", 0), "peleas calmadas")]
+        cw = (r.w - 60 * U) / len(datos)
         for i, (ic, v, et) in enumerate(datos):
             cx = r.x + 30 * U + cw * (i + 0.5)
-            icono(sup, ic, (cx, r.y + 232 * U), 26 * U, LILA, 2.6)
-            texto(sup, v, (cx, r.y + 266 * U), 28 * U, TINTA, 700, "titulo")
-            texto(sup, et, (cx, r.y + 292 * U), 13 * U, TINTA2, 900)
+            icono(sup, ic, (cx, r.y + 198 * U), 26 * U, LILA, 2.6)
+            texto(sup, v, (cx, r.y + 230 * U), 28 * U, TINTA, 700, "titulo")
+            texto(sup, et, (cx, r.y + 256 * U), 13 * U, TINTA2, 900)
         k = min(1, self.fase_t / 1.2)
-        texto(sup, f"+{round(res['monedas'] * k)} monedas", (r.centerx - 120 * U, r.y + 340 * U), 24 * U, (200, 140, 0),
+        texto(sup, f"+{round(res['monedas'] * k)} monedas", (r.centerx - 130 * U, r.y + 298 * U), 24 * U, (200, 140, 0),
               700, "titulo")
-        texto(sup, f"{res['puntos']:,} puntos".replace(",", "."), (r.centerx + 140 * U, r.y + 340 * U), 24 * U, TINTA, 700,
+        texto(sup, f"{res['puntos']:,} puntos".replace(",", "."), (r.centerx + 130 * U, r.y + 298 * U), 24 * U, TINTA, 700,
               "titulo")
-        nuevas = self.cambios.get("senales_nuevas", [])
-        y = r.y + 386 * U
+        # Lo que cambió en Ciudad Nova (los indicadores de la ciudad).
+        y = r.y + 336 * U
+        texto(sup, "Así cambió Ciudad Nova:", (r.x + 50 * U, y), 16 * U, TINTA, 900, ancla="midleft")
+        fin = chips_efectos(sup, res.get("efectos", {}), r.x + 250 * U, y - 16 * U, r.w - 290 * U, U)
+        nuevas = self.cambios.get("senales_nuevas", [])[:5]
+        y = max(fin + 22 * U, r.y + 400 * U)
         if nuevas:
             texto(sup, "¡Nuevas pistas en tu álbum!", (r.centerx, y), 18 * U, ROJO, 900)
             x0 = r.centerx - (len(nuevas) - 1) * 70 * U
-            for i, s in enumerate(nuevas[:5]):
-                circulo(sup, (x0 + i * 140 * U, y + 40 * U), 22 * U, (255, 230, 226))
-                icono(sup, SENALES[s][1], (x0 + i * 140 * U, y + 40 * U), 24 * U, ROJO, 2.6)
-                texto(sup, SENALES[s][0], (x0 + i * 140 * U, y + 74 * U), 13 * U, TINTA, 900)
+            for i, s in enumerate(nuevas):
+                circulo(sup, (x0 + i * 140 * U, y + 38 * U), 22 * U, (255, 230, 226))
+                icono(sup, SENALES[s][1], (x0 + i * 140 * U, y + 38 * U), 24 * U, ROJO, 2.6)
+                texto(sup, SENALES[s][0], (x0 + i * 140 * U, y + 72 * U), 13 * U, TINTA, 900)
         elif not gano:
             texto(sup, "No pasa nada: el barrio sigue en el mapa para intentarlo otra vez.", (r.centerx, y + 20 * U),
                   16 * U, TINTA2, 800)
         if self.fase_t > 0.8:
-            self.btn_seguir.dibujar(sup, pygame.Rect(r.centerx - 150 * U, r.bottom - 30 * U, 300 * U, 66 * U), self.t)
+            self.btn_seguir.dibujar(sup, pygame.Rect(r.centerx - 150 * U, r.bottom - 34 * U, 300 * U, 66 * U), self.t)
 
     def _noche(self, sup):
         """La noche: el rumor salta por las calles a barrios vecinos."""
@@ -365,16 +442,28 @@ class PantallaMapa:
         for z in self.cambios.get("focos", []):
             x, y = self.pos(z, 120)
             texto(sup, "¡Nuevo rumor!", (x, y - 70 * U), 18 * U, ROJO, 900)
-        r = panel(sup, (W / 2 - 520 * U, H - 186 * U, 1040 * U, 150 * U), BLANCO, round(28 * U))
-        icono(sup, "moon", (r.x + 70 * U, r.centery), 56 * U, LILA, 2.6)
-        texto(sup, f"Noche {self.c.dia - 1}: el rumor se mueve", (r.x + 130 * U, r.y + 50 * U), 28 * U, TINTA, 700,
-              "titulo", "midleft")
+        r = panel(sup, (W / 2 - 560 * U, H - 236 * U, 1120 * U, 214 * U), (250, 246, 236), round(22 * U))
+        # el Diario Nova de la mañana
+        texto(sup, "DIARIO NOVA", (r.x + 40 * U, r.y + 34 * U), 30 * U, TINTA, 700, "titulo", "midleft")
+        texto(sup, f"Edición de la mañana · día {min(self.c.dia, DIAS_TOTAL)} de {DIAS_TOTAL}",
+              (r.right - 40 * U, r.y + 34 * U), 14 * U, TINTA2, 900, ancla="midright")
+        pygame.draw.line(sup, TINTA, (r.x + 40 * U, r.y + 58 * U), (r.right - 40 * U, r.y + 58 * U), max(2, round(3 * U)))
+        titulo, bajada = self.cambios.get("titular") or ("Llega la noche en Ciudad Nova", "")
+        k = suave(min(1, self.fase_t / 0.5))
+        texto(sup, titulo, (r.x + 40 * U, r.y + 94 * U), 32 * U * (0.9 + 0.1 * k), TINTA, 700, "titulo", "midleft")
+        if bajada:
+            parrafo(sup, bajada, r.x + 40 * U, r.y + 116 * U, 680 * U, 16 * U, TINTA2, max_lineas=2)
         n = len(self.cambios.get("contagios", []))
-        txt = (f"{n} barrio{'s' if n != 1 else ''} enfermo{'s' if n != 1 else ''} contagiaron a un vecino por las calles. "
-               "Los barrios liberados hacen de muro.") if n else "Apareció un rumor nuevo en la ciudad."
-        parrafo(sup, txt, r.x + 130 * U, r.y + 72 * U, 560 * U, 16 * U, TINTA2, max_lineas=2)
+        if n:
+            txt = f"Esta noche: {n} barrio{'s' if n != 1 else ''} enfermo{'s' if n != 1 else ''} contagiaron a un vecino."
+        elif self.cambios.get("focos"):
+            txt = "Esta noche: apareció un rumor nuevo en la ciudad."
+        else:
+            txt = "Esta noche el rumor no logró avanzar: los barrios liberados hacen de muro."
+        icono(sup, "moon", (r.x + 52 * U, r.bottom - 32 * U), 22 * U, LILA, 2.6)
+        texto(sup, txt, (r.x + 72 * U, r.bottom - 32 * U), 15 * U, LILA, 900, ancla="midleft")
         if self.fase_t > 1.2:
-            self.btn_seguir.dibujar(sup, pygame.Rect(r.right - 300 * U, r.y + 40 * U, 270 * U, 74 * U), self.t)
+            self.btn_seguir.dibujar(sup, pygame.Rect(r.right - 300 * U, r.y + 86 * U, 260 * U, 70 * U), self.t)
 
     # -------------------------------------------------------------- final
     def _eleccion(self, sup):
@@ -397,17 +486,72 @@ class PantallaMapa:
             if k > 0.6:
                 texto(sup, f"{pct}%", r.center, 22 * U, BLANCO, 700, "titulo")
         if self.fase_t > 3.0:
-            r = panel(sup, (W / 2 - 440 * U, H - 270 * U, 880 * U, 250 * U), BLANCO, round(32 * U))
-            final = el["final"]
-            titulo = {"oro": "¡Ciudad Nova votó informada!", "plata": "¡Buena elección!",
-                      "bronce": "La ciudad votó dividida", "derrota": "Ganó la desinformación"}[final]
-            col = {"oro": DORADO, "plata": (150, 160, 190), "bronce": (205, 127, 50), "derrota": ROJO}[final]
-            icono(sup, "medal" if final != "derrota" else "cloud-lightning", (r.x + 80 * U, r.y + 80 * U), 80 * U, col, 2.6)
-            texto(sup, titulo, (r.centerx + 50 * U, r.y + 60 * U), 34 * U, TINTA, 700, "titulo")
-            texto(sup, f"{el['porcentaje']}% de la ciudad votó con información verdadera", (r.centerx + 50 * U,
-                  r.y + 104 * U), 18 * U, TINTA2, 900)
-            linea = (f"{el['liberadas']} barrios liberados · {el['estrellas']} estrellas · {el['hechos']} hechos en el "
-                     f"Archivo · {el['senales']} pistas")
-            texto(sup, linea, (r.centerx + 50 * U, r.y + 140 * U), 15 * U, TINTA, 800)
-            self.btn_seguir.etiqueta = "Volver al menú"
-            self.btn_seguir.dibujar(sup, pygame.Rect(r.centerx - 150 * U, r.bottom - 40 * U, 300 * U, 66 * U), self.t)
+            self._votos(sup, el)
+
+    def _votos(self, sup, el):
+        """El conteo: los cuatro candidatos, sus barras de votos, el ganador y cómo quedó la ciudad."""
+        U = self.U
+        W, H = sup.get_size()
+        e = self.fase_t - 3.0
+        r = panel(sup, (W / 2 - 590 * U, H - 420 * U, 1180 * U, 400 * U), BLANCO, round(32 * U))
+        final = el["final"]
+        candidatos = self.c.candidatos()
+        votos = el.get("votos") or {}
+        ganador = el.get("ganador")
+        nombre_ganador = next((c["nombre"] for c in candidatos if c["id"] == ganador), "")
+        titulo = {"oro": "¡Ciudad Nova votó informada!", "plata": "¡Buena elección!",
+                  "bronce": "La ciudad votó dividida", "derrota": "Ganó la desinformación"}[final]
+        col = {"oro": DORADO, "plata": (150, 160, 190), "bronce": (205, 127, 50), "derrota": ROJO}[final]
+        icono(sup, "medal" if final != "derrota" else "cloud-lightning", (r.x + 60 * U, r.y + 52 * U), 60 * U, col, 2.6)
+        texto(sup, titulo, (r.x + 104 * U, r.y + 38 * U), 30 * U, TINTA, 700, "titulo", "midleft")
+        sub = (f"{el['porcentaje']}% votó con información verdadera · Alcaldía: {nombre_ganador}" if votos
+               else f"{el['porcentaje']}% de la ciudad votó con información verdadera")
+        texto(sup, sub, (r.x + 104 * U, r.y + 72 * U), 16 * U, TINTA2, 900, ancla="midleft")
+        linea = (f"{el['liberadas']} barrios liberados · {el['estrellas']} estrellas · {el['hechos']} hechos en el "
+                 f"Archivo · {el['senales']} pistas")
+        texto(sup, linea, (r.x + 104 * U, r.y + 96 * U), 14 * U, LILA, 900, ancla="midleft")
+        # barras de los candidatos
+        maximo = max(votos.values()) if votos else 1
+        for i, c in enumerate(candidatos):
+            y = r.y + 144 * U + i * 52 * U
+            k = suave(min(1, max(0, e - i * 0.15) / 1.2))
+            if c.get("bot"):
+                av = personajes.avatar(LOOK_CANDIDATO["emilio"], round(42 * U), (255, 226, 226), "candidato", "feliz")
+            elif c.get("jugador"):
+                av = personajes.avatar(self.c.personaje.get("look") or {}, round(42 * U), tuple(c["color"]),
+                                       self.c.personaje.get("rol", "candidato"), "feliz")
+            else:
+                av = personajes.avatar(LOOK_CANDIDATO[c["id"]], round(42 * U), mezclar(c["color"], BLANCO, 0.7),
+                                       "candidato", "feliz" if c["id"] == ganador else "neutral")
+            sup.blit(av, (r.x + 30 * U, y - 21 * U))
+            if c.get("bot"):
+                circulo(sup, (r.x + 68 * U, y + 14 * U), 11 * U, ROJO)
+                icono(sup, "bot", (r.x + 68 * U, y + 14 * U), 14 * U, BLANCO, 2.6)
+            texto(sup, c["nombre"], (r.x + 82 * U, y - 9 * U), 17 * U, TINTA, 700, "titulo", "midleft")
+            texto(sup, c["lema"], (r.x + 82 * U, y + 11 * U), 12 * U, TINTA2, 900, ancla="midleft")
+            barra = pygame.Rect(r.x + 280 * U, y - 13 * U, 360 * U, 26 * U)
+            pygame.draw.rect(sup, (238, 240, 248), barra, border_radius=round(13 * U))
+            pct = votos.get(c["id"], 0)
+            relleno = barra.copy()
+            relleno.w = max(round(26 * U), round(barra.w * pct / maximo * k))
+            pygame.draw.rect(sup, c["color"], relleno, border_radius=round(13 * U))
+            texto(sup, f"{round(pct * k)}%", (barra.right + 12 * U, y), 18 * U, TINTA, 700, "titulo", "midleft")
+            if c["id"] == ganador and e > 1.4:
+                icono(sup, "crown", (barra.right + 86 * U, y), 30 * U, DORADO, 3)
+        # cómo quedó la ciudad
+        x0 = r.x + 760 * U
+        texto(sup, "Así quedó la ciudad", (x0, r.y + 130 * U), 17 * U, TINTA, 700, "titulo", "midleft")
+        for i, (_, nombre, ic, valor, sube_bien) in enumerate(self.c.indicadores_lista()):
+            y = r.y + 162 * U + i * 30 * U
+            colv = color_indicador(valor, sube_bien)
+            icono(sup, ic, (x0 + 10 * U, y), 18 * U, colv, 2.6)
+            texto(sup, nombre, (x0 + 28 * U, y), 13 * U, TINTA2, 900, ancla="midleft")
+            barra = pygame.Rect(x0 + 140 * U, y - 5 * U, 200 * U, 10 * U)
+            pygame.draw.rect(sup, (232, 234, 246), barra, border_radius=round(5 * U))
+            relleno = barra.copy()
+            relleno.w = round(barra.w * valor / 100)
+            pygame.draw.rect(sup, colv, relleno, border_radius=round(5 * U))
+            texto(sup, str(valor), (barra.right + 10 * U, y), 13 * U, colv, 900, ancla="midleft")
+        self.btn_seguir.etiqueta = "Volver al menú"
+        if e > 1.5:
+            self.btn_seguir.dibujar(sup, pygame.Rect(r.centerx - 150 * U, r.bottom - 42 * U, 300 * U, 62 * U), self.t)

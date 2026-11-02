@@ -7,9 +7,9 @@ import random
 import pygame
 
 from ..modelo.mapa import ZONAS, crear_mapa, nombre_zona
-from ..modelo.red_social import generar_red
+from ..modelo.red_social import conectar_jugador, generar_red
 from ..ui import personajes
-from ..ui.dibujo import BLANCO, LILA, MANGO, ROJO, TINTA, TINTA2, VERDE, icono, mezclar, pildora, rebote, texto
+from ..ui.dibujo import BLANCO, LILA, MANGO, ROJO, TINTA, TINTA2, VERDE, icono, mezclar, rebote, texto
 from ..ui.tema import TEMA
 from .comunes import Boton, Escala, panel, parrafo, titulo_grande
 from .contenido import BARRIOS_JUEGO
@@ -26,7 +26,13 @@ class PantallaFiesta:
         self.jugadores = [dict(j, puntos=0, estrellas=0) for j in jugadores]
         self.semilla = app.semilla if app.semilla is not None else random.randrange(1 << 30)
         rng = random.Random(self.semilla)
-        self.red = generar_red(random.Random(self.semilla), crear_mapa(), set())
+        mapa = crear_mapa()
+        nombres = {j["nombre"] for j in self.jugadores}
+        self.red = generar_red(random.Random(self.semilla), mapa, nombres)
+        # Cada jugador es un vértice de la red: en la alerta viral, lo que comparte les llega a sus seguidores.
+        for i, j in enumerate(self.jugadores):
+            conectar_jugador(self.red, mapa, random.Random(self.semilla + 1 + i), j["nombre"], i, j["rol"],
+                             j.get("look") or {})
         barrios = [z for z in ZONAS if z not in ("PLAZA", "ALCALDIA")]
         # La misma ronda tiene el mismo barrio para todos: así la competencia es justa.
         self.zonas = [rng.choice(barrios) for _ in range(RONDAS - 1)] + ["ALCALDIA"]
@@ -86,7 +92,7 @@ class PantallaFiesta:
     def actualizar(self, dt):
         self.t += dt
         self.t_estado += dt
-        if self.estado == "podio" and random.random() < 0.5:
+        if self.estado == "podio" and not self.app.menos_movimiento and random.random() < 0.5:
             self.confeti.append(dict(x=random.random(), y=-0.05, v=random.uniform(0.15, 0.35), c=random.choice(
                 [MANGO, ROJO, LILA, VERDE, (96, 190, 255)]), r=random.uniform(0, math.tau)))
         for c in self.confeti:

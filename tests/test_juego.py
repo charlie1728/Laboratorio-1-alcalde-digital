@@ -7,7 +7,7 @@ import time
 import unittest
 from pathlib import Path
 
-from alcalde.corta.campana import FINAL, INICIO, Campana
+from alcalde.corta.campana import FINAL, INICIO, PARA_EL_JEFE, Campana
 from alcalde.corta.nivel import ALTO, Nivel
 from alcalde.modelo.mapa import ZONAS, crear_mapa
 from alcalde.modelo.red_social import generar_red
@@ -127,7 +127,10 @@ class TestCampana(unittest.TestCase):
         c = Campana.nueva(ANA, 3)
         self.assertEqual(c.disponibles(), [INICIO])
         c.registrar(self._res(INICIO))
-        self.assertEqual(set(c.disponibles()), set(c.mapa.vecinos(INICIO)))
+        # La Alcaldía es vecina de la Plaza, pero el jefe pide liberar antes PARA_EL_JEFE barrios.
+        self.assertEqual(set(c.disponibles()), set(c.mapa.vecinos(INICIO)) - {FINAL})
+        c.liberadas += [z for z in ZONAS if z not in (INICIO, FINAL)][:PARA_EL_JEFE - 1]
+        self.assertIn(FINAL, c.disponibles())
 
     def test_el_rumor_no_pasa_por_barrios_liberados(self):
         c = Campana.nueva(ANA, 4)

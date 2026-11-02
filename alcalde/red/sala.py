@@ -4,7 +4,10 @@ Arquitectura cliente-servidor (un objeto JSON por línea, ver protocolo.py):
   * El SERVIDOR mantiene la sala: quién está conectado, con qué personaje, qué barrio se juega y con
     qué semilla (así todos ven exactamente las mismas publicaciones), el marcador y los ataques.
   * Cada CLIENTE juega su nivel en su computador y le cuenta al servidor sus puntos. Cuando hace un
-    combo de 5, le pide al servidor que le mande un rumor extra a los demás.
+    combo de 5, le pide al servidor que le mande un rumor extra a los demás. Cuando comparte algo en la
+    alerta viral, el servidor se lo reenvía a los rivales: si era verdad deben dejarlo pasar y si era
+    mentira, cortarlo (la información compartida viaja entre jugadores).
+  * El servidor guarda el historial de lo que pasó en la sala (quién entró, ataques, lo compartido).
 El anfitrión corre el servidor en un hilo y además se conecta a él como un cliente más.
 
 Cliente -> servidor
@@ -12,12 +15,14 @@ Cliente -> servidor
   {"t": "empezar", "zona"}                      solo el anfitrión
   {"t": "puntos", "puntos", "salud", "estado"}  cada medio segundo durante el nivel
   {"t": "ataque"}                               combo de 5: un rumor para cada rival
+  {"t": "compartir", "fuente", "texto", "verdad", "hecho"}   compartió en la alerta viral
 Servidor -> cliente
   {"t": "bienvenida", "id"}
   {"t": "sala", "jugadores": [...], "anfitrion": id}
   {"t": "empezar", "zona", "semilla"}
   {"t": "marcador", "jugadores": [...]}
   {"t": "ataque", "de"}
+  {"t": "compartida", "de", "fuente", "texto", "verdad", "hecho"}
   {"t": "aviso", "texto"}
 """
 from __future__ import annotations
@@ -26,6 +31,7 @@ import queue
 import random
 import socket
 import threading
+import time
 
 from .protocolo import Lector, codificar
 
@@ -43,6 +49,8 @@ class Servidor:
         self.conexiones = {}     # id -> socket
         self.anfitrion = None
         self.jugando = False
+        self.historial = []      # (segundos desde que abrió, texto) de lo que pasó en la sala
+        self._inicio = time.time()
         self._sig = 1
         self._candado = threading.Lock()
         self.vivo = True
@@ -71,6 +79,11 @@ class Servidor:
             c.sendall(codificar(msg))
         except OSError:
             self._sacar(cid)
+
+    def _anotar(self, texto):
+        with self._candado:
+            self.historial.append((round(time.time() - self._inicio, 1), texto))
+            del self.historial[:-200]
 
     def _todos(self, msg, excepto=None):
         for cid in list(self.conexiones):
@@ -117,12 +130,14 @@ class Servidor:
                 self.jugadores[cid] = dict(nombre=str(m.get("nombre", "Jugador"))[:14], rol=m.get("rol", "periodista"),
                                            look=m.get("look") or {}, color=m.get("color") or [255, 194, 61],
                                            puntos=0, salud=100, estado="sala")
+            self._anotar(f"Entró {self.jugadores[cid]['nombre']}")
             self._sala()
         elif t == "empezar" and cid == self.anfitrion and not self.jugando:
             self.jugando = True
             for j in self.jugadores.values():
                 j.update(puntos=0, salud=100, estado="jugando")
             self._todos({"t": "empezar", "zona": m.get("zona", "ESTADIO"), "semilla": random.randrange(1 << 30)})
+            self._anotar(f"Empieza el duelo en {m.get('zona', 'ESTADIO')}")
             self._marcador()
         elif t == "puntos" and cid in self.jugadores:
             j = self.jugadores[cid]
@@ -132,6 +147,13 @@ class Servidor:
                 self.jugando = False
         elif t == "ataque" and cid in self.jugadores:
             self._todos({"t": "ataque", "de": self.jugadores[cid]["nombre"]}, excepto=cid)
+            self._anotar(f"{self.jugadores[cid]['nombre']} mandó un rumor a los rivales")
+        elif t == "compartir" and cid in self.jugadores:
+            de = self.jugadores[cid]["nombre"]
+            self._todos({"t": "compartida", "de": de, "fuente": str(m.get("fuente", ""))[:60],
+                         "texto": str(m.get("texto", ""))[:120], "verdad": bool(m.get("verdad")),
+                         "hecho": str(m.get("hecho", ""))[:60]}, excepto=cid)
+            self._anotar(f"{de} compartió {'una verdad' if m.get('verdad') else 'una mentira'}")
         elif t == "volver" and cid == self.anfitrion:
             self.jugando = False
             for j in self.jugadores.values():

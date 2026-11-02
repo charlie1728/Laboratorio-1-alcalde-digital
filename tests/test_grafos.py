@@ -3,10 +3,8 @@
 """
 import json
 import math
-import random
 import unittest
 
-from alcalde.estructuras.archivo_avl import ArchivoHechosAVL
 from alcalde.estructuras.grafo import Grafo
 from alcalde.modelo.mapa import CALLES, ZONAS, crear_mapa
 

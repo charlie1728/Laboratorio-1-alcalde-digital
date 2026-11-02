@@ -70,7 +70,7 @@ def sombra_blanda(sup, cx, cy, rx, ry, alfa=70):
 
 
 def caja(sup, pr, x, y, z, w, d, h, color, techo=None, ventanas=None):
-    P, k = pr.p, pr.k
+    P = pr.p
     a, b, c = P(x, y + d, z), P(x + w, y + d, z), P(x + w, y, z)
     A, B, C, E = P(x, y + d, z + h), P(x + w, y + d, z + h), P(x + w, y, z + h), P(x, y, z + h)
     poli(sup, [a, b, B, A], oscuro(color, 0.86))

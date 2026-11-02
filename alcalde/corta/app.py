@@ -9,15 +9,17 @@ import sys
 
 import pygame
 
-from ..ui.dibujo import BLANCO, TINTA, pildora, texto
+from ..ui.dibujo import BLANCO, TINTA, ancho_texto, icono, pildora, texto
 from ..ui.personajes import civi
 from ..ui.sonido import sonidos
 from ..ui.tema import TEMA
 
+# El corte ("pop") no lleva subtítulo: ya se ve en pantalla y llenaría todo de texto.
 SUBTITULOS = {
-    "pop": "Sonido: corte", "malo": "Sonido: error", "logro": "Sonido: premio", "viral": "Sonido: alarma",
+    "malo": "Sonido: error", "logro": "Sonido: premio", "viral": "Sonido: ¡alarma!",
     "rama": "Sonido: el rumor se reenvía", "victoria": "Sonido: celebración", "noche": "Sonido: llega la noche",
-    "votos": "Sonido: conteo de votos", "turno": "Sonido: empieza el turno",
+    "votos": "Sonido: conteo de votos", "turno": "Sonido: empieza el turno", "evento": "Sonido: aviso",
+    "sello": "Sonido: sello de verificado",
 }
 
 
@@ -38,6 +40,7 @@ class AppCorta:
         self.duracion = duracion
         self.corriendo = True
         self.subtitulo = None
+        self.logro = None
         self.t = 0.0
         self._fundido = 0.0
         self.aplicar_sonido()
@@ -100,16 +103,19 @@ class AppCorta:
 
     def nueva_campana(self, personaje):
         from .campana import Campana
+        from .historia import PantallaHistoria
         c = Campana.nueva(personaje, self.semilla)
         c.guardar()
-        self.abrir_mapa(c)
+        # Antes de la primera campaña se cuenta la historia (se puede saltar con Esc).
+        self.cambiar(PantallaHistoria(self, personaje, lambda: self.abrir_mapa(c)))
 
     def jugar_zona(self, campana, zona):
         from .nivel import Nivel
         from .pantalla_nivel import PantallaNivel
         kw = {} if self.duracion is None else dict(duracion=self.duracion)
         n = Nivel(zona, campana.personaje, semilla=campana.semilla * 31 + campana.dia * 7 + len(zona), red=campana.red,
-                  mejoras=campana.mejoras, infeccion=campana.infeccion.get(zona, 0), tranquilo=TEMA.op["tranquilo"], **kw)
+                  mejoras=campana.mejoras, infeccion=campana.infeccion.get(zona, 0), tranquilo=TEMA.op["tranquilo"],
+                  mision=campana.mision(zona), **kw)
 
         def terminar(res):
             if res is None:
@@ -117,6 +123,12 @@ class AppCorta:
                 return
             cambios = campana.registrar(res)
             campana.guardar()
+            from .contenido import SENALES
+            from .logros import REGISTRO
+            if len(campana.senales) >= len(SENALES):
+                REGISTRO.ganar("coleccion")
+            if campana.terminada and (campana.eleccion or {}).get("final") == "oro":
+                REGISTRO.ganar("oro")
             self.abrir_mapa(campana, res, cambios)
         self.sonar("turno")
         self.cambiar(PantallaNivel(self, n, terminar))
@@ -124,6 +136,10 @@ class AppCorta:
     def fiesta(self, jugadores):
         from .fiesta import PantallaFiesta
         self.cambiar(PantallaFiesta(self, jugadores))
+
+    def rapido(self, jugador):
+        from .rapido import PantallaRapido
+        PantallaRapido(self, jugador)
 
     # -------------------------------------------------------------- bucle
     def paso(self, eventos, dt):
@@ -146,12 +162,42 @@ class AppCorta:
         sup = pygame.display.get_surface()
         self.actual.dibujar(sup)
         self._dibujar_subtitulo(sup)
+        self._dibujar_logro(sup)
         if self._fundido > 0:
             v = pygame.Surface(sup.get_size())
             v.fill((30, 20, 80))
             v.set_alpha(round(255 * self._fundido / 0.25))
             sup.blit(v, (0, 0))
             self._fundido = max(0.0, self._fundido - dt)
+
+    def _dibujar_logro(self, sup):
+        """Aviso de medalla nueva: baja desde arriba, se queda un rato y se va."""
+        from .comunes import estrella
+        from .logros import LOGROS, REGISTRO
+        if self.logro is None:
+            nuevo = REGISTRO.sacar_nuevo()
+            if nuevo is None:
+                return
+            self.logro = (nuevo, self.t)
+            self.sonar("logro")
+        k, t0 = self.logro
+        edad = self.t - t0
+        if edad > 3.4:
+            self.logro = None
+            return
+        nombre, ic, desc, _ = LOGROS[k]
+        U = sup.get_height() / 720
+        baja = min(1.0, edad / 0.35, (3.4 - edad) / 0.35)
+        w = max(ancho_texto(desc, 15 * U, 800), ancho_texto(nombre, 24 * U, 700, "titulo")) + 150 * U
+        r = pygame.Rect(0, 0, w, 84 * U)
+        r.midtop = (sup.get_width() / 2, -90 * U + baja * 196 * U)
+        pildora(sup, r, TINTA, round(26 * U))
+        pygame.draw.rect(sup, (255, 200, 40), r, max(2, round(4 * U)), border_radius=round(26 * U))
+        estrella(sup, (r.x + 46 * U, r.centery), 30 * U, (255, 200, 40), (214, 140, 0))
+        icono(sup, ic, (r.x + 46 * U, r.centery + 2 * U), 22 * U, TINTA, 2.8)
+        texto(sup, "¡Logro desbloqueado!", (r.x + 88 * U, r.y + 20 * U), 13 * U, (255, 200, 40), 900, ancla="midleft")
+        texto(sup, nombre, (r.x + 88 * U, r.y + 44 * U), 24 * U, BLANCO, 700, "titulo", "midleft")
+        texto(sup, desc, (r.x + 88 * U, r.y + 66 * U), 15 * U, (220, 214, 250), 800, ancla="midleft")
 
     def _dibujar_subtitulo(self, sup):
         if not self.subtitulo:
