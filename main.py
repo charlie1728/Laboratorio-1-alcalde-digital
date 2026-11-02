@@ -74,9 +74,9 @@ if __name__ == "__main__":
             _esperar()
             sys.exit(1)
     try:
-        from alcalde.vivo.app import AppVivo
+        from alcalde.corta.app import AppCorta
         semilla = int(sys.argv[1]) if len(sys.argv) > 1 else None
-        AppVivo(semilla=semilla).ejecutar()
+        AppCorta(semilla=semilla).ejecutar()
     except Exception:
         registro = Path(__file__).resolve().parent / "alcalde_error.log"
         registro.write_text(traceback.format_exc(), encoding="utf-8")

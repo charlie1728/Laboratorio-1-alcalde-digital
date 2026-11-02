@@ -27,9 +27,12 @@ class AppVivo:
         self.semilla = semilla
         self.dia_seg = dia_seg
         self.corriendo = True
-        from .menu import PantallaMenu
-        self.actual = PantallaMenu(self)
+        self.actual = self._menu_inicial()
         self.snd.musica(TEMA.op["musica"] and TEMA.op["sonido"])
+
+    def _menu_inicial(self):
+        from .menu import PantallaMenu
+        return PantallaMenu(self)
 
     @property
     def menos_movimiento(self):
