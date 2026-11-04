@@ -55,6 +55,12 @@ Caminas con las flechas por el barrio cazando **Bulos** (rumores morados que vue
 | Árbol de decisiones de la noticia | Encuentras una estrella: la miras (verificar), la entregas sin mirar (compartir) o la dejas (ignorar); si la miras: ¿es real? sí, la entregas / no, se reporta sola. Cada hoja guarda puntos y cambios en los indicadores. Al final se dibuja el árbol con cuántas veces pasaste por cada rama. |
 | AVL | Tabla de récords ordenada (recorrido en orden para el top 10). |
 
+## Estado del mapa (`cazabulos/mapa.py`, primera versión)
+
+Ya dibuja el barrio completo con colisiones (`Mapa.libre(rect)`): edificios con techo y fachada, avenida y carrera con línea amarilla, bordillos, 5 cebras, plaza con fuente, bancas y postes, mercado con 6 puestos, parque con laguna, caminos y kiosco de noticias, terminal y casas. Vista previa: script `prev_mapa.py` del scratchpad.
+
+Falta pulir: llenar más el parque (arbustos, flores, picnic, matera), buses estacionados en la terminal, cerca del patio del colegio y canchas pintadas, la fuente de la plaza más grande, más árboles en los bordes, semáforos dibujados con su luz, y carteles con mejor letra.
+
 ## Mecánicas pendientes de programar
 
 - Ronda de 90 s por jugador, cuenta 3-2-1, aviso a los 10 s.
