@@ -76,7 +76,7 @@ class Historia(Escena):
             nombre, lema, color = CANDIDATOS[c]
             fig = _figura_candidato(c)
             dy = math.sin(self.t * 3 + i) * 5
-            r = panel(pant, (x - 115, 230, 230, 300), borde=color)
+            panel(pant, (x - 115, 230, 230, 300), borde=color)
             pant.blit(fig, fig.get_rect(midbottom=(x, 420 + dy)))
             texto(pant, nombre, (x, 438), 26, color, "midtop")
             texto(pant, lema, (x, 474), 15, (230, 226, 245), "midtop", 600)

@@ -6,12 +6,11 @@ import pygame
 
 from .. import personajes, sprites
 from ..config import ALTO, ANCHO, TINTA
-from ..hud import INDICADORES
 from ..partida import CANDIDATOS, MOMENTOS, calcular_eleccion
 from ..personajes import PERSONAJES
 from ..recursos import escalar
-from ..ui import barra, panel, parrafo, render, tecla, texto
-from .base import Escena, FondoCiudad, es_aceptar, pie, titulo_pantalla
+from ..ui import barra, panel, parrafo, texto
+from .base import Escena, FondoCiudad, es_aceptar, titulo_pantalla
 
 
 class Confeti:
@@ -337,7 +336,7 @@ class Eleccion(Escena):
         titulo_pantalla(pant, "Ciudad Nova elige alcalde", 20, tam=48)
         votos = self.datos.get("votos", {})
         cands = [c for c in ("Lucia", "Marcos", "Elena", "Dani", "Emilio") if c in votos]
-        total = max(1, sum(votos.values()))
+        max(1, sum(votos.values()))
         cuenta = min(1.0, self.t / 4.0)
         ancho = (ANCHO - 160) // len(cands)
         for k, c in enumerate(cands):

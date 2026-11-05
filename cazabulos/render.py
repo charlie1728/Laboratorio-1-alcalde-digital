@@ -239,7 +239,7 @@ class Render:
 
     # ------------------------------------------------------------- dibujo
     def dibujar(self, pant):
-        m = self.m
+        self.m
         self.sx = int(self.rng.uniform(-self.temblor, self.temblor)) if self.temblor > 0.5 else 0
         self.sy = int(self.rng.uniform(-self.temblor, self.temblor)) if self.temblor > 0.5 else 0
         cx, cy = int(self.cam[0]), int(self.cam[1])
@@ -650,7 +650,7 @@ class Render:
             if x is None:
                 continue
             sx, sy = self.a_pantalla(x, y - 30)
-            img_r = texto(pant, s, (sx, sy - t * 10), 16, (255, 255, 255), "center", 700, (90, 40, 140))
+            texto(pant, s, (sx, sy - t * 10), 16, (255, 255, 255), "center", 700, (90, 40, 140))
 
     def _flechas(self, pant):
         m = self.m

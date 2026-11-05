@@ -4,13 +4,13 @@ import math
 import pygame
 
 from .. import personajes
-from ..config import ALTO, ANCHO, TINTA
+from ..config import ALTO, ANCHO
 from ..partida import Partida
 from ..personajes import ORDEN, PERSONAJES
 from ..recursos import escalar
 from ..red.protocolo import PUERTO, ips_locales
-from ..ui import barra, boton, panel, parrafo, tecla, texto
-from .base import Botonera, Escena, FondoCiudad, es_aceptar, es_volver, pie, titulo_pantalla
+from ..ui import barra, panel, parrafo, texto
+from .base import Botonera, Escena, FondoCiudad, es_aceptar, es_volver, titulo_pantalla
 from .seleccion import tarjeta_personaje
 
 

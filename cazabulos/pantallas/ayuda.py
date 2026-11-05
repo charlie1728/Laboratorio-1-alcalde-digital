@@ -1,15 +1,14 @@
 """AYUDA: objetivo, controles, personajes, cómo ganar, indicadores y las estructuras de datos."""
-import math
 
 import pygame
 
 from .. import personajes, sprites
 from ..ciudad import VECINOS, grafo_social
-from ..config import ALTO, ANCHO, TILE, TINTA
+from ..config import ALTO, ANCHO, TINTA
 from ..estructuras.arbol_decision import arbol_noticia
 from ..hud import INDICADORES
 from ..mapa import NODOS
-from ..personajes import ORDEN, PERSONAJES
+from ..personajes import ORDEN
 from ..recursos import escalar
 from ..ui import panel, parrafo, tecla, texto
 from .base import Escena, FondoCiudad, es_volver, pie
@@ -100,7 +99,7 @@ class Ayuda(Escena):
                  ("ESC", "Pausa.  ·  M: silenciar la música.  ·  F11: pantalla completa.")]
         for k, (t_, d) in enumerate(filas):
             y = c.y + 30 + k * 64
-            rr = tecla(pant, t_, (c.x + 40, y), 18)
+            tecla(pant, t_, (c.x + 40, y), 18)
             parrafo(pant, d, (c.x + 200, y + 2), 21, c.w - 260, (240, 240, 250))
         r = panel(pant, (c.x + 40, c.y + 420, c.w - 80, 110), (60, 40, 110), 230, borde=(255, 205, 50))
         texto(pant, "Truco de las noticias", (r.x + 20, r.y + 12), 22, (255, 230, 150))

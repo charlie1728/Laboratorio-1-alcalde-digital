@@ -1,14 +1,13 @@
 """La pantalla del turno: cuenta regresiva, el barrio, pausa y '¡Tiempo!'."""
-import math
 
 import pygame
 
-from ..config import ALTO, ANCHO, TINTA
+from ..config import ALTO, ANCHO
 from ..hud import Hud
 from ..mundo import Mundo
 from ..personajes import PERSONAJES
 from ..render import Render
-from ..ui import boton, panel, tecla, texto
+from ..ui import tecla, texto
 from .base import Botonera, Escena
 
 TECLAS_ACCION = (pygame.K_SPACE, pygame.K_RETURN, pygame.K_z, pygame.K_KP_ENTER)

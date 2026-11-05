@@ -11,7 +11,7 @@ pygame.init()
 pygame.display.set_mode((1, 1))
 
 from cazabulos.ciudad import linea_libre, ruta  # noqa: E402
-from cazabulos.mapa import H, NODOS, W  # noqa: E402
+from cazabulos.mapa import H, W  # noqa: E402
 from cazabulos.mundo import Estrella, Mundo, mapa_compartido  # noqa: E402
 from cazabulos.partida import Partida, calcular_eleccion  # noqa: E402
 from cazabulos.trafico import Trafico  # noqa: E402

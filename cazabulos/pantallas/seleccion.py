@@ -4,13 +4,13 @@ import math
 import pygame
 
 from .. import personajes
-from ..config import ALTO, ANCHO, TINTA
+from ..config import ALTO, ANCHO
 from ..mundo import ROLES
 from ..partida import MOMENTOS, Partida
 from ..personajes import ORDEN, PELOS, PERSONAJES, PIELES
 from ..recursos import escalar
 from ..ui import panel, parrafo, render, tecla, texto
-from .base import Escena, FondoCiudad, es_aceptar, es_volver, pie, titulo_pantalla
+from .base import Escena, FondoCiudad, es_aceptar, es_volver, titulo_pantalla
 from .menu import SI_NO, Formulario, Selector, Titulo
 
 

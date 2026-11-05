@@ -8,7 +8,7 @@ from .. import personajes, sprites
 from ..config import ALTO, ANCHO, TINTA
 from ..personajes import ORDEN, PERSONAJES
 from ..recursos import escalar
-from ..ui import barra, panel, parrafo, render, tecla, texto
+from ..ui import panel, parrafo, render, texto
 from .base import Botonera, Escena, FondoCiudad, es_aceptar, es_volver, pie, titulo_pantalla
 
 

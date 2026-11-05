@@ -62,7 +62,7 @@ class Hud:
     def _tarjeta(self, pant):
         j = self.m.jugador
         p = PERSONAJES[j.clave]
-        r = panel(pant, (14, 12, 300, 96), borde=p["color"])
+        panel(pant, (14, 12, 300, 96), borde=p["color"])
         fondo = pygame.Rect(24, 22, 76, 76)
         pygame.draw.rect(pant, p["color"], fondo, border_radius=12)
         pant.blit(self.retrato, self.retrato.get_rect(midbottom=(fondo.centerx, fondo.bottom + 2)))
@@ -72,7 +72,7 @@ class Hud:
         if j.combo >= 2:
             mult = 1 + min(3, (j.combo - 1) // 4)
             c = (255, 160, 60) if mult > 1 else (255, 220, 120)
-            rr = texto(pant, f"x{j.combo}", (300, 70), 22, c, "topright")
+            texto(pant, f"x{j.combo}", (300, 70), 22, c, "topright")
             if mult > 1:
                 texto(pant, f"COMBO x{mult}", (300, 50), 15, c, "topright")
 
@@ -196,7 +196,7 @@ class Hud:
         y = ALTO - 140
         for txt, t in self.r.toasts[-2:]:
             alfa = int(255 * min(1.0, (3.0 - t) / 0.5))
-            r = texto(pant, f"Decisión: {txt}", (24, y), 16, (255, 240, 180), alfa=alfa, peso=600)
+            texto(pant, f"Decisión: {txt}", (24, y), 16, (255, 240, 180), alfa=alfa, peso=600)
             y -= 26
 
     def _marcador(self, pant):

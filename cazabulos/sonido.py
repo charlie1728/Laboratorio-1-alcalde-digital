@@ -3,7 +3,6 @@
 Cada sonido tiene un subtítulo para el modo de subtítulos (componente inclusivo para quien
 no oye bien o juega sin volumen en la feria).
 """
-import math
 
 import numpy as np
 import pygame

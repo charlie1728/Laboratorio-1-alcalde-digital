@@ -3,8 +3,8 @@ import math
 
 import pygame
 
-from ..config import ALTO, ANCHO, ESC, TINTA
-from ..ui import boton, panel, texto
+from ..config import ALTO, ANCHO
+from ..ui import boton, texto
 
 
 class Escena:

@@ -9,7 +9,7 @@ import random
 
 import pygame
 
-from .ciudad import VECINOS, ZONAS_VECINO, grafo_ciudad, grafo_social, linea_libre, ruta
+from .ciudad import VECINOS, ZONAS_VECINO, grafo_ciudad, grafo_social, ruta
 from .config import DURACION_RONDA, TILE, VELOCIDAD_BULO, VELOCIDAD_JUGADOR
 from .estructuras.arbol_decision import arbol_noticia
 from .estructuras.arbol_mutaciones import ArbolMutaciones
