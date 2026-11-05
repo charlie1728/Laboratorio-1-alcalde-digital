@@ -25,8 +25,9 @@ REALES = ["La biblioteca abre el sábado", "Vacunas gratis en el parque", "Feria
           "Arreglaron los semáforos", "Debate de candidatos el viernes", "Nueva ciclovía en la avenida",
           "Concierto en la plaza", "El mercado abre más temprano"]
 T_VERIFICAR = 1.2
-ESCUDO = 12.0
-MAX_BULOS_LIBRES = 14
+ESCUDO = 15.0
+MAX_BULOS_LIBRES = 10
+MAX_VIRAL = 6           # a cuántos vecinos les llega el viral si no lo detienes
 
 ROLES = {
     "ana": {"poder": "Flash", "pasivo": "Ve los Bulos disfrazados y revisa las noticias al instante",
@@ -722,9 +723,9 @@ class Mundo:
 
     def _reenviar(self, v):
         """El vecino con Bulo se lo pasa a un amigo por un hilo del grafo social."""
-        v.t_prop = max(5.0, 11.0 - 0.7 * self.social.grado(v.nombre)) * (1.4 if self.tranquilo else 1.0)
+        v.t_prop = max(6.0, 12.5 - 0.7 * self.social.grado(v.nombre)) * (1.4 if self.tranquilo else 1.0)
         b = self.bulos.get(v.bulo)
-        if b is None or b.reenvios >= 2:      # cada Bulo se reenvía como mucho 2 veces
+        if b is None or b.reenvios >= 1:      # cada Bulo se reenvía una sola vez (la cadena crece en fila)
             return
         opciones = [(u, p) for u, p in self.social.vecinos(v.nombre).items()
                     if self.vecinos[u].bulo is None and self.vecinos[u].escudo <= 0
@@ -735,7 +736,7 @@ class Mundo:
         u = self.azar.choice([u for u, p in opciones if p == mayor])
         dist = _dist(v.pos, self.vecinos[u].pos)
         b.reenvios += 1
-        self.pulsos.append(Pulso(v.bulo, v.nombre, u, max(1.8, min(3.6, dist / 85))))
+        self.pulsos.append(Pulso(v.bulo, v.nombre, u, max(2.2, min(4.0, dist / 75))))
         self.sonar("reenvio", v.x, v.y)
         self.mostrar_pista("pulso", "¡Un Bulo viaja por el hilo! Lánzale antes de que llegue", ("ESPACIO",))
 
@@ -757,7 +758,7 @@ class Mundo:
         b.estado = "cabeza"
         b.vecino = v.nombre
         v.bulo = b.id
-        v.t_prop = 7.0
+        v.t_prop = 9.0
         v.triste = 2.0
         v.salto = 0.3
         self.ajustar(confianza=-1.5, bienestar=-1)
@@ -838,7 +839,7 @@ class Mundo:
         b.estado = "cabeza"
         b.vecino = v.nombre
         v.bulo = b.id
-        v.t_prop = 7.0
+        v.t_prop = 9.0
         v.triste = 2.0
         v.salto = 0.3
         self.ajustar(confianza=-1.5, bienestar=-1)
@@ -1004,7 +1005,7 @@ class Mundo:
             a.golpe = max(0.0, a.golpe - dt)
             a.t -= dt
             if a.t <= 0:
-                ritmo = max(5.0, 8.5 - self.t * 0.035) * (1.4 if self.tranquilo else 1.0)
+                ritmo = max(6.0, 9.5 - self.t * 0.035) * (1.4 if self.tranquilo else 1.0)
                 a.t = ritmo
                 if len(self.bulos_libres()) < MAX_BULOS_LIBRES:
                     b = self.nuevo_bulo(a.x, a.y - 34)
@@ -1102,6 +1103,8 @@ class Mundo:
             if w.bulo is not None:
                 ids[u] = w.bulo
                 continue
+            if alcanzados >= MAX_VIRAL:
+                break
             nuevo = self._infectar(w, ids.get(padre))
             if nuevo:
                 ids[u] = nuevo

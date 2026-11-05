@@ -153,8 +153,11 @@ class TestRelaciones(unittest.TestCase):
         m.vecinos[list(m.social.vecinos(origen))[0]].escudo = 99
         m.viral.t = 0
         m._viral(1 / 60)
-        esperados = {v for v, nivel, _ in m.social.bfs(origen, filtro=lambda u: m.vecinos[u].escudo <= 0, max_nivel=2)}
-        self.assertEqual({v.nombre for v in m.infectados()}, esperados)
+        orden = [v for v, nivel, _ in m.social.bfs(origen, filtro=lambda u: m.vecinos[u].escudo <= 0, max_nivel=2)]
+        infectados = {v.nombre for v in m.infectados()}
+        self.assertEqual(infectados, set(orden[:6]))       # le llega a los primeros 6 del BFS
+        self.assertIn(origen, infectados)
+        self.assertNotIn(list(m.social.vecinos(origen))[0], infectados)   # el protegido no
 
 
 class TestMapa(unittest.TestCase):

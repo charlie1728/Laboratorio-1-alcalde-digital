@@ -43,7 +43,7 @@ class Titulo(Escena):
         from .ayuda import Ayuda
         from .en_linea import EnLinea
         self.botones = Botonera([
-            ("¡Jugar ya!", lambda: app.cambiar(Seleccion(app, 1, 1, 60, app.op.get("tranquilo", False)))),
+            ("¡Jugar ya!", lambda: app.cambiar(Seleccion(app, 1, 1, 60, True))),
             ("Con amigos (mismo PC)", lambda: app.cambiar(Preparar(app))),
             ("En línea", lambda: app.cambiar(EnLinea(app))),
             ("Ayuda", lambda: app.cambiar(Ayuda(app))),
