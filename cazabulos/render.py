@@ -355,6 +355,13 @@ class Render:
             else:
                 getattr(self, "_d_" + d[2])(pant, *d[3:])
 
+    def _borde(self, pant, img, x, y):
+        """Modo alto contraste: un borde blanco grueso alrededor de lo importante."""
+        sil = escalar(sprites.silueta(img, (255, 255, 255)))
+        sx, sy = self.a_pantalla(x, y)
+        for dx, dy in ((-3, 0), (3, 0), (0, -3), (0, 3)):
+            pant.blit(sil, (sx + dx, sy + dy))
+
     def _sombra(self, pant, x, y, ancho=10):
         sx, sy = self.a_pantalla(x - ancho / 2, y - 2)
         pant.blit(escalar(sprites.sombra(ancho)), (sx, sy))
@@ -420,6 +427,8 @@ class Render:
         img = sprites.estrella(falsa=s.falsa, revelada_falsa=s.falsa and ana, brillo=int(self.t * 2) % 2)
         if s.vida < 5 and int(self.t * 8) % 2:
             return
+        if self.op.get("contraste"):
+            self._borde(pant, img, s.x - 8, s.y - 10 + bob)
         pant.blit(escalar(img), self.a_pantalla(s.x - 8, s.y - 10 + bob))
         if ana and s.falsa:
             texto(pant, "BULO", (sx, sy - 40), 13, (210, 170, 255), "midbottom")
@@ -448,6 +457,8 @@ class Render:
         bob = math.sin(b.t * 4) * 2
         self._sombra(pant, b.x, b.y + 10, 9)
         img = sprites.bulo(int(b.t * 5) % 2, corona, b.congelado > 0, mir)
+        if self.op.get("contraste"):
+            self._borde(pant, img, b.x - 8, b.y - 9 + bob)
         pant.blit(escalar(img), self.a_pantalla(b.x - 8, b.y - 9 + bob))
         if b.candidato:
             sx, sy = self.a_pantalla(b.x, b.y - 12 + bob)

@@ -6,17 +6,9 @@ Rama `cazabulos`. El juego nuevo vive en `cazabulos/`. El código viejo (`alcald
 
 Caminas con las flechas por el barrio cazando **Bulos** (rumores morados que vuelan) y les lanzas tu herramienta con **Espacio** antes de que se suban a la cabeza de los vecinos. Recoges **estrellas** (noticias) y se las llevas a la gente; si te quedas quieto un momento con la estrella, ves si es real o un Bulo disfrazado. La **antena del Bot** suelta Bulos y se apaga a golpes. Cada jugador juega su turno en el mismo barrio y gana quien salve a más gente.
 
-## Lo que ya está hecho
+## Estado
 
-- `cazabulos/config.py`: pantalla 1280x720, tiles de 16 px dibujados a x3.
-- `cazabulos/recursos.py`: hojas de Kenney (CC0), tiles, bloques, escalado sin borrosidad, fuentes Fredoka/Nunito, silueta y contorno.
-- `cazabulos/personajes.py`: los 4 protagonistas en pixel art propio de 16x24 (los vecinos de Kenney miden 16x16, así que los jugadores siempre se ven más grandes). Frente, espalda y lado con pasos de caminar.
-  - **Ana, Periodista** (amarillo): boina roja, melena negra, gabardina, cámara al pecho.
-  - **Beto, Influencer** (rosa): copete fucsia alto, gafas de sol, buzo con capucha, celular.
-  - **Caro, Ciudadana** (verde): gorra al revés, pelo naranja con cola, pecas, overol, morral.
-  - **Dani, Candidato** (azul): peinado con raya, traje, corbata roja, escarapela dorada.
-  - Piel y color de pelo se pueden cambiar (personalización = componente inclusivo).
-- `cazabulos/assets/`: hojas `ciudad.png` (Roguelike Modern City, 37 columnas) y `urbano.png` (RPG Urban Pack, 27 columnas) con sus licencias CC0, y las fuentes con su licencia OFL.
+El juego está completo y jugable (ver README y `docs/ENTREGA_FINAL.md`): mundo, render, HUD, todas las pantallas, ayuda, opciones, récords, elección, podio y modo en línea, con 31 pruebas. El código viejo (`alcalde/`) se quitó de la carpeta y queda en el historial de git; las entregas anteriores están en `docs/historial/`.
 
 ## Correcciones que pidió el usuario sobre el render
 
@@ -55,18 +47,3 @@ Caminas con las flechas por el barrio cazando **Bulos** (rumores morados que vue
 | Árbol de decisiones de la noticia | Encuentras una estrella: la miras (verificar), la entregas sin mirar (compartir) o la dejas (ignorar); si la miras: ¿es real? sí, la entregas / no, se reporta sola. Cada hoja guarda puntos y cambios en los indicadores. Al final se dibuja el árbol con cuántas veces pasaste por cada rama. |
 | AVL | Tabla de récords ordenada (recorrido en orden para el top 10). |
 
-## Estado del mapa (`cazabulos/mapa.py`, primera versión)
-
-Ya dibuja el barrio completo con colisiones (`Mapa.libre(rect)`): edificios con techo y fachada, avenida y carrera con línea amarilla, bordillos, 5 cebras, plaza con fuente, bancas y postes, mercado con 6 puestos, parque con laguna, caminos y kiosco de noticias, terminal y casas. Vista previa: script `prev_mapa.py` del scratchpad.
-
-Falta pulir: llenar más el parque (arbustos, flores, picnic, matera), buses estacionados en la terminal, cerca del patio del colegio y canchas pintadas, la fuente de la plaza más grande, más árboles en los bordes, semáforos dibujados con su luz, y carteles con mejor letra.
-
-## Mecánicas pendientes de programar
-
-- Ronda de 90 s por jugador, cuenta 3-2-1, aviso a los 10 s.
-- Espacio = lanzar (con un poco de auto-apuntado) o, junto a un vecino, entregar estrella o calmar una pelea. X = poder del rol (se carga cazando).
-- Poderes equilibrados: Ana ve los Bulos disfrazados y su Flash congela a los Bulos; Beto entrega la noticia también a los amigos del vecino (y si es falsa, la riega más) y su Transmisión protege a los de la pantalla; Caro es un poco más rápida, calma peleas al instante y su Red atrapa todo en un radio; Dani hace que la protección dure el doble y su Discurso empuja y cura en un radio.
-- Eventos al azar (misma semilla para todos los jugadores de la ronda): noticia falsa, Bulo viral con 10 s para atraparlo (si no, contagia por BFS), rumor sobre un candidato, discusión entre vecinos, lluvia de noticias reales, campaña de convivencia, un vecino que reporta solo.
-- 6 indicadores en vivo: información verificada, confianza, convivencia, bienestar digital, desinformación, conflictos.
-- Mismo PC: 1 a 4 jugadores por turnos y rondas, pantalla de relevo con el personaje de cuerpo entero. En línea: servidor con sockets, todos juegan a la vez, marcador en vivo y fantasmas de los rivales.
-- Elección final según lo que pasó en el barrio, podio, logros, récords, ayuda, opciones (subtítulos de sonidos, alto contraste, modo daltonismo, velocidad tranquila para niños).
