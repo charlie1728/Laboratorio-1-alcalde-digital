@@ -25,6 +25,10 @@ def minimapa_base(mapa, escala=3):
     return _mini
 
 
+# Las pistas nombran teclas; con un control USB se dicen con sus botones.
+CON_MANDO = (("con las FLECHAS", "con la CRUCETA"), ("ESPACIO", "A"), ("Pulsa X", "Pulsa B o X"))
+
+
 class Hud:
     def __init__(self, mundo, render, nombre=None, ronda=1, rondas=1, opciones=None):
         self.m = mundo
@@ -36,6 +40,7 @@ class Hud:
         self.t = 0.0
         self.puntos_vis = 0.0
         self.marcador = []          # en línea: [(nombre, clave, puntos)]
+        self.mando = False          # True si hay un control USB conectado (cambia las teclas que se muestran)
         self.retrato = escalar(personajes.retrato(mundo.jugador.clave, mundo.jugador.piel, mundo.jugador.pelo), 5)
 
     def actualizar(self, dt):
@@ -160,7 +165,9 @@ class Hud:
             return
         r = panel(pant, (14, ALTO - 62, 520, 48), radio=12)
         x = r.x + 12
-        for t_, desc in (("FLECHAS", "moverse"), ("ESPACIO", "lanzar / entregar"), ("X", "poder")):
+        filas = ((("CRUCETA", "moverse"), ("A", "lanzar / entregar"), ("B / X", "poder")) if self.mando
+                 else (("FLECHAS", "moverse"), ("ESPACIO", "lanzar / entregar"), ("X", "poder")))
+        for t_, desc in filas:
             rr = tecla(pant, t_, (x, r.y + 8), 15)
             texto(pant, desc, (rr.right + 8, r.y + 12), 17, (240, 240, 250), peso=600)
             x = rr.right + 18 + render(desc, 17, peso=600).get_width()
@@ -185,6 +192,9 @@ class Hud:
         if not p:
             return
         txt, teclas, t = p
+        if self.mando:
+            for tecla_, boton_ in CON_MANDO:
+                txt = txt.replace(tecla_, boton_)
         alfa = int(255 * min(1.0, t / 0.4))
         ancho = render(txt, 22, peso=700).get_width() + 60
         r = pygame.Rect(0, 0, ancho, 56)

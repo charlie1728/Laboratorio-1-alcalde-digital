@@ -92,7 +92,9 @@ class Botonera:
 
 
 class FondoCiudad:
-    """El barrio de fondo moviéndose despacio, oscurecido para que se lea el menú."""
+    """El barrio de fondo moviéndose despacio, oscurecido para que se lea el menú.
+    El reloj es compartido: al pasar de una pantalla a otra el fondo sigue donde iba."""
+    reloj = 0.0
 
     def __init__(self, app, oscuro=150):
         from ..mundo import mapa_compartido
@@ -103,13 +105,13 @@ class FondoCiudad:
         for y in range(0, ALTO, 4):
             a = int(oscuro * (0.7 + 0.3 * y / ALTO))
             self.velo.fill((20, 14, 46, a), (0, y, ANCHO, 4))
-        self.t = 0.0
 
     def dibujar(self, pant, dt):
-        self.t += dt
+        FondoCiudad.reloj += dt
+        t = FondoCiudad.reloj
         w, h = self.suelo.get_size()
-        x = (math.sin(self.t * 0.05) * 0.5 + 0.5) * (w - ANCHO)
-        y = (math.cos(self.t * 0.037) * 0.5 + 0.5) * (h - ALTO)
+        x = (math.sin(t * 0.05) * 0.5 + 0.5) * (w - ANCHO)
+        y = (math.cos(t * 0.037) * 0.5 + 0.5) * (h - ALTO)
         pant.blit(self.suelo, (0, 0), pygame.Rect(int(x), int(y), ANCHO, ALTO))
         pant.blit(self.velo, (0, 0))
 
@@ -118,5 +120,18 @@ def titulo_pantalla(pant, s, y=40, color=(255, 205, 50), tam=52):
     texto(pant, s, (ANCHO // 2, y), tam, color, "midtop", grosor=3)
 
 
-def pie(pant, s):
-    texto(pant, s, (ANCHO // 2, ALTO - 30), 18, (220, 214, 240), "center", 600)
+# Con un control USB en la mano, los avisos dicen sus botones en vez de las teclas.
+_BOTONES = (("ESPACIO", "A"), ("ENTER", "A"), ("ESC", "B"), ("TAB", "Y"), ("R:", "Y:"), ("Flechas y", "Cruceta y"),
+            ("Arriba/abajo", "Cruceta arriba/abajo"), ("Izquierda/derecha", "Cruceta izquierda/derecha"))
+
+
+def con_mando(app, s):
+    if app is None or not app.mando.en_uso:
+        return s
+    for tecla_, boton_ in _BOTONES:
+        s = s.replace(tecla_, boton_)
+    return s
+
+
+def pie(pant, s, app=None):
+    texto(pant, con_mando(app, s), (ANCHO // 2, ALTO - 30), 18, (220, 214, 240), "center", 600)

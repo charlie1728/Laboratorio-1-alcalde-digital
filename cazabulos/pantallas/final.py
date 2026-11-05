@@ -10,7 +10,7 @@ from ..partida import CANDIDATOS, MOMENTOS, calcular_eleccion
 from ..personajes import PERSONAJES
 from ..recursos import escalar
 from ..ui import barra, panel, parrafo, texto
-from .base import Escena, FondoCiudad, es_aceptar, titulo_pantalla
+from .base import Escena, FondoCiudad, con_mando, es_aceptar, titulo_pantalla
 
 
 class Confeti:
@@ -212,11 +212,11 @@ class ResultadoTurno(Escena):
         pygame.draw.line(pant, (90, 80, 140), (r.x + 16, y), (r.right - 16, y), 2)
         cuenta = min(1.0, self.t / 1.5)
         texto(pant, "Puntos", (r.x + 20, y + 10), 20, (230, 226, 245), peso=600)
-        texto(pant, str(int(res["puntos"] * cuenta)), (r.right - 20, y + 10), 22, (255, 255, 255), "topright")
+        texto(pant, str(round(res["puntos"] * cuenta)), (r.right - 20, y + 10), 22, (255, 255, 255), "topright")
         texto(pant, f"{res['salvados']} vecinos a salvo x 10", (r.x + 20, y + 40), 20, (140, 240, 160), peso=600)
-        texto(pant, f"+{int(res['bono'] * cuenta)}", (r.right - 20, y + 40), 22, (140, 240, 160), "topright")
+        texto(pant, f"+{round(res['bono'] * cuenta)}", (r.right - 20, y + 40), 22, (140, 240, 160), "topright")
         texto(pant, "TOTAL", (r.x + 20, y + 74), 28, p["color"])
-        texto(pant, str(int(res["total"] * cuenta)), (r.right - 20, y + 70), 34, (255, 230, 120), "topright")
+        texto(pant, str(round(res["total"] * cuenta)), (r.right - 20, y + 70), 34, (255, 230, 120), "topright")
         # árbol de decisiones
         ra = panel(pant, (840, 96, 420, 300), borde=(255, 205, 50, 120))
         texto(pant, "Tu árbol de decisiones con las noticias", (ra.centerx, ra.y + 10), 17, (255, 230, 150), "midtop")
@@ -227,7 +227,8 @@ class ResultadoTurno(Escena):
         texto(pant, "Logros nuevos" if nuevos else "Logros de este turno", (rl.x + 16, rl.y + 8), 17, (255, 230, 150))
         lista = nuevos or res.get("logros", [])
         if not lista:
-            texto(pant, "Ninguno esta vez. ¡Mira la Ayuda para ver cómo ganarlos!", (rl.x + 16, rl.y + 40), 16, (220, 214, 240), peso=600)
+            parrafo(pant, "Ninguno esta vez. ¡Mira la Ayuda para ver cómo ganarlos!", (rl.x + 16, rl.y + 40), 16, rl.w - 32,
+                    (220, 214, 240))
         for k, (clave, nombre, desc, nuevo) in enumerate(lista[:4]):
             x = rl.x + 16 + (k % 2) * 200
             y = rl.y + 36 + (k // 2) * 32
@@ -241,11 +242,11 @@ class ResultadoTurno(Escena):
             pant.blit(velo, (0, 0))
             texto(pant, "La red del barrio al terminar tu turno", (ANCHO // 2, 30), 34, (255, 205, 50), "midtop")
             dibujar_red(pant, pygame.Rect(140, 90, ANCHO - 280, 560), res, self.t)
-            texto(pant, "TAB para volver  ·  ESPACIO para seguir", (ANCHO // 2, ALTO - 34), 22, (255, 255, 255), "center")
+            texto(pant, con_mando(self.app, "TAB para volver  ·  ESPACIO para seguir"), (ANCHO // 2, ALTO - 34), 22, (255, 255, 255), "center")
             return
-        texto(pant, "TAB: ver la red del barrio", (ANCHO // 2 + 200, 580), 20, (200, 196, 230), "midtop", 600)
+        texto(pant, con_mando(self.app, "TAB: ver la red del barrio"), (ANCHO // 2 + 200, 580), 20, (200, 196, 230), "midtop", 600)
         sube = math.sin(self.t * 4) * 3
-        texto(pant, "Pulsa ESPACIO para seguir", (ANCHO // 2, ALTO - 40 + sube), 26, (255, 255, 255), "center")
+        texto(pant, con_mando(self.app, "Pulsa ESPACIO para seguir"), (ANCHO // 2, ALTO - 40 + sube), 26, (255, 255, 255), "center")
 
 
 class TablaRonda(Escena):
@@ -283,10 +284,10 @@ class TablaRonda(Escena):
             texto(pant, j["nombre"], (r.x + 190, r.y + 16), 30, p["color"])
             texto(pant, f"{pa.salvados(i)} vecinos salvados en total", (r.x + 190, r.y + 56), 18, (220, 214, 240), peso=600)
             barra(pant, (r.x + 520, r.y + 34, 400 * crece * pa.total(i) / maximo + 1, 30), 1, p["color"])
-            texto(pant, str(int(pa.total(i) * crece)), (r.right - 24, r.centery), 34, (255, 255, 255), "midright")
+            texto(pant, str(round(pa.total(i) * crece)), (r.right - 24, r.centery), 34, (255, 255, 255), "midright")
         siguiente = "¡Ahora, la elección del alcalde!" if self.final else f"Siguiente ronda: {MOMENTOS.get(pa.ronda + 1, '')}"
         sube = math.sin(self.t * 4) * 3
-        texto(pant, f"{siguiente}  ·  ESPACIO para seguir", (ANCHO // 2, ALTO - 44 + sube), 26, (255, 255, 255), "center")
+        texto(pant, con_mando(self.app, f"{siguiente}  ·  ESPACIO para seguir"), (ANCHO // 2, ALTO - 44 + sube), 26, (255, 255, 255), "center")
 
 
 def _figura_candidato(c):
@@ -336,13 +337,12 @@ class Eleccion(Escena):
         titulo_pantalla(pant, "Ciudad Nova elige alcalde", 20, tam=48)
         votos = self.datos.get("votos", {})
         cands = [c for c in ("Lucia", "Marcos", "Elena", "Dani", "Emilio") if c in votos]
-        max(1, sum(votos.values()))
         cuenta = min(1.0, self.t / 4.0)
         ancho = (ANCHO - 160) // len(cands)
         for k, c in enumerate(cands):
             nombre, lema, color = CANDIDATOS[c]
             x = 80 + k * ancho + ancho // 2
-            v = int(votos[c] * cuenta)
+            v = round(votos[c] * cuenta)
             alto = int(min(230, 230 * v / max(votos.values()))) if max(votos.values()) else 0
             alto = int(alto * cuenta) if cuenta < 1 else alto
             base_y = 450
@@ -382,7 +382,7 @@ class Podio(Escena):
         app.son.tocar("victoria")
 
     def evento(self, e):
-        if e.type == pygame.KEYDOWN and e.key in (pygame.K_r,):
+        if e.type == pygame.KEYDOWN and e.key in (pygame.K_r, pygame.K_TAB):      # TAB = botón Y del control
             from .seleccion import Preparar
             self.app.cambiar(Preparar(self.app))
         elif (es_aceptar(e) or (e.type == pygame.MOUSEBUTTONDOWN and e.button == 1)) and self.t > 1.0:
@@ -433,4 +433,4 @@ class Podio(Escena):
                 pant.blit(corona, corona.get_rect(midbottom=(x, base.y - 24 * esc - 44 - salto)))
         nombre, lema, color = CANDIDATOS[self.ganador]
         texto(pant, f"Alcalde de Ciudad Nova: {nombre}", (ANCHO // 2, 100), 26, color, "midtop")
-        texto(pant, "ENTER: volver al menú  ·  R: jugar otra partida", (20, ALTO - 12), 16, (220, 214, 240), "bottomleft", 600)
+        texto(pant, con_mando(self.app, "ENTER: volver al menú  ·  R: jugar otra partida"), (20, ALTO - 12), 16, (220, 214, 240), "bottomleft", 600)

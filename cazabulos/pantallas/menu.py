@@ -29,6 +29,8 @@ def piloto(m, rng):
 
 
 class Titulo(Escena):
+    inactividad = None
+
     def __init__(self, app):
         super().__init__(app)
         from ..mundo import Mundo
@@ -112,7 +114,7 @@ class Titulo(Escena):
             texto(pant, p["nombre"], (x + 48, y + 150), 22, p["color"], "midtop")
             texto(pant, p["rol"], (x + 48, y + 176), 15, (230, 226, 245), "midtop", 600)
         self.botones.dibujar(pant, self.t)
-        pie(pant, "Flechas y ENTER para elegir  ·  M silencia la música  ·  F11 pantalla completa")
+        pie(pant, "Flechas y ENTER para elegir  ·  M silencia la música  ·  F11 pantalla completa", self.app)
 
 
 class Selector:
@@ -190,7 +192,7 @@ class Formulario(Escena):
         titulo_pantalla(pant, self.titulo)
         self._rects = []
         y = 140
-        alto_fila = 62 if len(self.filas) <= 5 else 54
+        alto_fila = 62 if len(self.filas) <= 5 else (54 if len(self.filas) <= 7 else 50)
         for i, f in enumerate(self.filas):
             activo = i == self.sel
             r = pygame.Rect(ANCHO // 2 - 420, y, 840, alto_fila - 8)
@@ -210,7 +212,7 @@ class Formulario(Escena):
             r = pygame.Rect(xs + k * 300, max(y, ALTO - 120), 280, 60)
             boton(pant, r, txt, self.sel == len(self.filas) + k, tam=26, t=self.t)
             self._rects.append(r)
-        pie(pant, "Arriba/abajo para elegir  ·  izquierda/derecha para cambiar  ·  ESC para volver")
+        pie(pant, "Arriba/abajo para elegir  ·  izquierda/derecha para cambiar  ·  ESC para volver", self.app)
 
 
 SI_NO = [("Sí", True), ("No", False)]
@@ -233,6 +235,8 @@ class Opciones(Formulario):
                      "Los Bulos van más despacio y las peleas duran más. Para niños pequeños o para aprender a jugar."),
             Selector("Pistas en pantalla", SI_NO, 0 if op["pistas"] else 1, "Muestra mensajes que explican qué hacer la primera vez."),
             Selector("Pantalla completa", SI_NO, 0 if op["pantalla_completa"] else 1, "También se cambia con F11."),
+            Selector("Volver solo al inicio (feria)", SI_NO, 0 if op.get("volver_inicio", True) else 1,
+                     "Si nadie toca nada en 90 segundos, el juego vuelve a la pantalla de inicio para el siguiente niño."),
         ]
         super().__init__(app, filas, [("Listo", self.volver)])
 
@@ -245,6 +249,7 @@ class Opciones(Formulario):
         if op["pantalla_completa"] != f[6].valor:
             op["pantalla_completa"] = f[6].valor
             pygame.display.toggle_fullscreen()
+        op["volver_inicio"] = f[7].valor
         self.app.aplicar_volumen()
         self.app.guardar_opciones()
 
@@ -294,4 +299,4 @@ class RecordsPantalla(Escena):
                 pant.blit(img, img.get_rect(center=(x + 18, y + 22)))
             texto(pant, nombre, (x + 44, y + 2), 18, (255, 255, 255) if ok else (170, 164, 200))
             parrafo(pant, desc, (x + 44, y + 26), 13, 200, (220, 214, 240) if ok else (140, 134, 170))
-        pie(pant, "Los récords se ordenan con un árbol AVL y se guardan en la carpeta datos  ·  ENTER para volver")
+        pie(pant, "Los récords se ordenan con un árbol AVL y se guardan en la carpeta datos  ·  ENTER para volver", self.app)

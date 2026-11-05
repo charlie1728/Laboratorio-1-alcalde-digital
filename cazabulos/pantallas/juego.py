@@ -7,7 +7,7 @@ from ..hud import Hud
 from ..mundo import Mundo
 from ..personajes import PERSONAJES
 from ..render import Render
-from ..ui import tecla, texto
+from ..ui import render, tecla, texto
 from .base import Botonera, Escena
 
 TECLAS_ACCION = (pygame.K_SPACE, pygame.K_RETURN, pygame.K_z, pygame.K_KP_ENTER)
@@ -16,6 +16,12 @@ TECLAS_PODER = (pygame.K_x, pygame.K_LSHIFT, pygame.K_RSHIFT)
 
 class PantallaJuego(Escena):
     permite_mute = True
+    inactividad = None          # el turno termina solo cuando se acaba el tiempo
+
+    @property
+    def mando_juego(self):
+        """Con el control, B/X/Y son el poder mientras se juega (en la pausa B es volver)."""
+        return self.estado in ("juego", "cuenta") and not self.pausa
 
     def __init__(self, app, partida, en_linea=None, indice=None):
         super().__init__(app)
@@ -29,6 +35,7 @@ class PantallaJuego(Escena):
                        partida.ronda, j["piel"], j["pelo"], pistas)
         self.r = Render(self.m, app.son, op)
         self.hud = Hud(self.m, self.r, j["nombre"], partida.ronda, partida.rondas, op)
+        self.hud.mando = app.mando.en_uso
         self.estado = "cuenta"
         self.t_estado = 0.0
         self.ultimo_num = None
@@ -77,10 +84,12 @@ class PantallaJuego(Escena):
 
     def _teclas(self):
         k = pygame.key.get_pressed()
-        e = {"izq": k[pygame.K_LEFT] or k[pygame.K_a], "der": k[pygame.K_RIGHT] or k[pygame.K_d],
-             "arriba": k[pygame.K_UP] or k[pygame.K_w], "abajo": k[pygame.K_DOWN] or k[pygame.K_s]}
-        # mantener ESPACIO presionado también lanza (a los niños pequeños les pasa mucho)
-        if (k[pygame.K_SPACE] or k[pygame.K_z]) and self.m.jugador.enfriar <= 0 and not self.m.jugador.estrella:
+        pad = self.app.mando.estado()
+        e = {"izq": k[pygame.K_LEFT] or k[pygame.K_a] or pad["izq"], "der": k[pygame.K_RIGHT] or k[pygame.K_d] or pad["der"],
+             "arriba": k[pygame.K_UP] or k[pygame.K_w] or pad["arriba"], "abajo": k[pygame.K_DOWN] or k[pygame.K_s] or pad["abajo"]}
+        # mantener ESPACIO (o A) presionado también lanza (a los niños pequeños les pasa mucho)
+        sostenido = k[pygame.K_SPACE] or k[pygame.K_z] or pad["accion"]
+        if sostenido and self.m.jugador.enfriar <= 0 and not self.m.jugador.estrella:
             e["accion"] = True
         e.update(self.entrada)
         self.entrada = {}
@@ -109,6 +118,7 @@ class PantallaJuego(Escena):
             self._terminar()
             return
         self.r.actualizar(dt)
+        self.hud.mando = self.app.mando.en_uso
         self.hud.actualizar(dt)
         if self.red:
             self.t_red -= dt
@@ -163,8 +173,12 @@ class PantallaJuego(Escena):
             if self.red:
                 texto(pant, "En línea el tiempo sigue corriendo", (ANCHO // 2, 220), 22, (255, 200, 200), "center", 600)
             self.pausa.dibujar(pant, self.t)
-            x = ANCHO // 2 - 330
-            for t_, d in (("FLECHAS", "moverse"), ("ESPACIO", "lanzar / entregar / calmar"), ("X", "poder")):
+            filas = ((("CRUCETA", "moverse"), ("A", "lanzar / entregar / calmar"), ("B / X", "poder")) if self.app.mando.en_uso
+                     else (("FLECHAS", "moverse"), ("ESPACIO", "lanzar / entregar / calmar"), ("X", "poder")))
+            medidas = [(max(render(t_, 16, peso=700, borde=None).get_width() + 18, 30), render(d, 18, peso=600).get_width())
+                       for t_, d in filas]
+            x = ANCHO // 2 - (sum(a + 8 + b for a, b in medidas) + 36 * (len(filas) - 1)) // 2
+            for (t_, d), (a, b) in zip(filas, medidas):
                 rr = tecla(pant, t_, (x, ALTO - 120), 16)
                 texto(pant, d, (rr.right + 8, ALTO - 116), 18, (240, 240, 250), peso=600)
-                x = rr.right + 30 + len(d) * 9
+                x = rr.right + 8 + b + 36

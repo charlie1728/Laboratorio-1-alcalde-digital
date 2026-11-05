@@ -67,7 +67,7 @@ class Ayuda(Escena):
             x += img_w + 8
         caja = panel(pant, (30, 80, ANCHO - 60, ALTO - 140), borde=(255, 205, 50, 90))
         getattr(self, f"_p{self.pag}")(pant, caja)
-        pie(pant, "Izquierda/derecha para cambiar de página  ·  ESC para volver")
+        pie(pant, "Izquierda/derecha para cambiar de página  ·  ESC para volver", self.app)
 
     # ------------------------------------------------------------- páginas
     def _p0(self, pant, c):
@@ -106,6 +106,8 @@ class Ayuda(Escena):
         parrafo(pant, "Cuando recoges una estrella, QUÉDATE QUIETO un segundo: se llena un círculo y sabrás si es real. "
                       "Si la entregas sin mirar y era un Bulo disfrazado, el vecino se contagia. ¡Antes de compartir, mira!",
                 (r.x + 20, r.y + 44), 19, r.w - 40, (240, 240, 250))
+        texto(pant, "¿Con control USB?  Cruceta: caminar  ·  A: lanzar  ·  B o X: poder  ·  Start: pausa",
+              (c.centerx, r.bottom + 16), 19, (200, 230, 255), "midtop", 600)
 
     def _p2(self, pant, c):
         w = 270

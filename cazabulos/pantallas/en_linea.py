@@ -22,6 +22,8 @@ def partida_desde(msg, rondas_previas=None):
 
 
 class EnLinea(Escena):
+    inactividad = None
+
     def __init__(self, app):
         super().__init__(app)
         self.fondo = FondoCiudad(app)
@@ -207,6 +209,8 @@ def empezar_ronda(app, cliente, msg, partida):
 
 
 class EsperaRed(Escena):
+    inactividad = None
+
     """Después de tu turno en línea: esperas a los demás y ves la tabla de la ronda."""
 
     def __init__(self, app, partida, cliente):

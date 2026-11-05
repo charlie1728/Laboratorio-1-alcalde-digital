@@ -103,6 +103,8 @@ La tabla de récords: inserción y eliminación balanceadas, recorrido en orden 
 - **Alto contraste:** borde blanco grueso en Bulos y estrellas, controles siempre visibles y la marca "TÚ" sobre el jugador. Atiende a quien ve poco o se distrae.
 - **Modo tranquilo:** Bulos más lentos y peleas más largas. Atiende a niños pequeños y a quien está aprendiendo.
 - **Personalización:** se puede cambiar la piel (5 tonos) y el pelo (6 colores) de cada personaje para que cada niño se vea representado.
+- **Control USB:** se puede jugar sin teclado (cruceta, A, B/X y Start). Las ayudas en pantalla se cambian solas a los botones del control. Atiende a niños que no manejan bien un teclado.
+- **Regreso solo al inicio:** si nadie toca nada en 90 segundos, el juego vuelve a la pantalla de inicio. Así el siguiente niño de la fila de la feria siempre encuentra el juego listo.
 - **Formas además de colores:** los Bulos son gotas con antenas y las noticias son estrellas. La estrella falsa tiene un ojito. Así se distinguen aunque alguien no vea bien los colores.
 
 ## 6. Respuestas para la sustentación
@@ -125,7 +127,7 @@ La tabla de récords: inserción y eliminación balanceadas, recorrido en orden 
 
 ## 7. Pruebas
 
-`python -m unittest discover tests` corre 31 pruebas.
+`python -m unittest discover -s tests` corre 42 pruebas.
 
 - **Estructuras:** BFS por niveles y con filtro, componentes, Dijkstra, subárboles, recorridos, árbol de decisiones y AVL.
 - **Juego:**
@@ -135,6 +137,7 @@ La tabla de récords: inserción y eliminación balanceadas, recorrido en orden 
   - Influencer, peleas que rompen hilos, viral por BFS.
 - **Mapa:** colisiones con edificios, grafo de la ciudad caminable y carros siempre en su carril sin chocar.
 - **Partida y red:** turnos y rondas, elección y servidor con dos clientes.
+- **Control USB y feria:** botones que cambian según la pantalla, palanca con margen para que no tiemble, cruceta que mueve al jugador y regreso solo al inicio sin interrumpir un turno ni el modo en línea, y el rescate que vuelve al inicio si una pantalla falla.
 
 ## 8. Capturas
 

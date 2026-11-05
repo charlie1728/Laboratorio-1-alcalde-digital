@@ -18,6 +18,10 @@ Ciudad Nova va a elegir alcalde y por la red social Civitas corren los **Bulos**
 | **X** | El poder de tu personaje, cuando el círculo se llena |
 | **Esc** | Pausa · **M** silencia la música · **F11** pantalla completa |
 
+**Con control USB** (tipo Xbox): cruceta o palanca para caminar, **A** para lanzar o aceptar, **B** o **X** para el poder (en los menús B es volver), **Start** para pausa. Se conecta en cualquier momento y las ayudas en pantalla cambian solas a los botones del control.
+
+**Para la feria:** si nadie toca nada durante 90 segundos, el juego vuelve solo a la pantalla de inicio (se puede apagar en Opciones). No pasa a mitad de un turno ni en el modo en línea.
+
 - **Bulos:** vuelan hacia los vecinos con más amigos. Si llegan, se le suben a la cabeza y el vecino se pone gris.
 - **Hilos:** las amistades se ven como hilos. Un vecino con Bulo se lo reenvía a un amigo por su hilo (la bolita morada que viaja). Puedes cortarla en el aire.
 - **Bulo con corona:** es la raíz de una cadena. Si lo atrapas, caen todas sus copias de una vez.
@@ -72,7 +76,7 @@ Para jugar en línea, los computadores deben estar en la misma red. La primera v
 Pruebas:
 
 ```bash
-python -m unittest discover tests
+python -m unittest discover -s tests
 ```
 
 ## Créditos

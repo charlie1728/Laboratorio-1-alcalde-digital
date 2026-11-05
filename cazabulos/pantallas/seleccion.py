@@ -157,7 +157,10 @@ class Seleccion(Escena):
             tarjeta_personaje(pant, clave, r, self.t, i == self.cursor, tomado, self.piel[clave], self.pelo[clave])
             self._rects.append(r)
         x = ANCHO // 2 - 380
-        for t_, d in (("< >", "elegir"), ("ARRIBA/ABAJO", "color de piel"), ("C", "color de pelo"), ("ENTER", "¡listo!")):
+        ayudas = ((("< >", "elegir"), ("ARRIBA/ABAJO", "color de piel"), ("X", "color de pelo"), ("A", "¡listo!"))
+                  if self.app.mando.en_uso else
+                  (("< >", "elegir"), ("ARRIBA/ABAJO", "color de piel"), ("C", "color de pelo"), ("ENTER", "¡listo!")))
+        for t_, d in ayudas:
             rr = tecla(pant, t_, (x, ALTO - 66), 16)
             texto(pant, d, (rr.right + 8, ALTO - 62), 18, (240, 240, 250), peso=600)
             x = rr.right + 26 + render(d, 18, peso=600).get_width()
@@ -203,11 +206,16 @@ class Relevo(Escena):
         texto(pant, f"¡Te toca, {j['nombre']}!", (x, 130), 60, color, grosor=3)
         texto(pant, p["rol"], (x, 210), 30, (255, 255, 255))
         if len(pa.jugadores) > 1:
-            texto(pant, f"Pásale el teclado a {j['nombre']}", (x, 254), 22, (255, 230, 150), peso=600)
+            cosa = "el control" if self.app.mando.en_uso else "el teclado"
+            texto(pant, f"Pásale {cosa} a {j['nombre']}", (x, 254), 22, (255, 230, 150), peso=600)
         r = panel(pant, (x, 300, 520, 240), borde=color)
         rol = ROLES[j["clave"]]
-        filas = [("FLECHAS", "moverte por el barrio"), ("ESPACIO", "lanzar a los Bulos y entregar noticias"),
-                 ("X", f"poder: {rol['poder']}")]
+        if self.app.mando.en_uso:
+            filas = [("CRUCETA", "moverte por el barrio"), ("A", "lanzar a los Bulos y entregar noticias"),
+                     ("B / X", f"poder: {rol['poder']}")]
+        else:
+            filas = [("FLECHAS", "moverte por el barrio"), ("ESPACIO", "lanzar a los Bulos y entregar noticias"),
+                     ("X", f"poder: {rol['poder']}")]
         for k, (t_, d) in enumerate(filas):
             rr = tecla(pant, t_, (r.x + 20, r.y + 20 + k * 50), 16)
             texto(pant, d, (rr.right + 12, r.y + 24 + k * 50), 20, (240, 240, 250), peso=600)
@@ -228,4 +236,5 @@ class Relevo(Escena):
                 img.set_alpha(110)
             pant.blit(img, (xx, y))
         sube = math.sin(self.t * 4) * 4
-        texto(pant, "Pulsa ESPACIO cuando tengas el teclado", (ANCHO // 2, ALTO - 40 + sube), 26, (255, 255, 255), "center")
+        aviso = "Pulsa A cuando tengas el control" if self.app.mando.en_uso else "Pulsa ESPACIO cuando tengas el teclado"
+        texto(pant, aviso, (ANCHO // 2, ALTO - 40 + sube), 26, (255, 255, 255), "center")

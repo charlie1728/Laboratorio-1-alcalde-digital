@@ -9,7 +9,7 @@ from ..partida import CANDIDATOS
 from ..personajes import ORDEN, PERSONAJES
 from ..recursos import escalar
 from ..ui import panel, texto
-from .base import Escena, FondoCiudad, es_aceptar
+from .base import Escena, FondoCiudad, con_mando, es_aceptar
 
 
 ESCENAS = [
@@ -63,7 +63,7 @@ class Historia(Escena):
         getattr(self, f"_e{self.k}")(pant)
         for i in range(len(ESCENAS)):
             pygame.draw.circle(pant, (255, 205, 50) if i == self.k else (90, 80, 140), (ANCHO // 2 - 30 + i * 30, ALTO - 70), 8)
-        texto(pant, "ESPACIO para seguir  ·  ESC para saltar", (ANCHO // 2, ALTO - 34), 18, (220, 214, 240), "center", 600)
+        texto(pant, con_mando(self.app, "ESPACIO para seguir  ·  ESC para saltar"), (ANCHO // 2, ALTO - 34), 18, (220, 214, 240), "center", 600)
 
     def _e0(self, pant):
         cands = ["Lucia", "Marcos", "Elena", "Emilio"]

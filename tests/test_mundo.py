@@ -236,6 +236,7 @@ class TestRed(unittest.TestCase):
             a.enviar({"t": "empezar", "rondas": 1, "duracion": 60})
             time.sleep(0.4)
             msgs_a, msgs_b = a.recibir(), b.recibir()
+            self.assertTrue(any(m["t"] == "ronda" for m in msgs_a))     # los dos reciben la ronda
             ronda = [m for m in msgs_b if m["t"] == "ronda"][0]
             claves = {j["clave"] for j in ronda["jugadores"]}
             self.assertEqual(len(claves), 2)
