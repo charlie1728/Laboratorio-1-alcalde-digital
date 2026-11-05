@@ -102,6 +102,44 @@ def mensaje(res):
     return "Los Bulos ganaron esta vez. Apaga la antena pronto y lánzales a las cabezas de los vecinos."
 
 
+def dibujar_red(pant, rect, res, t=0.0):
+    """El grafo social al final del turno: quién quedó con Bulo, quién protegido y qué hilos cambiaron."""
+    from ..ciudad import VECINOS
+    red = res.get("red")
+    if not red:
+        return
+    pygame.draw.rect(pant, (20, 16, 44), rect, border_radius=14)
+    pos = {n: (rect.x + 30 + p[0] / 64 * (rect.w - 60), rect.y + 30 + (p[1] - 6) / 40 * (rect.h - 60))
+           for n, _, _, _, p in VECINOS}
+    rotos = {tuple(sorted(x)) for x in res.get("rotos", [])}
+    nuevos = {tuple(sorted(x)) for x in res.get("nuevos", [])}
+    for a, b, p in red["aristas"]:
+        clave = tuple(sorted((a, b)))
+        col = (120, 230, 140) if clave in nuevos else (176, 110, 255) if "bulo" in (red["estados"][a], red["estados"][b]) else (120, 112, 170)
+        pygame.draw.line(pant, col, pos[a], pos[b], 1 + p)
+    for a, b in rotos:
+        (x0, y0), (x1, y1) = pos[a], pos[b]
+        for k in range(0, 20, 2):
+            f0, f1 = k / 20, (k + 1) / 20
+            pygame.draw.line(pant, (255, 90, 90), (x0 + (x1 - x0) * f0, y0 + (y1 - y0) * f0),
+                             (x0 + (x1 - x0) * f1, y0 + (y1 - y0) * f1), 3)
+    colores = {"bulo": (170, 100, 255), "protegido": (255, 214, 70), "sano": (235, 235, 245)}
+    for n, (x, y) in pos.items():
+        e = red["estados"][n]
+        r = 11 if n == red.get("mas_conectado") else 9
+        pygame.draw.circle(pant, TINTA, (int(x), int(y) + 2), r + 3)
+        pygame.draw.circle(pant, colores[e], (int(x), int(y)), r)
+        texto(pant, n, (x, y + 12), 13, (230, 226, 245), "midtop", 600)
+    ley = [("con Bulo", (170, 100, 255)), ("protegido", (255, 214, 70)), ("sano", (235, 235, 245)),
+           ("amistad rota", (255, 90, 90)), ("amistad nueva", (120, 230, 140))]
+    x = rect.x + 16
+    for nombre, col in ley:
+        pygame.draw.circle(pant, col, (x + 8, rect.bottom - 18), 7)
+        texto(pant, nombre, (x + 20, rect.bottom - 28), 15, (230, 226, 245), peso=600)
+        x += 40 + len(nombre) * 9
+    texto(pant, f"Comunidades (DFS): {red['comunidades']}", (rect.right - 16, rect.y + 12), 16, (255, 230, 150), "topright", 600)
+
+
 class ResultadoTurno(Escena):
     def __init__(self, app, partida, indice, res, red=None):
         super().__init__(app)
@@ -112,6 +150,10 @@ class ResultadoTurno(Escena):
         app.son.tocar("victoria" if res["reputacion"] >= 2 else "fin")
 
     def evento(self, e):
+        if e.type == pygame.KEYDOWN and e.key == pygame.K_TAB:
+            self.ver_red = not getattr(self, "ver_red", False)
+            self.app.son.tocar("mover")
+            return
         if (es_aceptar(e) or (e.type == pygame.MOUSEBUTTONDOWN and e.button == 1)) and self.t > 0.8:
             self.app.son.tocar("click")
             self._seguir()
@@ -194,6 +236,15 @@ class ResultadoTurno(Escena):
             texto(pant, nombre, (x + 26, y), 17, (255, 255, 255), peso=600)
         if res.get("puesto") and res["puesto"] <= 10:
             texto(pant, f"¡Entraste al puesto {res['puesto']} de los récords!", (ANCHO // 2 + 200, 540), 22, (255, 230, 120), "midtop")
+        if getattr(self, "ver_red", False):
+            velo = pygame.Surface((ANCHO, ALTO), pygame.SRCALPHA)
+            velo.fill((16, 10, 36, 220))
+            pant.blit(velo, (0, 0))
+            texto(pant, "La red del barrio al terminar tu turno", (ANCHO // 2, 30), 34, (255, 205, 50), "midtop")
+            dibujar_red(pant, pygame.Rect(140, 90, ANCHO - 280, 560), res, self.t)
+            texto(pant, "TAB para volver  ·  ESPACIO para seguir", (ANCHO // 2, ALTO - 34), 22, (255, 255, 255), "center")
+            return
+        texto(pant, "TAB: ver la red del barrio", (ANCHO // 2 + 200, 580), 20, (200, 196, 230), "midtop", 600)
         sube = math.sin(self.t * 4) * 3
         texto(pant, "Pulsa ESPACIO para seguir", (ANCHO // 2, ALTO - 40 + sube), 26, (255, 255, 255), "center")
 

@@ -43,6 +43,7 @@ El aprendizaje sale de las mecánicas, no de preguntas: **detenerse a mirar una 
   - **Objetivo de los Bulos:** buscan al vecino de mayor **grado**.
   - **Influencer:** el BFS de un nivel lleva la noticia a los amigos.
   - **Comunidades:** **DFS / componentes**.
+- **Se ve al final de cada turno:** en la pantalla de resultados, la tecla TAB muestra la red del barrio: quién quedó con Bulo, quién protegido, las amistades rotas (rojo) y las nuevas (verde), y cuántas comunidades quedaron (DFS).
 - **Cambia durante la partida:**
   - Si una pelea no se calma, la amistad se rompe (**eliminar arista**) y el Bulo ya no pasa por ahí.
   - Si se calma, la confianza sube (el peso aumenta).

@@ -1272,4 +1272,9 @@ class Mundo:
                 "defendidos": dict(self.defendidos), "rotos": list(self.rotos), "nuevos": list(self.nuevos),
                 "arbol": [(n.clave, n.texto, n.veces, n.padre.clave if n.padre else None, n.es_hoja)
                           for n in self.decisiones.preorden()],
-                "cadena_max": self.arbol.mayor_cadena}
+                "cadena_max": self.arbol.mayor_cadena,
+                "red": {"estados": {n: ("bulo" if v.bulo is not None else "protegido" if v.escudo > 0 else "sano")
+                                    for n, v in self.vecinos.items()},
+                        "aristas": [list(a) for a in self.social.aristas()],
+                        "comunidades": len(self.social.componentes()),
+                        "mas_conectado": self.social.mas_conectado()}}
