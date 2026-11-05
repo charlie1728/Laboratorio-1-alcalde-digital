@@ -74,6 +74,10 @@ if __name__ == "__main__":
             _esperar()
             sys.exit(1)
     try:
+        import numpy  # noqa: F401
+    except ImportError:
+        print("Aviso: sin numpy el juego no tiene sonido. Para instalarlo: python -m pip install numpy")
+    try:
         from cazabulos.app import App
         semilla = int(sys.argv[1]) if len(sys.argv) > 1 else None
         App(semilla=semilla).ejecutar()

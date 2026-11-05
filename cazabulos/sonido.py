@@ -4,8 +4,12 @@ Cada sonido tiene un subtítulo para el modo de subtítulos (componente inclusiv
 no oye bien o juega sin volumen en la feria).
 """
 
-import numpy as np
 import pygame
+
+try:
+    import numpy as np
+except ImportError:          # sin numpy el juego funciona igual, solo que sin sonido
+    np = None
 
 FR = 22050
 SUBTITULOS = {
@@ -126,6 +130,8 @@ class Sonido:
         self.vol_musica = 0.45
         self.musica = None
         self.canal_musica = None
+        if np is None:
+            return
         try:
             if not pygame.mixer.get_init():
                 pygame.mixer.init(FR, -16, 1, 512)

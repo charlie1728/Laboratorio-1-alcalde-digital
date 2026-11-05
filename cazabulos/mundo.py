@@ -246,7 +246,9 @@ class Mundo:
         self.orden_antenas = r.sample(range(len(ANTENAS)), len(ANTENAS))
         self.k_antena = 0
         self.t_antena = 3.0
-        self.kiosco = [(r.uniform(-30, 30), r.uniform(-6, 18), r.random() < 0.22) for _ in range(60)]
+        # cada ronda es un poco más difícil: en la tarde hay más noticias falsas y en la noche dos antenas
+        falsas = 0.22 if self.ronda == 1 else 0.3
+        self.kiosco = [(r.uniform(-30, 30), r.uniform(-6, 18), r.random() < falsas) for _ in range(60)]
         self.k_kiosco = 0
         self.t_kiosco = 2.0
         tipos = ["falsa", "pelea", "rumor", "verdad", "reporte", "campana", "pelea", "falsa", "rumor"]
@@ -259,8 +261,8 @@ class Mundo:
             self.guion.append([t, tipo, r.random()])
             t += r.uniform(9, 14)
         self.guion.append([d * r.uniform(0.38, 0.55), "viral", r.random()])
-        if d >= 80:
-            self.guion.append([d * 0.72, "antena2", r.random()])
+        if d >= 80 or self.ronda >= 3:
+            self.guion.append([d * (0.45 if self.ronda >= 3 else 0.72), "antena2", r.random()])
         self.guion.sort()
         puntos = []
         while len(puntos) < 40:
