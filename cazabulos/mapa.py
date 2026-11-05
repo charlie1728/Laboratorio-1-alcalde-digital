@@ -9,13 +9,39 @@ import random
 import pygame
 
 from .config import TILE
-from .recursos import C
+from .recursos import C, U
 
 W, H = 64, 46
 
 # Avenida (horizontal) y carrera (vertical)
 AV_Y0, AV_Y1 = 20, 23      # filas de la calzada
 CR_X0, CR_X1 = 44, 47      # columnas de la calzada
+
+# Grafo de la ciudad: lugares y esquinas (en tiles) y las calles que los unen.
+NODOS = {
+    "Colegio": (8, 12), "Salida colegio": (8, 17.5), "Anden colegio": (8, 19.5),
+    "Plaza": (24.5, 14.5), "Alcaldia": (25.5, 9.5), "Fuente": (28, 15.5), "Casas": (40.5, 8),
+    "Cebra plaza": (23, 19.5), "Esquina NO": (42.5, 19.5), "Esquina NE": (49, 19.5),
+    "Puestos": (58.5, 16), "Pasillo mercado": (58.5, 11.5), "Mercado": (54.5, 11.5),
+    "Esquina SO": (42.5, 24.5), "Esquina SE": (49, 24.5), "Cebra parque": (23, 24.5),
+    "Entrada parque": (23, 28.5), "Laguna": (13, 29.5), "Camino este": (33, 28.5),
+    "Picnic": (33, 34.5), "Sur parque": (33, 40), "Kiosco": (27.5, 37), "Laguna sur": (18, 36),
+    "Sur laguna": (18, 40), "Oeste parque": (4, 40), "Entrada terminal": (50, 30.5), "Terminal": (56, 31), "Paradero": (56, 34.6),
+}
+ARISTAS = [
+    ("Colegio", "Salida colegio"), ("Salida colegio", "Anden colegio"), ("Anden colegio", "Cebra plaza"),
+    ("Plaza", "Cebra plaza"), ("Plaza", "Alcaldia"), ("Plaza", "Fuente"),
+    ("Alcaldia", "Casas"), ("Casas", "Esquina NO"), ("Cebra plaza", "Esquina NO"),
+    ("Esquina NO", "Esquina NE"), ("Esquina NE", "Puestos"), ("Puestos", "Pasillo mercado"),
+    ("Pasillo mercado", "Mercado"), ("Esquina NO", "Esquina SO"), ("Esquina NE", "Esquina SE"),
+    ("Esquina SO", "Esquina SE"), ("Cebra plaza", "Cebra parque"), ("Cebra parque", "Esquina SO"),
+    ("Cebra parque", "Entrada parque"), ("Entrada parque", "Laguna"), ("Entrada parque", "Camino este"),
+    ("Camino este", "Picnic"), ("Picnic", "Sur parque"), ("Kiosco", "Laguna sur"),
+    ("Laguna sur", "Sur laguna"), ("Sur laguna", "Oeste parque"), ("Sur laguna", "Sur parque"),
+    ("Esquina SE", "Entrada terminal"), ("Entrada terminal", "Terminal"), ("Terminal", "Paradero"),
+]
+# Lugares donde el Bot puede plantar su antena (en tiles)
+ANTENAS = [(12, 10), (37, 15), (61, 8), (37, 31), (3, 35), (61, 31), (28, 42), (20, 9)]
 
 TECHO = {"rojo": 0, "gris": 8, "claro": 16, "beige": 24}
 FACHADA = {"rojo": (148, 185, 407), "gris": (152, 189, 411), "beige": (156, 193, 415), "vitrina": (160, 197, 419)}
@@ -33,6 +59,8 @@ class Mapa:
         self.zonas = {}
         self.cebras = []                                   # rects en tiles
         self.semaforos = []
+        self.luces = []                                    # puntos que brillan de noche
+        self.lineas = []                                   # líneas blancas pintadas (x0, y0, x1, y1) en px
         self._construir()
         self.superficie = self._dibujar_suelo()
 
@@ -68,7 +96,20 @@ class Mapa:
         for k, i in enumerate((597, 634, 671)):
             img.blit(C(i), (0, k * TILE))
         self.props.append((img, x * TILE, (y + 1) * TILE))
-        self.rects.append(pygame.Rect(x * TILE + 6, y * TILE + 11, 4, 4))
+        self.rects.append(pygame.Rect(x * TILE + 6, y * TILE + 11, 4, 3))
+        self.luces.append((x * TILE + 8, y * TILE + 2))
+
+    def arbusto(self, x, y, tipo=0):
+        self.capa[y][x] = 512 + tipo % 6
+        self.rects.append(pygame.Rect(x * TILE + 2, y * TILE + 4, TILE - 4, TILE - 6))
+
+    def bus(self, x, y):
+        img = pygame.Surface((TILE * 2, TILE * 2), pygame.SRCALPHA)
+        for dy, fila in enumerate(((447, 448), (474, 475))):
+            for dx, i in enumerate(fila):
+                img.blit(U(i), (dx * TILE, dy * TILE))
+        self.props.append((img, x * TILE, (y + 2) * TILE))
+        self.rects.append(pygame.Rect(x * TILE + 3, y * TILE + 4, 2 * TILE - 6, 2 * TILE - 6))
 
     def objeto(self, x, y, tile, solido=True, alto=1):
         if alto == 1:
@@ -161,6 +202,45 @@ class Mapa:
         for x in (50, 63):
             self.arbol(x, 44, 1)
 
+        # ---------------- detalles: postes en los andenes, arbustos, bancas, canecas
+        for x in (4, 13, 31, 38, 52, 60):
+            self.poste(x, AV_Y0 - 2)
+            self.poste(x, AV_Y1 + 2)
+        for x in range(1, 15):
+            if x not in (7, 8):
+                self.arbusto(x, 17, x)
+        # cancha pintada en el patio del colegio
+        x0, y0, x1, y1 = 3 * TILE, 9 * TILE + 4, 13 * TILE, 16 * TILE - 4
+        self.lineas += [(x0, y0, x1, y0), (x0, y1, x1, y1), (x0, y0, x0, y1), (x1, y0, x1, y1),
+                        ((x0 + x1) // 2, y0, (x0 + x1) // 2, y1)]
+        for x, y in ((21, 9), (33, 9), (54, 7), (41, 17), (26, 17), (3, 25), (60, 25)):
+            self.objeto(x, y, 496)
+        self.objeto(43, 17, 533)
+        self.objeto(48, 26, 533)
+        for x, y in ((20, 16), (30, 16)):
+            for k in range(3):
+                self.capa[y][x + k] = 179 + k
+            self.rects.append(pygame.Rect(x * TILE + 1, y * TILE + 5, 3 * TILE - 2, TILE - 6))
+        # parque: arbustos, bancas y materas
+        for k, (x, y) in enumerate(((19, 27), (11, 27), (25, 30), (30, 30), (34, 38), (16, 38), (20, 41), (4, 37),
+                                    (2, 30), (38, 29), (39, 41), (30, 41), (11, 41), (24, 34))):
+            self.arbusto(x, y, k)
+        for x, y in ((14, 30), (20, 38), (29, 38), (8, 38)):
+            self.objeto(x, y, 572)
+            self.objeto(x + 1, y, 573)
+        # mercado: canecas de fruta y una matera
+        for x, y in ((50, 12), (63, 12), (63, 16)):
+            self.objeto(x, y, 675 + x % 5)
+        # terminal: buses en sus bahías y la línea de parqueo
+        for x in (51, 54, 57, 60):
+            self.bus(x, 27)
+            self.lineas.append(((x - 1) * TILE + 8, 26 * TILE + 2, (x - 1) * TILE + 8, 29 * TILE + 8))
+        self.lineas.append(((63) * TILE + 8, 26 * TILE + 2, 63 * TILE + 8, 29 * TILE + 8))
+        self.objeto(53, 34, 572)
+        self.objeto(54, 34, 573)
+        self.objeto(59, 34, 572)
+        self.objeto(60, 34, 573)
+
         # borde inferior del mapa: fila de árboles
         for x in range(0, W, 3):
             if self.suelo[H - 1][x] not in ("r", "a"):
@@ -210,6 +290,8 @@ class Mapa:
                     if (horizontal and (x // 4) % 2 == 0 and 2 <= (y % 32) <= 29) or \
                        (not horizontal and (y // 4) % 2 == 0 and 2 <= (x % 32) <= 29):
                         s.set_at((x, y), blanco)
+        for x0, y0, x1, y1 in self.lineas:
+            pygame.draw.line(s, (245, 245, 240), (x0, y0), (x1, y1), 1)
         # bordillo entre andén y calzada
         for y in range(H):
             for x in range(W):

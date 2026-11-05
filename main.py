@@ -1,6 +1,6 @@
-"""Alcalde Digital.
+"""Cazabulos · Alcalde Digital.
 Ejecutar:  python main.py           (partida aleatoria)
-           python main.py 42        (semilla fija: la partida se repite igual)
+           python main.py 42        (semilla fija: los barrios salen siempre igual)
 En Windows también se puede abrir con doble clic en jugar.bat.
 """
 import subprocess
@@ -74,11 +74,11 @@ if __name__ == "__main__":
             _esperar()
             sys.exit(1)
     try:
-        from alcalde.corta.app import AppCorta
+        from cazabulos.app import App
         semilla = int(sys.argv[1]) if len(sys.argv) > 1 else None
-        AppCorta(semilla=semilla).ejecutar()
+        App(semilla=semilla).ejecutar()
     except Exception:
-        registro = Path(__file__).resolve().parent / "alcalde_error.log"
+        registro = Path(__file__).resolve().parent / "cazabulos_error.log"
         registro.write_text(traceback.format_exc(), encoding="utf-8")
         traceback.print_exc()
         print(f"\nEl juego se cerró por un error. Quedó guardado en {registro}")

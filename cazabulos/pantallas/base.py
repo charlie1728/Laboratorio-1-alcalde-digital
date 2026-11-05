@@ -1,0 +1,122 @@
+"""Piezas comunes de las pantallas: escena base, lista de botones y fondo de ciudad animado."""
+import math
+
+import pygame
+
+from ..config import ALTO, ANCHO, ESC, TINTA
+from ..ui import boton, panel, texto
+
+
+class Escena:
+    musica = True
+
+    def __init__(self, app):
+        self.app = app
+        self.t = 0.0
+
+    def evento(self, e):
+        pass
+
+    def actualizar(self, dt):
+        self.t += dt
+
+    def dibujar(self, pant):
+        pass
+
+    def al_entrar(self):
+        pass
+
+
+def es_aceptar(e):
+    return e.type == pygame.KEYDOWN and e.key in (pygame.K_RETURN, pygame.K_SPACE, pygame.K_KP_ENTER)
+
+
+def es_volver(e):
+    return e.type == pygame.KEYDOWN and e.key in (pygame.K_ESCAPE, pygame.K_BACKSPACE)
+
+
+class Botonera:
+    """Botones en columna que se manejan con flechas + Enter/Espacio o con el mouse."""
+
+    def __init__(self, opciones, centro=(ANCHO // 2, 380), ancho=380, alto=64, sep=16, tam=28, color=(255, 205, 50)):
+        self.opciones = opciones        # [(texto, función)]
+        self.sel = 0
+        self.centro = centro
+        self.ancho, self.alto, self.sep, self.tam, self.color = ancho, alto, sep, tam, color
+        self.rects = []
+        self._colocar()
+
+    def _colocar(self):
+        cx, cy = self.centro
+        total = len(self.opciones) * self.alto + (len(self.opciones) - 1) * self.sep
+        y = cy - total // 2
+        self.rects = []
+        for _ in self.opciones:
+            self.rects.append(pygame.Rect(cx - self.ancho // 2, y, self.ancho, self.alto))
+            y += self.alto + self.sep
+
+    def evento(self, e, app=None):
+        if e.type == pygame.KEYDOWN:
+            if e.key in (pygame.K_UP, pygame.K_w):
+                self.sel = (self.sel - 1) % len(self.opciones)
+                if app:
+                    app.son.tocar("mover")
+                return True
+            if e.key in (pygame.K_DOWN, pygame.K_s):
+                self.sel = (self.sel + 1) % len(self.opciones)
+                if app:
+                    app.son.tocar("mover")
+                return True
+            if es_aceptar(e):
+                if app:
+                    app.son.tocar("click")
+                self.opciones[self.sel][1]()
+                return True
+        elif e.type == pygame.MOUSEMOTION:
+            for i, r in enumerate(self.rects):
+                if r.collidepoint(e.pos):
+                    self.sel = i
+        elif e.type == pygame.MOUSEBUTTONDOWN and e.button == 1:
+            for i, r in enumerate(self.rects):
+                if r.collidepoint(e.pos):
+                    self.sel = i
+                    if app:
+                        app.son.tocar("click")
+                    self.opciones[i][1]()
+                    return True
+        return False
+
+    def dibujar(self, pant, t=0.0):
+        for i, ((txt, _), r) in enumerate(zip(self.opciones, self.rects)):
+            boton(pant, r, txt, i == self.sel, self.color, self.tam, t)
+
+
+class FondoCiudad:
+    """El barrio de fondo moviéndose despacio, oscurecido para que se lea el menú."""
+
+    def __init__(self, app, oscuro=150):
+        from ..mundo import mapa_compartido
+        from ..render import suelo_escalado
+        mapa, _ = mapa_compartido()
+        self.suelo = suelo_escalado(mapa)
+        self.velo = pygame.Surface((ANCHO, ALTO), pygame.SRCALPHA)
+        for y in range(0, ALTO, 4):
+            a = int(oscuro * (0.7 + 0.3 * y / ALTO))
+            self.velo.fill((20, 14, 46, a), (0, y, ANCHO, 4))
+        self.t = 0.0
+
+    def dibujar(self, pant, dt):
+        self.t += dt
+        w, h = self.suelo.get_size()
+        x = (math.sin(self.t * 0.05) * 0.5 + 0.5) * (w - ANCHO)
+        y = (math.cos(self.t * 0.037) * 0.5 + 0.5) * (h - ALTO)
+        pant.blit(self.suelo, (0, 0), pygame.Rect(int(x), int(y), ANCHO, ALTO))
+        pant.blit(self.velo, (0, 0))
+
+
+def titulo_pantalla(pant, s, y=40, color=(255, 205, 50), tam=52):
+    texto(pant, s, (ANCHO // 2, y), tam, color, "midtop", grosor=3)
+
+
+def pie(pant, s):
+    texto(pant, s, (ANCHO // 2, ALTO - 30), 18, (220, 214, 240), "center", 600)
