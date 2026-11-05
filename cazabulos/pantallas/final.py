@@ -362,8 +362,8 @@ class Eleccion(Escena):
             prom = self.datos["promedio"]
             r = panel(pant, (ANCHO // 2 - 470, 584, 940, 92), borde=(255, 205, 50))
             if self.ganador == "Emilio":
-                s = (f"Ganaron los Bulos: el barrio terminó con {int(prom['desinformacion'])} de desinformación. "
-                     "Cuando la gente comparte sin mirar, gana quien más mentiras riega.")
+                s = (f"Ganaron los Bulos: la desinformación promedio llegó a {int(prom['desinformacion'])} (50 o más). "
+                     "Cuando la mitad del barrio se cree los rumores, gana quien más mentiras riega.")
             else:
                 s = (f"Ciudad Nova votó informada: {int(prom['informacion'])} de información verificada y "
                      f"{int(prom['confianza'])} de confianza. Lo que hicieron en el barrio decidió la elección.")
@@ -413,11 +413,14 @@ class Podio(Escena):
             p = PERSONAJES[j["clave"]]
             x = xs[puesto]
             h = alturas[puesto]
-            base = pygame.Rect(x - 100, 676 - h, 200, h)
+            base = pygame.Rect(x - 100, 660 - h, 200, h)
             pygame.draw.rect(pant, tuple(int(c * 0.6) for c in p["color"]), base.move(0, 8), border_radius=12)
             pygame.draw.rect(pant, p["color"], base, border_radius=12)
-            texto(pant, f"{puesto + 1}°", (x, base.y + 14), 48, (255, 255, 255), "midtop", grosor=3)
-            texto(pant, str(pa.total(i)), (x, base.y + 70), 26, TINTA, "midtop", borde=None)
+            if h >= 110:
+                texto(pant, f"{puesto + 1}°", (x, base.y + 14), 48, (255, 255, 255), "midtop", grosor=3)
+                texto(pant, str(pa.total(i)), (x, base.y + 70), 26, TINTA, "midtop", borde=None)
+            else:
+                texto(pant, f"{puesto + 1}°  {pa.total(i)}", (x, base.y + h // 2), 30, (255, 255, 255), "center", grosor=3)
             cs = personajes.cuadros(j["clave"], j["piel"], j["pelo"])
             cuadro = int(self.t * 6 + puesto) % 4
             esc = 8 if puesto == 0 else 6
@@ -430,4 +433,4 @@ class Podio(Escena):
                 pant.blit(corona, corona.get_rect(midbottom=(x, base.y - 24 * esc - 44 - salto)))
         nombre, lema, color = CANDIDATOS[self.ganador]
         texto(pant, f"Alcalde de Ciudad Nova: {nombre}", (ANCHO // 2, 100), 26, color, "midtop")
-        texto(pant, "ENTER: volver al menú  ·  R: jugar otra partida", (ANCHO - 20, ALTO - 16), 16, (220, 214, 240), "bottomright", 600)
+        texto(pant, "ENTER: volver al menú  ·  R: jugar otra partida", (20, ALTO - 12), 16, (220, 214, 240), "bottomleft", 600)

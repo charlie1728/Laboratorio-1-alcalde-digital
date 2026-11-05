@@ -25,7 +25,7 @@ El aprendizaje sale de las mecánicas, no de preguntas: **detenerse a mirar una 
 | Estado de la ciudad | 6 indicadores en vivo: información verificada, confianza, convivencia, bienestar digital, desinformación y conflictos (`Mundo.indicadores`). |
 | Puntuación individual y resultado general | Puntos por jugador + bono por vecinos a salvo + estrellas de reputación. La ciudad tiene sus indicadores y la elección. |
 | Logros, recompensas y retroalimentación | 14 logros guardados (`cazabulos/guardado.py`), combos, textos flotantes, mensaje final según cómo jugaste y el árbol de decisiones del turno. |
-| Elección del alcalde | `calcular_eleccion` en `cazabulos/partida.py`: la desinformación y los conflictos le dan votos a Emilio Bot. La confianza, la convivencia, el bienestar y los rumores frenados reparten los votos de los demás. |
+| Elección del alcalde | `calcular_eleccion` en `cazabulos/partida.py`: la regla es clara para los niños: si la desinformación promedio de todos los turnos llega a 50 (la mitad del barrio se creyó los Bulos), gana Emilio Bot. Si no, gana el candidato honesto con más votos; esos votos salen de la confianza, la convivencia, el bienestar y los rumores frenados o creídos sobre cada uno. |
 | Multijugador cliente-servidor con sockets | `cazabulos/red/`: servidor TCP con hilos y mensajes JSON. Sincroniza la sala, los jugadores y sus personajes, las rondas (semilla y duración), las posiciones y puntajes en vivo, los avisos, los resultados de cada ronda y los finales. |
 | Interfaz gráfica | Todo en pygame: ciudad, personaje, publicaciones (estrellas y Bulos), opciones, estado, puntuación, indicadores y resultados. |
 | Inclusividad | Ver la sección 5. |

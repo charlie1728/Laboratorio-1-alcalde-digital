@@ -73,6 +73,9 @@ class Partida:
         return r["total"] if r else 0
 
 
+UMBRAL_BULOS = 50
+
+
 def calcular_eleccion(resultados, jugadores, votantes=1000):
     """La elección depende de cómo quedó el barrio en todos los turnos."""
     res = list(resultados.values())
@@ -81,8 +84,8 @@ def calcular_eleccion(resultados, jugadores, votantes=1000):
     prom = {k: sum(r["indicadores"][k] for r in res) / len(res) for k in res[0]["indicadores"]}
     rumores = {c: sum(r["rumores"].get(c, 0) for r in res) for c in ("Lucia", "Marcos", "Elena")}
     defendidos = {c: sum(r["defendidos"].get(c, 0) for r in res) for c in ("Lucia", "Marcos", "Elena")}
-    bot = 0.06 + prom["desinformacion"] / 100 * 0.6 + prom["conflictos"] / 100 * 0.15 - prom["informacion"] / 100 * 0.12
-    bot = max(0.04, min(0.8, bot))
+    bot = 0.05 + prom["desinformacion"] / 100 * 0.55 + prom["conflictos"] / 100 * 0.1 - prom["informacion"] / 100 * 0.1
+    bot = max(0.04, min(0.75, bot))
     pesos = {
         "Lucia": 1 + prom["confianza"] / 120 + 0.35 * defendidos["Lucia"] - 0.4 * rumores["Lucia"],
         "Marcos": 1 + prom["convivencia"] / 120 + 0.35 * defendidos["Marcos"] - 0.4 * rumores["Marcos"],
@@ -98,8 +101,17 @@ def calcular_eleccion(resultados, jugadores, votantes=1000):
     suma = sum(pesos.values())
     votos = {c: int(votantes * (1 - bot) * p / suma) for c, p in pesos.items()}
     votos["Emilio"] = votantes - sum(votos.values())
+    # La regla, clara para todos: si en promedio la mitad del barrio se creyó los Bulos (desinformación
+    # de 50 o más), gana Emilio Bot. Si no, gana el candidato honesto con más votos.
+    informado = prom["desinformacion"] < UMBRAL_BULOS
     orden = sorted(votos, key=lambda c: -votos[c])
-    return orden, {"votos": votos, "promedio": prom, "rumores": rumores, "defendidos": defendidos}
+    if informado and orden[0] == "Emilio":
+        votos["Emilio"], votos[orden[1]] = votos[orden[1]], votos["Emilio"]
+    elif not informado and orden[0] != "Emilio":
+        votos["Emilio"], votos[orden[0]] = votos[orden[0]], votos["Emilio"]
+    orden = sorted(votos, key=lambda c: (-votos[c], c != "Emilio" if not informado else c == "Emilio"))
+    return orden, {"votos": votos, "promedio": prom, "rumores": rumores, "defendidos": defendidos,
+                   "informado": informado}
 
 
 def nombre_jugador(j):

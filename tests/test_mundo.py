@@ -216,6 +216,9 @@ class TestPartida(unittest.TestCase):
         self.assertLess(bueno["votos"]["Emilio"], malo["votos"]["Emilio"])
         orden, _ = calcular_eleccion(res(100, 0), js)
         self.assertEqual(orden[0], "Emilio")
+        # la regla del umbral: con 50 o más de desinformación gana Emilio; con menos, no
+        self.assertNotEqual(calcular_eleccion(res(49, 30), js)[0][0], "Emilio")
+        self.assertEqual(calcular_eleccion(res(50, 80), js)[0][0], "Emilio")
 
 
 class TestRed(unittest.TestCase):
