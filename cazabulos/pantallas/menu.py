@@ -48,7 +48,7 @@ class Titulo(Escena):
             ("En línea", lambda: app.cambiar(EnLinea(app))),
             ("Ayuda", lambda: app.cambiar(Ayuda(app))),
             ("Opciones", lambda: app.cambiar(Opciones(app))),
-            ("Récords", lambda: app.cambiar(RecordsPantalla(app))),
+            ("Récords y logros", lambda: app.cambiar(RecordsPantalla(app))),
             ("Salir", self._salir),
         ], centro=(ANCHO // 2, 474), ancho=360, alto=44, sep=8, tam=24)
 
@@ -261,20 +261,37 @@ class RecordsPantalla(Escena):
             self.app.cambiar(Titulo(self.app))
 
     def dibujar(self, pant):
+        from ..guardado import LOGROS
         self.fondo.dibujar(pant, 1 / 60)
-        titulo_pantalla(pant, "Récords")
-        r = panel(pant, (ANCHO // 2 - 400, 120, 800, 520), borde=(255, 205, 50))
+        titulo_pantalla(pant, "Récords y logros", 24)
+        r = panel(pant, (40, 100, 640, 540), borde=(255, 205, 50))
+        texto(pant, "Mejores turnos", (r.x + 24, r.y + 14), 24, (255, 230, 150))
         if not self.lista:
-            texto(pant, "Todavía no hay récords. ¡Juega una partida!", r.center, 26, (255, 255, 255), "center")
+            texto(pant, "Todavía no hay récords. ¡Juega una partida!", r.center, 22, (255, 255, 255), "center")
         for k, rec in enumerate(self.lista):
-            y = r.y + 24 + k * 48
+            y = r.y + 56 + k * 47
             color = [(255, 205, 50), (220, 220, 235), (230, 160, 100)][k] if k < 3 else (255, 255, 255)
-            texto(pant, f"{k + 1}.", (r.x + 30, y), 26, color)
+            texto(pant, f"{k + 1}.", (r.x + 24, y), 24, color)
             clave = rec.get("personaje", "caro")
             img = escalar(personajes.retrato(clave), 2)
-            pant.blit(img, (r.x + 80, y - 2))
-            texto(pant, rec["nombre"], (r.x + 130, y), 26, PERSONAJES.get(clave, PERSONAJES["caro"])["color"])
-            texto(pant, f"{rec['salvados']} a salvo", (r.x + 430, y + 4), 20, (200, 230, 210), peso=600)
-            texto(pant, rec.get("fecha", ""), (r.x + 580, y + 4), 18, (190, 186, 220), peso=600)
-            texto(pant, str(rec["total"]), (r.right - 30, y), 28, color, "topright")
-        pie(pant, "La tabla se ordena con un árbol AVL (se guarda en la carpeta datos)  ·  ENTER para volver")
+            pant.blit(img, (r.x + 70, y - 2))
+            texto(pant, rec["nombre"], (r.x + 116, y), 24, PERSONAJES.get(clave, PERSONAJES["caro"])["color"])
+            texto(pant, f"{rec['salvados']} a salvo", (r.x + 300, y + 4), 18, (200, 230, 210), peso=600)
+            texto(pant, rec.get("fecha", ""), (r.x + 430, y + 4), 16, (190, 186, 220), peso=600)
+            texto(pant, str(rec["total"]), (r.right - 24, y), 26, color, "topright")
+        rl = panel(pant, (700, 100, 540, 540), borde=(255, 205, 50))
+        ganados = self.app.logros.ganados
+        texto(pant, f"Logros  {len(ganados & {c for c, *_ in LOGROS})}/{len(LOGROS)}", (rl.x + 24, rl.y + 14), 24, (255, 230, 150))
+        for k, (clave, nombre, desc, _) in enumerate(LOGROS):
+            col, fila = k % 2, k // 2
+            x, y = rl.x + 20 + col * 262, rl.y + 56 + fila * 68
+            ok = clave in ganados
+            pygame.draw.circle(pant, (90, 60, 150) if ok else (70, 62, 110), (x + 18, y + 22), 17)
+            if ok:
+                pygame.draw.circle(pant, (255, 205, 50), (x + 18, y + 22), 17, 3)
+            if ok:
+                img = escalar(sprites.estrella(), 2)
+                pant.blit(img, img.get_rect(center=(x + 18, y + 22)))
+            texto(pant, nombre, (x + 44, y + 2), 18, (255, 255, 255) if ok else (170, 164, 200))
+            parrafo(pant, desc, (x + 44, y + 26), 13, 200, (220, 214, 240) if ok else (140, 134, 170))
+        pie(pant, "Los récords se ordenan con un árbol AVL y se guardan en la carpeta datos  ·  ENTER para volver")

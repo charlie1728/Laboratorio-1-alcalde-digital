@@ -93,7 +93,7 @@ class Ayuda(Escena):
 
     def _p1(self, pant, c):
         filas = [("FLECHAS", "Caminar por el barrio (también W A S D)."),
-                 ("ESPACIO", "Lanzar tu herramienta: atrapa Bulos, cura a un vecino si le das al Bulo de su cabeza y golpea la antena."),
+                 ("ESPACIO", "Lanzar tu herramienta (puedes dejarla presionada): atrapa Bulos, cura a un vecino si le das al Bulo de su cabeza y golpea la antena."),
                  ("ESPACIO", "Junto a un vecino con una estrella real: se la entregas y queda protegido (brilla dorado)."),
                  ("ESPACIO", "Junto a dos vecinos peleando: los calmas y su amistad se hace más fuerte."),
                  ("X", "Usar el poder de tu personaje cuando el círculo se llena."),
