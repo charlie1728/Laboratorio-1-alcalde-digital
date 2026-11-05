@@ -556,9 +556,10 @@ class Render:
                 sx, sy = self.a_pantalla(x, y)
                 pygame.draw.circle(pant, pr.color, (int(sx), int(sy)), 2 + k)
             sx, sy = self.a_pantalla(pr.x, pr.y)
-            pygame.draw.circle(pant, (30, 20, 50), (int(sx), int(sy)), 11)
-            pygame.draw.circle(pant, pr.color, (int(sx), int(sy)), 9)
-            pygame.draw.circle(pant, (255, 255, 255), (int(sx) - 2, int(sy) - 2), 4)
+            img = escalar(sprites.herramienta(pr.clave))
+            giro = (0.5 - pr.vida) * 900 * (1 if pr.vx >= 0 else -1)
+            rot = pygame.transform.rotate(img, giro)
+            pant.blit(rot, rot.get_rect(center=(int(sx), int(sy))))
 
     def _efectos(self, pant):
         for p in self.part:

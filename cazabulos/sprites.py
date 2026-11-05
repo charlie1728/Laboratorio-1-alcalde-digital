@@ -126,6 +126,34 @@ def antena(luz=True, golpe=False):
     return _guardar(clave, hacer)
 
 
+HERRAMIENTAS = {
+    # Ana: periódico enrollado · Beto: corazón (un "me gusta") · Caro: su red · Dani: un volante
+    "ana": [".kkkkkkkkkk.", "kwwwwrwwwwwk", "kgggwrgggwwk", "kwwwwrwwwwwk", "kgggwrggwwwk", ".kkkkkkkkkk."],
+    "beto": [".kk...kk.", "kppk.kppk", "kpwpkpppk", "kpppppppk", ".kpppppk.", "..kpppk..", "...kpk...", "....k...."],
+    "caro": ["..kkkkk..", ".kgwgwgk.", "kgwgwgwgk", "kwgwgwgwk", "kgwgwgwgk", ".kgwgwgk.", "..kkkkk..", "....b....", "....b...."],
+    "dani": ["kkkkkkkk", "kwwwwwwk", "kbbbbbbk", "kwwwwwwk", "kwbbbbwk", "kwwwwwwk", "kwwwbbwk", "kkkkkkkk"],
+}
+_COLORES_H = {"k": (40, 26, 38), "w": (250, 250, 255), "g": (120, 200, 120), "p": (255, 96, 170),
+              "b": (70, 120, 240), "r": (226, 58, 64)}
+
+
+def herramienta(clave):
+    def hacer():
+        filas = HERRAMIENTAS[clave]
+        colores = dict(_COLORES_H)
+        if clave == "ana":
+            colores["g"] = (150, 150, 165)
+        if clave == "caro":
+            colores["b"] = (140, 90, 50)
+        s = pygame.Surface((max(len(f) for f in filas), len(filas)), pygame.SRCALPHA)
+        for y, f in enumerate(filas):
+            for x, ch in enumerate(f):
+                if ch in colores:
+                    s.set_at((x, y), colores[ch])
+        return s
+    return _guardar(("herr", clave), hacer)
+
+
 def corazon(color=(255, 90, 130)):
     def hacer():
         s = pygame.Surface((7, 6), pygame.SRCALPHA)

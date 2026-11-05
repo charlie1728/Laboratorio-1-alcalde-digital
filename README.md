@@ -31,10 +31,10 @@ Ciudad Nova va a elegir alcalde y por la red social Civitas corren los **Bulos**
 
 | Personaje | Rol | Ventaja | Poder (X) |
 |---|---|---|---|
-| **Ana** (amarillo) | Periodista | Ve los Bulos disfrazados y revisa las noticias al instante | **Flash:** congela a los Bulos cercanos |
-| **Beto** (rosa) | Influencer | Lo que entrega les llega también a los amigos del vecino (¡y si es falso, también!) | **En vivo:** protege a todos los vecinos cercanos |
-| **Caro** (verde) | Ciudadana | Corre más rápido y protege a quienes reconcilia | **Red gigante:** atrapa todos los Bulos cercanos |
-| **Dani** (azul) | Candidato | Su protección dura el doble y compite en la elección | **Discurso:** cura a los vecinos cercanos y empuja a los Bulos |
+| **Ana** (amarillo, lanza periódicos) | Periodista | Ve los Bulos disfrazados y revisa las noticias al instante | **Flash:** congela a los Bulos cercanos |
+| **Beto** (rosa, lanza corazones) | Influencer | Lo que entrega les llega también a los amigos del vecino (¡y si es falso, también!) | **En vivo:** protege a todos los vecinos cercanos |
+| **Caro** (verde, lanza su red) | Ciudadana | Corre más rápido y protege a quienes reconcilia | **Red gigante:** atrapa todos los Bulos cercanos |
+| **Dani** (azul, lanza volantes) | Candidato | Su protección dura el doble y compite en la elección | **Discurso:** cura a los vecinos cercanos y empuja a los Bulos |
 
 La piel y el color de pelo se pueden cambiar al elegir.
 

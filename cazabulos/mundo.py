@@ -154,11 +154,12 @@ class Viral:
 
 
 class Proyectil:
-    def __init__(self, x, y, vx, vy, color):
+    def __init__(self, x, y, vx, vy, color, clave="caro"):
         self.x, self.y = x, y
         self.vx, self.vy = vx, vy
         self.vida = 0.5
         self.color = color
+        self.clave = clave
         self.rastro = []
 
 
@@ -522,7 +523,7 @@ class Mundo:
             d = _dist(mejor, (ox, oy))
             vx, vy = (mejor[0] - ox) / d, (mejor[1] - oy) / d
         from .personajes import PERSONAJES
-        self.proyectiles.append(Proyectil(ox, oy, vx * 240, vy * 240, PERSONAJES[j.clave]["color"]))
+        self.proyectiles.append(Proyectil(ox, oy, vx * 240, vy * 240, PERSONAJES[j.clave]["color"], j.clave))
         self.sonar("lanzar")
 
     def _blancos(self):
