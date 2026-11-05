@@ -14,7 +14,7 @@ Ciudad Nova va a elegir alcalde y por la red social Civitas corren los **Bulos**
 | Tecla | Qué hace |
 |---|---|
 | **Flechas** (o WASD) | Caminar por el barrio |
-| **Espacio** | Lanzar tu herramienta a los Bulos (o a la cabeza de un vecino para curarlo, o a la antena). Junto a un vecino con una estrella: entregársela. Junto a dos vecinos peleando: calmarlos |
+| **Espacio** (se puede mantener) | Lanzar tu herramienta a los Bulos (o a la cabeza de un vecino para curarlo, o a la antena). Junto a un vecino con una estrella: entregársela. Junto a dos vecinos peleando: calmarlos |
 | **X** | El poder de tu personaje, cuando el círculo se llena |
 | **Esc** | Pausa · **M** silencia la música · **F11** pantalla completa |
 
@@ -40,6 +40,7 @@ La piel y el color de pelo se pueden cambiar al elegir.
 
 ## Modos
 
+- **¡Jugar ya!:** un turno de 60 segundos sin configurar nada, ideal para la fila de la feria.
 - **Mismo computador (1 a 4):** no se comparte el teclado. Cada uno juega su turno de 60, 90 o 120 segundos y le pasa el teclado al siguiente. En cada ronda todos juegan **el mismo barrio con los mismos eventos** (misma semilla), así es justo. Hasta 3 rondas: mañana, tarde y noche.
 - **En línea (2 a 4 computadores en la misma red):** uno crea la sala y los demás escriben la dirección que aparece. Todos juegan a la vez, ven a los rivales como fantasmas y el marcador en vivo.
 
@@ -65,6 +66,8 @@ python main.py
 ```
 
 En Windows también funciona con doble clic en `jugar.bat`. Servidor sin ventana para el modo en línea: `python servidor.py`.
+
+Para jugar en línea, los computadores deben estar en la misma red. La primera vez, Windows puede preguntar si deja que Python use la red: hay que dar **Permitir** en el computador que crea la sala.
 
 Pruebas:
 

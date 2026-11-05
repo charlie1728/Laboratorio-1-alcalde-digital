@@ -50,6 +50,7 @@ class Render:
         self.banners = []
         self.toasts = []
         self.brillos = {}
+        self.burbujas = {}
         self.temblor = 0.0
         self.capa = pygame.Surface((ANCHO, ALTO), pygame.SRCALPHA)
         self.oscuro = pygame.Surface((ANCHO, ALTO), pygame.SRCALPHA)
@@ -142,6 +143,8 @@ class Render:
                 self._estallido(fx[1], fx[2], (230, 230, 240), 5, vel=20, grav=0)
             elif tipo == "decision":
                 self.toasts.append([fx[2], 0.0])
+            elif tipo == "burbuja":
+                self.burbujas[fx[1]] = [fx[2], fx[3], 0.0]
         m.fx.clear()
 
     def _estallido(self, x, y, color, n, vel=80, grav=120, retraso=0.0, tam=1):
@@ -178,6 +181,9 @@ class Render:
             for e in lista:
                 e[-1] += dt
             lista[:] = [e for e in lista if e[-1] < dur]
+        for b in self.burbujas.values():
+            b[2] += dt
+        self.burbujas = {k: b for k, b in self.burbujas.items() if b[2] < 2.8}
         for c in self.cadenas:
             c[1] += dt
         self.cadenas = [c for c in self.cadenas if c[1] < 0.8]
@@ -247,6 +253,7 @@ class Render:
         self._proyectiles(pant)
         self._efectos(pant)
         self._luz_del_dia(pant)
+        self._burbujas(pant)
         self._textos(pant)
         self._flechas(pant)
         if getattr(self, "flash", 0) > 0:
@@ -611,6 +618,28 @@ class Render:
                 img = sprites.luz(r * ESC // 2)
                 s.blit(img, (sx - img.get_width() // 2, sy - img.get_height() // 2), special_flags=pygame.BLEND_RGBA_SUB)
             pant.blit(s, (0, 0))
+
+    def _burbujas(self, pant):
+        """Lo que dicen los vecinos (el rumor que creyeron o la noticia que recibieron)."""
+        for nombre, (txt, color, t) in self.burbujas.items():
+            v = self.m.vecinos.get(nombre)
+            if v is None or not self.visible(v.x, v.y, 0):
+                continue
+            sx, sy = self.a_pantalla(v.x, v.y - (40 if v.bulo is not None else 30))
+            alfa = int(255 * max(0.0, min(1.0, t / 0.15, (2.8 - t) / 0.3)))
+            img = render(txt, 16, (255, 255, 255), 700, None)
+            r = img.get_rect(midbottom=(sx, sy - 10 - min(1.0, t / 0.15) * 4))
+            caja = r.inflate(18, 10)
+            caja.clamp_ip(pygame.Rect(6, 6, ANCHO - 12, ALTO - 12))
+            s = pygame.Surface((caja.w, caja.h + 10), pygame.SRCALPHA)
+            pygame.draw.rect(s, (*color, min(235, alfa)), (0, 0, caja.w, caja.h), border_radius=10)
+            pygame.draw.rect(s, (255, 255, 255, alfa), (0, 0, caja.w, caja.h), 2, border_radius=10)
+            cx = max(10, min(caja.w - 10, int(sx - caja.x)))
+            pygame.draw.polygon(s, (*color, min(235, alfa)), [(cx - 7, caja.h - 1), (cx + 7, caja.h - 1), (cx, caja.h + 9)])
+            pant.blit(s, caja.topleft)
+            img2 = img.copy()
+            img2.set_alpha(alfa)
+            pant.blit(img2, img2.get_rect(center=caja.center))
 
     def _textos(self, pant):
         for x, y, s, color, grande, t in self.textos:

@@ -39,17 +39,18 @@ class Titulo(Escena):
         self.velo = pygame.Surface((ANCHO, ALTO), pygame.SRCALPHA)
         for y in range(0, ALTO, 4):
             self.velo.fill((18, 12, 44, int(90 + 110 * abs(y - 330) / 400)), (0, y, ANCHO, 4))
-        from .seleccion import Preparar
+        from .seleccion import Preparar, Seleccion
         from .ayuda import Ayuda
         from .en_linea import EnLinea
         self.botones = Botonera([
-            ("¡A jugar!", lambda: app.cambiar(Preparar(app))),
+            ("¡Jugar ya!", lambda: app.cambiar(Seleccion(app, 1, 1, 60, app.op.get("tranquilo", False)))),
+            ("Con amigos (mismo PC)", lambda: app.cambiar(Preparar(app))),
             ("En línea", lambda: app.cambiar(EnLinea(app))),
             ("Ayuda", lambda: app.cambiar(Ayuda(app))),
             ("Opciones", lambda: app.cambiar(Opciones(app))),
             ("Récords", lambda: app.cambiar(RecordsPantalla(app))),
             ("Salir", self._salir),
-        ], centro=(ANCHO // 2, 470), ancho=330, alto=50, sep=10, tam=26)
+        ], centro=(ANCHO // 2, 474), ancho=360, alto=44, sep=8, tam=24)
 
     def _salir(self):
         self.app.corriendo = False

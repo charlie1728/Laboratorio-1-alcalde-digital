@@ -41,7 +41,7 @@ ARISTAS = [
     ("Esquina SE", "Entrada terminal"), ("Entrada terminal", "Terminal"), ("Terminal", "Paradero"),
 ]
 # Lugares donde el Bot puede plantar su antena (en tiles)
-ANTENAS = [(12, 10), (37, 15), (61, 8), (37, 31), (3, 35), (61, 31), (28, 42), (20, 9)]
+ANTENAS = [(12, 10), (36, 11), (61, 8), (37, 31), (3, 35), (61, 31), (8, 27), (24, 9)]
 
 TECHO = {"rojo": 0, "gris": 8, "claro": 16, "beige": 24}
 FACHADA = {"rojo": (148, 185, 407), "gris": (152, 189, 411), "beige": (156, 193, 415), "vitrina": (160, 197, 419)}

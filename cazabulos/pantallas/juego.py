@@ -80,6 +80,9 @@ class PantallaJuego(Escena):
         k = pygame.key.get_pressed()
         e = {"izq": k[pygame.K_LEFT] or k[pygame.K_a], "der": k[pygame.K_RIGHT] or k[pygame.K_d],
              "arriba": k[pygame.K_UP] or k[pygame.K_w], "abajo": k[pygame.K_DOWN] or k[pygame.K_s]}
+        # mantener ESPACIO presionado también lanza (a los niños pequeños les pasa mucho)
+        if (k[pygame.K_SPACE] or k[pygame.K_z]) and self.m.jugador.enfriar <= 0 and not self.m.jugador.estrella:
+            e["accion"] = True
         e.update(self.entrada)
         self.entrada = {}
         return e

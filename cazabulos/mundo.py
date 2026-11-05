@@ -17,6 +17,13 @@ from .mapa import ANTENAS, NODOS, Mapa
 from .trafico import Trafico
 
 CANDIDATOS = ["Lucia", "Marcos", "Elena", "Emilio"]
+# Lo que dicen los vecinos: rumores (falsos) y noticias reales. Cortos para que se lean rápido.
+RUMORES = ["¡Van a cerrar el colegio!", "Dicen que el alcalde roba", "¡Mañana cierran los parques!",
+           "El agua tiene un virus", "Regalan celulares en la plaza", "¡Se cae el puente!",
+           "Ya no habrá recreo", "El bus 7 desaparece", "¡Prohíben los perros!", "Cierran el mercado"]
+REALES = ["La biblioteca abre el sábado", "Vacunas gratis en el parque", "Feria de ciencias el lunes",
+          "Arreglaron los semáforos", "Debate de candidatos el viernes", "Nueva ciclovía en la avenida",
+          "Concierto en la plaza", "El mercado abre más temprano"]
 T_VERIFICAR = 1.2
 ESCUDO = 12.0
 MAX_BULOS_LIBRES = 14
@@ -120,6 +127,7 @@ class Estrella:
         self.vida = 30.0
         self.revelada = False
         self.t = 0.0
+        self.titular = (RUMORES if falsa else REALES)[ident % (len(RUMORES) if falsa else len(REALES))]
 
 
 class Antena:
@@ -282,6 +290,9 @@ class Mundo:
 
     def sonar(self, nombre, x=None, y=None):
         self.emitir("sonido", nombre, x, y)
+
+    def decir(self, vecino, texto, color=(40, 30, 70)):
+        self.emitir("burbuja", vecino, texto, color)
 
     def mostrar_pista(self, clave, texto, teclas=()):
         if not self.pistas_on or clave in self.pistas_vistas:
@@ -456,12 +467,12 @@ class Mundo:
             j.stats["reportadas"] += 1
             j.estrella = None
             self.emitir("pop", j.x, j.y - 26, (150, 80, 240))
-            self.texto(j.x, j.y - 40, "¡Era un Bulo disfrazado!", (200, 160, 255))
+            self.texto(j.x, j.y - 40, f"Bulo: \"{s.titular}\"", (210, 170, 255))
             self.sonar("reporte")
             self.cargar(10)
         else:
             self.sonar("real")
-            self.texto(j.x, j.y - 40, "¡Es real!", (255, 230, 90))
+            self.texto(j.x, j.y - 40, f"Real: {s.titular}", (255, 230, 90))
             self.mostrar_pista("entregar", "Llévasela a un vecino y pulsa ESPACIO", ("ESPACIO",))
 
     def _aplicar_hoja(self, hoja, x, y):
@@ -537,6 +548,7 @@ class Mundo:
             self.sonar("mal")
             self.texto(v.x, v.y - 44, "¡Era un Bulo disfrazado!", (255, 120, 140), True)
             raiz = self._infectar(v, None)
+            self.decir(v.nombre, s.titular, (120, 60, 200))
             if beto and raiz is not None:
                 for u, nivel, padre in self.social.bfs(v.nombre, max_nivel=1)[1:]:
                     w = self.vecinos[u]
@@ -552,6 +564,7 @@ class Mundo:
             self._atrapar(v.bulo, curar_bonus=True)
             self.texto(v.x, v.y - 44, "¡La verdad cortó el rumor!", (255, 230, 120))
         v.escudo = dur
+        self.decir(v.nombre, f"¡Gracias! {s.titular}", (190, 130, 20))
         self.cargar(12)
         if beto:
             alcanzados = 0
@@ -578,6 +591,7 @@ class Mundo:
         self.sumar(20, (a.x + b.x) / 2, (a.y + b.y) / 2 - 20, "¡paz!")
         self.ajustar(convivencia=8, conflictos=-4, bienestar=3)
         self.emitir("corazones", (a.x + b.x) / 2, (a.y + b.y) / 2 - 22)
+        self.decir(a.nombre, "Perdón, no lo había verificado", (40, 150, 80))
         self.sonar("paz")
         self.cargar(15)
         if j.clave == "caro":
@@ -749,6 +763,7 @@ class Mundo:
         self.ajustar(confianza=-1.5, bienestar=-1)
         self.emitir("contagio", v.x, v.y - 22)
         self.sonar("contagio", v.x, v.y)
+        self.decir(v.nombre, RUMORES[b.id % len(RUMORES)], (120, 60, 200))
         return b.id
 
     def _bulos(self, dt):
@@ -829,14 +844,16 @@ class Mundo:
         self.ajustar(confianza=-1.5, bienestar=-1)
         if b.candidato:
             self.rumores[b.candidato] += 1
-            self.texto(v.x, v.y - 44, f"{v.nombre} cree el rumor sobre {b.candidato}", (220, 170, 255))
+            self.decir(v.nombre, f"¿Supiste lo de {b.candidato}?", (120, 60, 200))
+        else:
+            self.decir(v.nombre, RUMORES[b.id % len(RUMORES)], (120, 60, 200))
         self.emitir("contagio", v.x, v.y - 22)
         self.sonar("contagio", v.x, v.y)
         self.mostrar_pista("cabeza", "¡Un vecino tiene un Bulo! Lánzale a su cabeza para curarlo", ("ESPACIO",))
 
     def _rebote(self, b):
         v = self.vecinos[b.objetivo]
-        self.texto(v.x, v.y - 40, "¡No le creyó!", (255, 230, 120))
+        self.decir(v.nombre, "¡Eso ya lo verifiqué!", (190, 130, 20))
         self.emitir("pop", b.x, b.y, (255, 220, 90))
         self.sumar(5, v.x, v.y - 30)
         self.ajustar(informacion=1)
@@ -860,6 +877,7 @@ class Mundo:
                     v.bulo = None
                     v.salto = 0.4
                     j.stats["curados"] += 1
+                    self.decir(v.nombre, "¡Uy, era mentira!", (40, 150, 80))
                     self.ajustar(confianza=1.5, bienestar=1)
             if b.candidato:
                 self.defendidos[b.candidato] += 1
@@ -1107,6 +1125,8 @@ class Mundo:
                     p["t"] = 15.0 if not self.tranquilo else 20.0
                     a.ruta, b.ruta = [], []
                     self.emitir("pelea", a.nombre, b.nombre)
+                    self.decir(a.nombre, "¡Eso es mentira!", (200, 70, 60))
+                    self.decir(b.nombre, "¡Lo leí en Civitas!", (200, 70, 60))
                     self.sonar("pelea", a.x, a.y)
                     self.mostrar_pista("pelea", "¡Una pelea! Acércate y pulsa ESPACIO para calmarlos", ("ESPACIO",))
                 continue
