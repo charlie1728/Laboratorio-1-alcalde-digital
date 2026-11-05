@@ -29,6 +29,6 @@ MORADO_OSCURO = (52, 22, 96)
 CIELO = (120, 200, 255)
 
 # Ronda
-DURACION_RONDA = 90         # segundos por turno (se puede cambiar en el menú)
+DURACION_RONDA = 120        # segundos por turno (se puede cambiar en el menú)
 VELOCIDAD_JUGADOR = 78      # pixeles nativos por segundo
 VELOCIDAD_BULO = 34

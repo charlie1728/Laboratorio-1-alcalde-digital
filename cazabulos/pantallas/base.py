@@ -135,3 +135,38 @@ def con_mando(app, s):
 
 def pie(pant, s, app=None):
     texto(pant, con_mando(app, s), (ANCHO // 2, ALTO - 30), 18, (220, 214, 240), "center", 600)
+
+
+def instrucciones(pant, centro, t=0.0, mando=False):
+    """Todo el juego en tres dibujos (se ve en la cuenta regresiva, antes de empezar a jugar):
+    atrapa los Bulos, cura a los morados y recoge las estrellas."""
+    from .. import sprites
+    from ..recursos import escalar
+    from ..ui import panel, tecla
+    cx, cy = centro
+    w, h, sep = 270, 190, 26
+    x0 = cx - (3 * w + 2 * sep) // 2
+    bulo = escalar(sprites.bulo(int(t * 4) % 2, False, False, (0, 1)), 5)
+    vecino = escalar(sprites.morado(sprites.vecino(1, 0, "abajo", 0)), 5)
+    cabeza = escalar(sprites.bulo(int(t * 3) % 2, False, False, (0, 1)), 3)
+    estrella = escalar(sprites.estrella(brillo=int(t * 2) % 2), 5)
+    tarjetas = [("¡Atrápalos!", (190, 130, 255)), ("¡Cura a los morados!", (220, 160, 255)),
+                ("Recoge las estrellas", (255, 214, 70))]
+    for k, (txt, color) in enumerate(tarjetas):
+        r = pygame.Rect(x0 + k * (w + sep), cy - h // 2, w, h)
+        panel(pant, r, (30, 22, 60), 235, 18, color, 3)
+        icono_y = r.y + 96 + math.sin(t * 4 + k) * 4
+        if k == 0:
+            pant.blit(bulo, bulo.get_rect(midbottom=(r.centerx, icono_y)))
+        elif k == 1:
+            pant.blit(vecino, vecino.get_rect(midbottom=(r.centerx, r.y + 112)))
+            pant.blit(cabeza, cabeza.get_rect(midbottom=(r.centerx, r.y + 112 - 62 + math.sin(t * 5) * 2)))
+        else:
+            pant.blit(estrella, estrella.get_rect(midbottom=(r.centerx, icono_y)))
+        texto(pant, txt, (r.centerx, r.bottom - 50), 24, color, "midtop")
+    filas = ((("A", "lanzar"), ("B / X", "poder")) if mando else (("ESPACIO", "lanzar"), ("X", "poder")))
+    x = cx - 150
+    for t_, d in filas:
+        rr = tecla(pant, t_, (x, cy + h // 2 + 22), 18)
+        texto(pant, d, (rr.right + 10, cy + h // 2 + 26), 22, (255, 255, 255))
+        x = rr.right + 120

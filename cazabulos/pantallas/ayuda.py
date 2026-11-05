@@ -5,7 +5,7 @@ import pygame
 from .. import personajes, sprites
 from ..ciudad import VECINOS, grafo_social
 from ..config import ALTO, ANCHO, TINTA
-from ..estructuras.arbol_decision import arbol_noticia
+from ..estructuras.arbol_decision import arbol_publicacion
 from ..hud import INDICADORES
 from ..mapa import NODOS
 from ..personajes import ORDEN
@@ -27,8 +27,9 @@ class Ayuda(Escena):
         self.social = grafo_social()
         from ..mundo import mapa_compartido
         _, self.ciudad = mapa_compartido()
-        self.arbol = arbol_noticia()
-        for camino in (["mirar", "real", "entregar"], ["mirar", "real", "entregar"], ["mirar", "falsa"], ["entregar", "falsa"]):
+        self.arbol = arbol_publicacion()
+        for camino in (["falsa", "atrapar"], ["falsa", "atrapar"], ["falsa", "llega", "curar"], ["falsa", "llega", "pasar"],
+                       ["verdadera", "compartir"]):
             self.arbol.recorrer(camino)
         self._tabs = []
 
@@ -72,13 +73,13 @@ class Ayuda(Escena):
     # ------------------------------------------------------------- páginas
     def _p0(self, pant, c):
         texto(pant, "Salva a Ciudad Nova de los Bulos", (c.x + 40, c.y + 30), 34, (255, 205, 50))
-        parrafo(pant, "Ciudad Nova va a elegir alcalde y por la red social Civitas corren los BULOS: rumores y noticias falsas "
-                      "que se suben a la cabeza de los vecinos y saltan de amigo en amigo. Tu misión es que el barrio llegue a "
-                      "la elección bien informado.", (c.x + 40, c.y + 84), 22, 700, (240, 240, 250))
-        items = [(escalar(sprites.bulo(0, False, False, (1, 0)), 3), "Bulo", "Un rumor falso. Atrápalo antes de que llegue a un vecino."),
+        parrafo(pant, "Ciudad Nova va a elegir alcalde y por la red social Civitas corren los BULOS: rumores falsos que se "
+                      "suben a la cabeza de los vecinos y los vuelven morados. Atrápalos y cura a los morados antes de que se "
+                      "los pasen a sus amigos.", (c.x + 40, c.y + 84), 22, 700, (240, 240, 250))
+        items = [(escalar(sprites.bulo(0, False, False, (1, 0)), 3), "Bulo", "Una publicación falsa. Atrápala antes de que llegue a un vecino."),
+                 (escalar(sprites.morado(sprites.vecino(1, 0, "abajo", 0)), 3), "Vecino morado", "Se creyó un Bulo. Lánzale tu herramienta para curarlo."),
                  (escalar(sprites.bulo(0, True, False, (1, 0)), 3), "Bulo con corona", "Es la raíz de una cadena: si lo atrapas caen todas sus copias."),
-                 (escalar(sprites.estrella(), 3), "Estrella", "Una noticia. Quédate quieto para mirarla: si es real, llévasela a alguien."),
-                 (escalar(sprites.estrella(falsa=True), 3), "Estrella con ojito", "¡Un Bulo disfrazado! Si la miras antes, la descubres."),
+                 (escalar(sprites.estrella(), 3), "Estrella", "Una noticia verdadera. Tócala: protege y cura al vecino y a sus amigos."),
                  (pygame.transform.scale(sprites.antena(), (24, 60)), "Antena del Bot", "Suelta Bulos sin parar. Golpéala varias veces para apagarla.")]
         for k, (img, nombre, desc) in enumerate(items):
             y = c.y + 210 + k * 70
@@ -92,9 +93,7 @@ class Ayuda(Escena):
 
     def _p1(self, pant, c):
         filas = [("FLECHAS", "Caminar por el barrio (también W A S D)."),
-                 ("ESPACIO", "Lanzar tu herramienta (puedes dejarla presionada): atrapa Bulos, cura a un vecino si le das al Bulo de su cabeza y golpea la antena."),
-                 ("ESPACIO", "Junto a un vecino con una estrella real: se la entregas y queda protegido (brilla dorado)."),
-                 ("ESPACIO", "Junto a dos vecinos peleando: los calmas y su amistad se hace más fuerte."),
+                 ("ESPACIO", "Lanzar tu herramienta (puedes dejarla presionada). Todo se arregla lanzándole: Bulos, vecinos morados, la antena y las peleas."),
                  ("X", "Usar el poder de tu personaje cuando el círculo se llena."),
                  ("ESC", "Pausa.  ·  M: silenciar la música.  ·  F11: pantalla completa.")]
         for k, (t_, d) in enumerate(filas):
@@ -102,9 +101,9 @@ class Ayuda(Escena):
             tecla(pant, t_, (c.x + 40, y), 18)
             parrafo(pant, d, (c.x + 200, y + 2), 21, c.w - 260, (240, 240, 250))
         r = panel(pant, (c.x + 40, c.y + 420, c.w - 80, 110), (60, 40, 110), 230, borde=(255, 205, 50))
-        texto(pant, "Truco de las noticias", (r.x + 20, r.y + 12), 22, (255, 230, 150))
-        parrafo(pant, "Cuando recoges una estrella, QUÉDATE QUIETO un segundo: se llena un círculo y sabrás si es real. "
-                      "Si la entregas sin mirar y era un Bulo disfrazado, el vecino se contagia. ¡Antes de compartir, mira!",
+        texto(pant, "Las estrellas", (r.x + 20, r.y + 12), 22, (255, 230, 150))
+        parrafo(pant, "Una estrella es una noticia VERDADERA. Con solo tocarla la compartes: la verdad le llega al vecino más "
+                      "cercano y a sus amigos por la red social, los cura y los protege un rato (brillan dorado).",
                 (r.x + 20, r.y + 44), 19, r.w - 40, (240, 240, 250))
         texto(pant, "¿Con control USB?  Cruceta: caminar  ·  A: lanzar  ·  B o X: poder  ·  Start: pausa",
               (c.centerx, r.bottom + 16), 19, (200, 230, 255), "midtop", 600)
@@ -117,27 +116,26 @@ class Ayuda(Escena):
 
     def _p3(self, pant, c):
         texto(pant, "Cómo se gana", (c.x + 40, c.y + 26), 32, (255, 205, 50))
-        filas = [("Atrapar un Bulo", "+10 (más en combo y en cadena)"), ("Curar a un vecino", "+15"),
-                 ("Apagar una antena", "+50"), ("Entregar una noticia que miraste", "+25"),
-                 ("Entregar sin mirar (si era real)", "+10"), ("Descubrir un Bulo disfrazado", "+15"),
-                 ("Compartir un Bulo disfrazado", "-20"), ("Calmar una pelea", "+20"), ("Detener el viral", "+60"),
+        filas = [("Atrapar un Bulo", "+10 (más en combo y en cadena)"), ("Curar a un vecino morado", "+15"),
+                 ("Cortar un Bulo que viaja por un hilo", "+8"), ("Compartir una estrella", "+20"),
+                 ("Calmar una pelea", "+20"), ("Apagar una antena", "+50"), ("Detener el viral", "+60"),
                  ("Cada vecino a salvo al final", "+10")]
         for k, (a, b) in enumerate(filas):
             y = c.y + 80 + k * 36
             texto(pant, a, (c.x + 40, y), 20, (240, 240, 250), peso=600)
             texto(pant, b, (c.x + 560, y), 20, (255, 120, 120) if b.startswith("-") else (140, 240, 160), "topright")
         parrafo(pant, "Cada jugador juega su turno en el MISMO barrio, con los mismos eventos. Al final de todas las rondas gana "
-                      "quien sume más puntos. Las estrellas de reputación (1 a 3) premian salvar vecinos sin compartir Bulos.",
+                      "quien sume más puntos. Las estrellas de reputación (1 a 3) dependen de cuántos vecinos terminan a salvo.",
                 (c.x + 620, c.y + 80), 20, c.w - 660, (240, 240, 250))
         parrafo(pant, "Después viene la ELECCIÓN: si el barrio terminó informado, gana un candidato con propuestas. Si quedó lleno "
                       "de Bulos, gana Emilio Bot, el de las cadenas.", (c.x + 620, c.y + 300), 20, c.w - 660, (255, 230, 150))
 
     def _p4(self, pant, c):
         texto(pant, "Los indicadores del barrio", (c.x + 40, c.y + 26), 32, (255, 205, 50))
-        desc = {"informacion": "Cuánta gente tiene noticias verificadas. Sube al entregar estrellas reales.",
+        desc = {"informacion": "Cuánta gente tiene noticias verificadas. Sube al compartir estrellas.",
                 "confianza": "Qué tanto confían los vecinos entre sí. Baja con cada contagio.",
                 "convivencia": "Qué tan bien se llevan. Baja si dejas que una pelea rompa una amistad.",
-                "bienestar": "Cómo se sienten. Los vecinos con Bulo están tristes y grises.",
+                "bienestar": "Cómo se sienten. Los vecinos con Bulo están tristes y morados.",
                 "desinformacion": "Cuántos Bulos hay sueltos y en cabezas. ¡Mejor bajo!",
                 "conflictos": "Peleas y amistades rotas. ¡Mejor bajo!"}
         for k, (clave, nombre, color, bueno) in enumerate(INDICADORES):
@@ -182,8 +180,8 @@ class Ayuda(Escena):
         for n in ("Colegio", "Terminal", "Plaza", "Mercado", "Kiosco", "Laguna"):
             x, y = pc[n]
             texto(pant, n, (x, y - 8), 13, (255, 255, 255), "midbottom", 600)
-        parrafo(pant, "Dijkstra encuentra el camino más corto por las calles. Lo usa la flecha que te guía hacia la antena o el "
-                      "viral, y lo usan los vecinos para ir de una zona a otra sin atravesar edificios.",
+        parrafo(pant, "Dijkstra encuentra el camino más corto por las calles. Lo usa la línea que te guía hacia el viral, una "
+                      "pelea o el vecino morado más cercano, y lo usan los vecinos para ir de una zona a otra sin atravesar edificios.",
                 (area2.x, area2.bottom + 8), 16, area2.w, (230, 226, 245))
 
     def _p6(self, pant, c):
@@ -205,13 +203,14 @@ class Ayuda(Escena):
         parrafo(pant, "Cada vez que un Bulo salta a otro vecino nace un HIJO. Si atrapas un Bulo, caen también todos sus "
                       "descendientes (se elimina el subárbol). La raíz lleva corona: ¡es la que tumba toda la cadena!",
                 (area.x, area.bottom + 10), 17, area.w, (230, 226, 245))
-        texto(pant, "Árbol de decisiones de cada noticia", (c.x + 620, c.y + 16), 22, (255, 205, 50))
+        texto(pant, "Árbol de decisiones de cada publicación", (c.x + 620, c.y + 16), 22, (255, 205, 50))
         area2 = pygame.Rect(c.x + 610, c.y + 50, 590, 330)
         pygame.draw.rect(pant, (20, 16, 44), area2, border_radius=12)
         filas = [(n.clave, n.texto, n.veces, n.padre.clave if n.padre else None, n.es_hoja) for n in self.arbol.preorden()]
         dibujar_arbol(pant, filas, area2.inflate(-20, -20), self.t)
-        parrafo(pant, "Cada estrella baja por este árbol según lo que haces: mirarla, compartirla sin mirar o dejarla. Las hojas "
-                      "dicen los puntos y cómo cambian los indicadores. Al final de tu turno ves tu propio árbol con los números.",
+        parrafo(pant, "Cada publicación baja por este árbol: si es falsa la REPORTAS atrapándola o la VERIFICAS curando a quien "
+                      "se la creyó; si es verdadera la COMPARTES o la IGNORAS. Las hojas cambian los indicadores. Al final del "
+                      "turno ves tu propio árbol con los números.",
                 (area2.x, area2.bottom + 10), 17, area2.w, (230, 226, 245))
 
     def _p7(self, pant, c):

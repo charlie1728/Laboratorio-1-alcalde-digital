@@ -12,7 +12,7 @@ pygame.display.set_mode((1, 1))
 
 from cazabulos.ciudad import linea_libre, ruta  # noqa: E402
 from cazabulos.mapa import H, W  # noqa: E402
-from cazabulos.mundo import Estrella, Mundo, mapa_compartido  # noqa: E402
+from cazabulos.mundo import MAX_VIRAL, Estrella, Mundo, Proyectil, mapa_compartido  # noqa: E402
 from cazabulos.partida import Partida, calcular_eleccion  # noqa: E402
 from cazabulos.trafico import Trafico  # noqa: E402
 
@@ -90,39 +90,107 @@ class TestCadena(unittest.TestCase):
         self.assertIsNone(m.vecinos["Carlos"].bulo)
 
 
-class TestNoticias(unittest.TestCase):
-    def _con_estrella(self, m, falsa):
+def lanzar_a(m, punto, clave=None):
+    """Pone un proyectil quieto justo encima de 'punto' y lo hace chocar."""
+    pr = Proyectil(punto[0], punto[1], 0, 0, (255, 255, 255), clave or m.jugador.clave)
+    m.proyectiles.append(pr)
+    m._proyectiles(1 / 60)
+
+
+class TestEstrellas(unittest.TestCase):
+    def _tocar_estrella_junto_a(self, m, nombre):
         j = m.jugador
-        j.estrella = Estrella(999, j.x, j.y, falsa)
-        v = m.vecinos["Rosa"]
+        v = m.vecinos[nombre]
         j.x, j.y = v.x + 6, v.y
+        m.estrellas.append(Estrella(999, j.x, j.y - 6))
+        m.actualizar(1 / 60, {})
         return v
 
-    def test_compartir_sin_mirar_un_bulo_disfrazado(self):
-        m = nuevo()
-        v = self._con_estrella(m, True)
-        m.actualizar(1 / 60, {"accion": True})
-        self.assertIsNotNone(v.bulo)
-        self.assertEqual(m.decisiones.buscar("bulo").veces, 1)
-        self.assertEqual(m.jugador.stats["compartidas_falsas"], 1)
-
-    def test_mirar_antes_descubre_el_bulo(self):
-        m = nuevo()
-        self._con_estrella(m, True)
-        for _ in range(int(60 * 1.4)):
-            m.actualizar(1 / 60, {})
-        self.assertIsNone(m.jugador.estrella)
-        self.assertEqual(m.decisiones.buscar("reporte").veces, 1)
-
-    def test_verdad_protege_y_beto_llega_a_los_amigos(self):
-        m = nuevo("beto")
-        v = self._con_estrella(m, False)
-        m.jugador.estrella.revelada = True
-        m.actualizar(1 / 60, {"accion": True})
+    def test_estrella_comparte_la_verdad_por_el_grafo(self):
+        m = nuevo("caro")
+        amigos = list(m.social.vecinos("Rosa"))
+        m._infectar(m.vecinos[amigos[0]], None)
+        v = self._tocar_estrella_junto_a(m, "Rosa")
         self.assertGreater(v.escudo, 0)
-        for amigo in m.social.vecinos("Rosa"):
+        for amigo in amigos:
             self.assertGreater(m.vecinos[amigo].escudo, 0)
-        self.assertEqual(m.decisiones.buscar("verdad").veces, 1)
+        self.assertIsNone(m.vecinos[amigos[0]].bulo)               # la verdad lo curó
+        self.assertEqual(m.decisiones.buscar("compartida").veces, 1)
+        self.assertEqual(m.jugador.stats["compartidas"], 1)
+        nivel2 = [u for u, n, _ in m.social.bfs("Rosa", max_nivel=2) if n == 2]
+        self.assertTrue(any(m.vecinos[u].escudo == 0 for u in nivel2))   # a los amigos de los amigos no
+
+    def test_beto_el_influencer_llega_a_dos_niveles(self):
+        m = nuevo("beto")
+        self._tocar_estrella_junto_a(m, "Rosa")
+        for u, n, _ in m.social.bfs("Rosa", max_nivel=2):
+            self.assertGreater(m.vecinos[u].escudo, 0)
+
+    def test_estrella_que_se_pierde_es_ignorar(self):
+        m = nuevo()
+        m.estrellas.append(Estrella(5, 10, 10))
+        m.estrellas[0].vida = 0.001
+        m._estrellas(1 / 60)
+        self.assertEqual(m.decisiones.buscar("perdida").veces, 1)
+
+
+class TestLanzar(unittest.TestCase):
+    def test_curar_lanzando_al_cuerpo_del_morado(self):
+        m = nuevo()
+        rosa = m.vecinos["Rosa"]
+        m._infectar(rosa, None)
+        lanzar_a(m, rosa.cuerpo)
+        self.assertIsNone(rosa.bulo)
+        self.assertEqual(m.jugador.stats["curados"], 1)
+        self.assertEqual(m.decisiones.buscar("verificada").veces, 1)
+
+    def test_atrapar_en_el_aire_es_reportar(self):
+        m = nuevo()
+        b = m.nuevo_bulo(300, 300)
+        lanzar_a(m, b.pos)
+        self.assertNotIn(b.id, m.bulos)
+        self.assertEqual(m.decisiones.buscar("reportada").veces, 1)
+
+    def test_beto_cura_tambien_a_los_amigos(self):
+        m = nuevo("beto")
+        amigo = list(m.social.vecinos("Rosa"))[0]
+        m._infectar(m.vecinos["Rosa"], None)
+        m._infectar(m.vecinos[amigo], None)          # otra cadena distinta
+        lanzar_a(m, m.vecinos["Rosa"].cuerpo)
+        self.assertIsNone(m.vecinos[amigo].bulo)
+
+    def test_el_periodico_de_ana_atraviesa_varios(self):
+        for clave, esperado in (("ana", 3), ("dani", 1)):
+            m = nuevo(clave)
+            for k in range(3):
+                m.nuevo_bulo(300 + k * 14, 300)
+            m.jugador.x, m.jugador.y, m.jugador.vec = 280, 312, (1.0, 0.0)
+            m._lanzar()
+            for _ in range(30):
+                m._proyectiles(1 / 60)
+            self.assertEqual(m.jugador.stats["bulos"], esperado, clave)
+
+    def test_pelea_se_calma_lanzando(self):
+        for clave, golpes in (("ana", 2), ("caro", 1)):
+            m = nuevo(clave)
+            m._empezar_pelea(0.0)
+            p = m.peleas[0]
+            p["activa"], p["t"] = True, 15
+            for _ in range(golpes):
+                lanzar_a(m, m.vecinos[p["a"]].cuerpo)
+            self.assertEqual(p.get("fin"), "paz", clave)
+
+    def test_reenvio_que_llega_es_regar(self):
+        m = nuevo()
+        rosa = m.vecinos["Rosa"]
+        m._infectar(rosa, None)
+        rosa.t_prop = 0
+        m._vecinos(1 / 60)
+        self.assertEqual(len(m.pulsos), 1)
+        m.pulsos[0].f = 0.999
+        m._pulsos(1 / 60)
+        self.assertEqual(m.decisiones.buscar("regada").veces, 1)
+        self.assertEqual(m.jugador.stats["regados"], 1)
 
 
 class TestRelaciones(unittest.TestCase):
@@ -155,7 +223,7 @@ class TestRelaciones(unittest.TestCase):
         m._viral(1 / 60)
         orden = [v for v, nivel, _ in m.social.bfs(origen, filtro=lambda u: m.vecinos[u].escudo <= 0, max_nivel=2)]
         infectados = {v.nombre for v in m.infectados()}
-        self.assertEqual(infectados, set(orden[:6]))       # le llega a los primeros 6 del BFS
+        self.assertEqual(infectados, set(orden[:MAX_VIRAL]))     # le llega a los primeros del BFS
         self.assertIn(origen, infectados)
         self.assertNotIn(list(m.social.vecinos(origen))[0], infectados)   # el protegido no
 

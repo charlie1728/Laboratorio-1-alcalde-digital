@@ -25,8 +25,8 @@ class Preparar(Formulario):
             Selector("Rondas", [("1 (mañana)", 1), ("2 (mañana y tarde)", 2), ("3 (mañana, tarde y noche)", 3)],
                      max(0, min(2, op.get("rondas", 2) - 1)),
                      "En cada ronda todos juegan el mismo barrio con los mismos eventos. Gana quien sume más."),
-            Selector("Tiempo por turno", [("60 segundos", 60), ("90 segundos", 90), ("2 minutos", 120)],
-                     {60: 0, 90: 1, 120: 2}.get(op.get("duracion", 90), 1)),
+            Selector("Tiempo por turno", [("90 segundos", 90), ("2 minutos", 120), ("3 minutos", 180)],
+                     {90: 0, 120: 1, 180: 2}.get(op.get("duracion", 120), 1)),
             Selector("Modo tranquilo (para peques)", SI_NO, 0 if op["tranquilo"] else 1,
                      "Los Bulos van más despacio y las peleas duran más."),
         ]
@@ -211,15 +211,15 @@ class Relevo(Escena):
         r = panel(pant, (x, 300, 520, 240), borde=color)
         rol = ROLES[j["clave"]]
         if self.app.mando.en_uso:
-            filas = [("CRUCETA", "moverte por el barrio"), ("A", "lanzar a los Bulos y entregar noticias"),
+            filas = [("CRUCETA", "moverte por el barrio"), ("A", "lanzar a los Bulos y a los morados"),
                      ("B / X", f"poder: {rol['poder']}")]
         else:
-            filas = [("FLECHAS", "moverte por el barrio"), ("ESPACIO", "lanzar a los Bulos y entregar noticias"),
+            filas = [("FLECHAS", "moverte por el barrio"), ("ESPACIO", "lanzar a los Bulos y a los morados"),
                      ("X", f"poder: {rol['poder']}")]
         for k, (t_, d) in enumerate(filas):
             rr = tecla(pant, t_, (r.x + 20, r.y + 20 + k * 50), 16)
             texto(pant, d, (rr.right + 12, r.y + 24 + k * 50), 20, (240, 240, 250), peso=600)
-        parrafo(pant, "Salva a los vecinos: atrapa los Bulos, mira las noticias antes de compartirlas y apaga la antena del Bot.",
+        parrafo(pant, "Atrapa los Bulos, cura a los vecinos morados y recoge las estrellas. ¡Gana quien salve a más vecinos!",
                 (r.x + 20, r.y + 172), 18, r.w - 40, (220, 214, 240))
         # orden de turnos de esta ronda
         orden = pa.orden()

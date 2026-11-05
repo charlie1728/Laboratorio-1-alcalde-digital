@@ -57,9 +57,8 @@ class Hud:
         self._indicadores(pant)
         self._poder(pant)
         self._controles(pant)
-        self._banner(pant)
+        self._avisos(pant)
         self._pista(pant)
-        self._toasts(pant)
         if self.marcador:
             self._marcador(pant)
 
@@ -112,7 +111,11 @@ class Hud:
         for v in m.vecinos.values():
             punto(v.x, v.y, (170, 100, 255) if v.bulo is not None else (255, 214, 70) if v.escudo > 0 else (240, 240, 240), 3)
         for s in m.estrellas:
-            punto(s.x, s.y, (255, 240, 120), 2)
+            punto(s.x, s.y, (255, 240, 120), 3)
+        if m.jugador.clave == "ana":
+            for b in m.bulos.values():
+                if b.estado == "libre":
+                    punto(b.x, b.y, (190, 110, 255), 2)
         for a in m.antenas:
             if int(self.t * 4) % 2:
                 punto(a.x, a.y, (255, 60, 60), 5)
@@ -165,49 +168,37 @@ class Hud:
             return
         r = panel(pant, (14, ALTO - 62, 520, 48), radio=12)
         x = r.x + 12
-        filas = ((("CRUCETA", "moverse"), ("A", "lanzar / entregar"), ("B / X", "poder")) if self.mando
-                 else (("FLECHAS", "moverse"), ("ESPACIO", "lanzar / entregar"), ("X", "poder")))
+        filas = ((("CRUCETA", "moverse"), ("A", "lanzar"), ("B / X", "poder")) if self.mando
+                 else (("FLECHAS", "moverse"), ("ESPACIO", "lanzar"), ("X", "poder")))
         for t_, desc in filas:
             rr = tecla(pant, t_, (x, r.y + 8), 15)
             texto(pant, desc, (rr.right + 8, r.y + 12), 17, (240, 240, 250), peso=600)
             x = rr.right + 18 + render(desc, 17, peso=600).get_width()
 
-    def _banner(self, pant):
-        if not self.r.banners:
-            return
-        titulo, txt, color, t = self.r.banners[0]
-        entra = min(1.0, t / 0.25)
-        sale = min(1.0, max(0.0, (3.2 - t) / 0.3))
-        y = int(100 + (1 - entra) * -40) + (60 if self.m.viral else 0)
-        alfa = int(240 * sale)
-        ancho = max(520, render(txt, 18, peso=600).get_width() + 60)
-        r = pygame.Rect(0, 0, ancho, 70)
-        r.midtop = (ANCHO // 2, y)
-        panel(pant, r, (26, 20, 52), alfa, borde=color)
-        texto(pant, titulo, (r.centerx, r.y + 8), 26, color, "midtop", alfa=int(255 * sale))
-        texto(pant, txt, (r.centerx, r.y + 40), 18, (240, 240, 250), "midtop", 600, alfa=int(255 * sale))
+    def _avisos(self, pant):
+        """Una o dos palabras grandes que entran y salen rápido, debajo del reloj (nunca párrafos)."""
+        y = 100 + (58 if self.m.viral else 0)
+        for palabra, color, t in self.r.avisos[-1:]:
+            entra = min(1.0, t / 0.15)
+            sale = min(1.0, max(0.0, (1.8 - t) / 0.3))
+            tam = int(44 + 14 * (1 - entra))
+            texto(pant, palabra, (ANCHO // 2, y), tam, color, "midtop", grosor=4, alfa=int(255 * sale))
 
     def _pista(self, pant):
+        """La única pista que queda durante el juego: corta y arriba, para no tapar la acción."""
         p = self.m.pista
-        if not p:
+        if not p or self.r.avisos:
             return
         txt, teclas, t = p
         if self.mando:
             for tecla_, boton_ in CON_MANDO:
                 txt = txt.replace(tecla_, boton_)
-        alfa = int(255 * min(1.0, t / 0.4))
-        ancho = render(txt, 22, peso=700).get_width() + 60
-        r = pygame.Rect(0, 0, ancho, 56)
-        r.midbottom = (ANCHO // 2, ALTO - 80 - int(math.sin(self.t * 4) * 3))
-        panel(pant, r, (255, 248, 230), min(245, alfa), borde=(255, 205, 50))
+        alfa = int(255 * min(1.0, (3.5 - t) / 0.3, t / 0.4))
+        ancho = render(txt, 22, peso=700).get_width() + 40
+        r = pygame.Rect(0, 0, ancho, 44)
+        r.midtop = (ANCHO // 2, 100 + (58 if self.m.viral else 0))
+        panel(pant, r, (255, 248, 230), min(240, alfa), borde=(255, 205, 50))
         texto(pant, txt, r.center, 22, TINTA, "center", borde=None, alfa=alfa)
-
-    def _toasts(self, pant):
-        y = ALTO - 140
-        for txt, t in self.r.toasts[-2:]:
-            alfa = int(255 * min(1.0, (3.0 - t) / 0.5))
-            texto(pant, f"Decisión: {txt}", (24, y), 16, (255, 240, 180), alfa=alfa, peso=600)
-            y -= 26
 
     def _marcador(self, pant):
         x0, y0 = 14, 120

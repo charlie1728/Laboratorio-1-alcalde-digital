@@ -2,7 +2,7 @@
 import random
 import unittest
 
-from cazabulos.estructuras.arbol_decision import arbol_noticia
+from cazabulos.estructuras.arbol_decision import arbol_publicacion
 from cazabulos.estructuras.arbol_mutaciones import ArbolMutaciones
 from cazabulos.estructuras.avl import AVL
 from cazabulos.estructuras.grafo import Grafo
@@ -102,25 +102,29 @@ class TestArbolMutaciones(unittest.TestCase):
 
 class TestArbolDecision(unittest.TestCase):
     def test_caminos_y_hojas(self):
-        a = arbol_noticia()
-        self.assertEqual(a.recorrer(["mirar", "real", "entregar"]).clave, "verdad")
-        self.assertEqual(a.recorrer(["entregar", "falsa"]).clave, "bulo")
-        self.assertEqual(a.recorrer(["mirar", "falsa"]).clave, "reporte")
+        a = arbol_publicacion()
+        self.assertEqual(a.recorrer(["falsa", "atrapar"]).clave, "reportada")
+        self.assertEqual(a.recorrer(["falsa", "llega", "curar"]).clave, "verificada")
+        self.assertEqual(a.recorrer(["verdadera", "compartir"]).clave, "compartida")
         self.assertEqual(a.raiz.veces, 3)
-        self.assertEqual(a.buscar("mirar").veces, 2)
-        self.assertEqual(a.camino_a("verdad"), ["noticia", "mirar", "real", "verdad"])
-        self.assertEqual(len(a.hojas()), 6)
+        self.assertEqual(a.buscar("falsa").veces, 2)
+        self.assertEqual(a.camino_a("verificada"), ["publicacion", "falsa", "creida", "verificada"])
+        self.assertEqual(len(a.hojas()), 5)
 
-    def test_compartir_sin_mirar_un_bulo_resta(self):
-        a = arbol_noticia()
-        self.assertLess(a.buscar("bulo").efecto["puntos"], 0)
-        self.assertGreater(a.buscar("verdad").efecto["puntos"], a.buscar("suerte").efecto["puntos"])
+    def test_los_cuatro_verbos_del_enunciado(self):
+        a = arbol_publicacion()
+        textos = " ".join(n.texto for n in a.hojas()).lower()
+        for verbo in ("reportas", "verificas", "compartes", "ignoras"):
+            self.assertIn(verbo, textos)
+        self.assertGreater(a.buscar("compartida").efecto["puntos"], 0)
+        self.assertGreater(a.buscar("regada").efecto["desinformacion"], 0)
+        self.assertLess(a.buscar("reportada").efecto["desinformacion"], 0)
 
     def test_eliminar_rama(self):
-        a = arbol_noticia()
-        a.eliminar("sin_mirar")
-        self.assertIsNone(a.buscar("bulo"))
-        self.assertEqual(len(a.hojas()), 4)
+        a = arbol_publicacion()
+        a.eliminar("creida")
+        self.assertIsNone(a.buscar("verificada"))
+        self.assertEqual(len(a.hojas()), 3)
 
 
 class TestAVL(unittest.TestCase):

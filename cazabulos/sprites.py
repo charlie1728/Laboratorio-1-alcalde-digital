@@ -226,6 +226,32 @@ def desaturar(img):
     return _guardar(clave, hacer)
 
 
+def morado(img):
+    """El vecino que se creyó un Bulo se pone morado (así se ve de lejos a quién hay que curar)."""
+    clave = ("morado", id(img))
+
+    def hacer():
+        g = img.copy()
+        arr = pygame.surfarray.pixels3d(g)
+        lum = arr[:, :, 0] * 0.3 + arr[:, :, 1] * 0.59 + arr[:, :, 2] * 0.11
+        for c, (k, base) in enumerate(((0.55, 70), (0.25, 20), (0.75, 110))):
+            arr[:, :, c] = (lum * k + base).clip(0, 255)
+        del arr
+        return g
+    return _guardar(clave, hacer)
+
+
+def bandera(color):
+    """Banderita del candidato sobre un Bulo que dice un rumor de él o de ella."""
+    def hacer():
+        s = pygame.Surface((6, 7), pygame.SRCALPHA)
+        s.fill((60, 50, 70), (0, 0, 1, 7))
+        s.fill(color, (1, 0, 5, 4))
+        s.fill(tuple(min(255, c + 60) for c in color), (1, 0, 5, 1))
+        return s
+    return _guardar(("bandera", color), hacer)
+
+
 def silueta(img, color):
     clave = ("sil", id(img), color)
 

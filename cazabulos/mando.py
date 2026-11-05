@@ -2,7 +2,7 @@
 
 Pensado para la feria: un niño puede jugar con un control tipo Xbox sin tocar el teclado.
   Cruceta o palanca = flechas
-  A = ESPACIO (lanzar, entregar, aceptar)
+  A = ESPACIO (lanzar, aceptar)
   B = atrás en los menús; en el juego es el poder (igual que X y Y)
   X = poder en el juego; en la selección cambia el color de pelo
   Y = poder en el juego; en los resultados muestra la red del barrio (TAB)

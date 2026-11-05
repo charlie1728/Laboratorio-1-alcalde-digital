@@ -14,8 +14,8 @@ from .base import Escena, FondoCiudad, con_mando, es_aceptar
 
 ESCENAS = [
     ("Ciudad Nova va a elegir alcalde", "Los candidatos hablan con la gente por la red social Civitas."),
-    ("Pero el Bot de Emilio llena Civitas de BULOS", "Rumores falsos que se suben a la cabeza y saltan de amigo en amigo."),
-    ("¡Los Cazabulos al rescate!", "Atrápalos, mira las noticias antes de compartir y salva a tus vecinos."),
+    ("Pero el Bot de Emilio llena Civitas de BULOS", "Rumores falsos que se suben a la cabeza y vuelven morada a la gente."),
+    ("¡Los Cazabulos al rescate!", "Atrapa los Bulos, cura a los vecinos morados y comparte la verdad."),
 ]
 
 
@@ -98,7 +98,7 @@ class Historia(Escena):
             pant.blit(b, b.get_rect(center=(x, y)))
         for i, (tipo, var) in enumerate(((1, 0), (4, 1), (2, 2), (0, 1))):
             x = 180 + i * 300 if i < 2 else 180 + i * 300
-            v = sprites.desaturar(sprites.vecino(tipo, var, "abajo", 0))
+            v = sprites.morado(sprites.vecino(tipo, var, "abajo", 0))
             img = escalar(v, 5)
             pant.blit(img, img.get_rect(midbottom=(x, 640)))
             b = escalar(sprites.bulo(int(self.t * 3 + i) % 2), 3)

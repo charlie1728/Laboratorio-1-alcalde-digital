@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pygame
 
-from .config import ALTO, ANCHO, FPS, TITULO
+from .config import ALTO, ANCHO, ASSETS, FPS, TITULO
 from .guardado import Logros, Records, cargar_opciones, guardar_opciones
 from .mando import EVENTOS as EVENTOS_MANDO
 from .mando import Mandos
@@ -16,18 +16,31 @@ INACTIVIDAD = 90          # segundos sin tocar nada para volver solo al inicio (
 TOQUES = (pygame.KEYDOWN, pygame.MOUSEBUTTONDOWN, pygame.MOUSEWHEEL, pygame.JOYBUTTONDOWN)
 
 
+def _nombre_en_windows():
+    """En Windows la barra de tareas agrupa por programa: sin esto muestra el ícono de Python.
+    Con un identificador propio muestra el ícono del juego."""
+    import sys
+    if sys.platform.startswith("win"):
+        try:
+            import ctypes
+            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("Uninorte.Cazabulos.AlcaldeDigital")
+        except (AttributeError, OSError):
+            pass
+
+
 class App:
     def __init__(self, semilla=None):
+        _nombre_en_windows()
         pygame.mixer.pre_init(22050, -16, 1, 512)
         pygame.init()
         pygame.display.set_caption(TITULO)
+        self._icono()                       # antes de abrir la ventana, para que Windows lo tome
         self.op = cargar_opciones()
         flags = pygame.SCALED | (pygame.FULLSCREEN if self.op.get("pantalla_completa") else 0)
         try:
             self.pantalla = pygame.display.set_mode((ANCHO, ALTO), flags)
         except pygame.error:
             self.pantalla = pygame.display.set_mode((ANCHO, ALTO))
-        self._icono()
         self.reloj = pygame.time.Clock()
         self.son = Sonido()
         self.aplicar_volumen()
@@ -45,13 +58,11 @@ class App:
         self.escena.al_entrar()
 
     def _icono(self):
+        """El Bulo con corona (cazabulos/assets/icono32.png), agrandado sin difuminar."""
         try:
-            from .personajes import retrato
-            img = pygame.transform.scale(retrato("caro"), (32, 28))
-            ico = pygame.Surface((32, 32), pygame.SRCALPHA)
-            ico.blit(img, (0, 2))
-            pygame.display.set_icon(ico)
-        except pygame.error:
+            ico = pygame.image.load(str(ASSETS / "icono32.png"))
+            pygame.display.set_icon(pygame.transform.scale(ico, (64, 64)))
+        except (pygame.error, FileNotFoundError):
             pass
 
     def aplicar_volumen(self):

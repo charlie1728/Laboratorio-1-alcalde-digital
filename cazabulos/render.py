@@ -45,12 +45,11 @@ class Render:
         self.textos = []
         self.cadenas = []
         self.olas = []
+        self.rayos = []            # la verdad viajando de la estrella al vecino
         self.anillos = []
         self.subs = []
-        self.banners = []
-        self.toasts = []
+        self.avisos = []           # una o dos palabras grandes arriba ("¡VIRAL!", "¡PELEA!")
         self.brillos = {}
-        self.burbujas = {}
         self.temblor = 0.0
         self.capa = pygame.Surface((ANCHO, ALTO), pygame.SRCALPHA)
         self.oscuro = pygame.Surface((ANCHO, ALTO), pygame.SRCALPHA)
@@ -100,10 +99,8 @@ class Render:
                 self.anillos.append([fx[1], fx[2], 0.0, 0.5, (255, 220, 120), 40])
             elif tipo == "temblor":
                 self.temblor = max(self.temblor, fx[1])
-            elif tipo == "banner":
-                self.banners.append([fx[1], fx[2], fx[3], 0.0])
-                if self.son:
-                    self.son.tocar("alarma" if "VIRAL" in fx[1] else "fanfarria" if "Detuviste" in fx[1] else "cuenta")
+            elif tipo == "aviso":
+                self.avisos = [a for a in self.avisos if a[0] != fx[1]][-1:] + [[fx[1], fx[2], 0.0]]
             elif tipo == "sonido":
                 _, nombre, x, y = fx
                 if self.son:
@@ -129,11 +126,19 @@ class Render:
             elif tipo == "ola":
                 v = m.vecinos.get(fx[1])
                 if v:
-                    self.olas.append([fx[1], -fx[2] * 0.35, (255, 110, 160)])
+                    color = fx[3] if len(fx) > 3 else (255, 110, 160)
+                    self.olas.append([fx[1], -fx[2] * 0.35, color])
+            elif tipo == "verdad":
+                # la estrella revienta en dorado y la verdad sale hacia el vecino más cercano
+                self._estallido(fx[1], fx[2], (255, 220, 90), 22, vel=90)
+                self.anillos.append([fx[1], fx[2], 0.0, 0.6, (255, 230, 120), 30])
+                v = m.vecinos.get(fx[3])
+                if v:
+                    self.rayos.append([fx[1], fx[2] - 6, v.x, v.y - 14, 0.0])
             elif tipo == "poder":
                 from .personajes import PERSONAJES
                 color = PERSONAJES[fx[1]]["color"]
-                radio = {"ana": 190, "beto": 160, "caro": 85, "dani": 95}[fx[1]]
+                radio = {"ana": 240, "beto": 230, "caro": 120, "dani": 110}[fx[1]]
                 self.anillos.append([fx[2], fx[3] - 8, 0.0, 0.7, color, radio])
                 self.anillos.append([fx[2], fx[3] - 8, -0.1, 0.7, (255, 255, 255), radio * 0.7])
                 if fx[1] == "ana":
@@ -141,10 +146,6 @@ class Render:
                 self.temblor = max(self.temblor, 4)
             elif tipo == "puff":
                 self._estallido(fx[1], fx[2], (230, 230, 240), 5, vel=20, grav=0)
-            elif tipo == "decision":
-                self.toasts.append([fx[2], 0.0])
-            elif tipo == "burbuja":
-                self.burbujas[fx[1]] = [fx[2], fx[3], 0.0]
         m.fx.clear()
 
     def _estallido(self, x, y, color, n, vel=80, grav=120, retraso=0.0, tam=1):
@@ -177,13 +178,10 @@ class Render:
             p["vy"] += p["grav"] * dt
             p["vida"] -= dt
         self.part = [p for p in self.part if p["vida"] > 0]
-        for lista, dur in ((self.textos, 1.3), (self.subs, 1.2), (self.toasts, 3.0)):
+        for lista, dur in ((self.textos, 1.3), (self.subs, 1.2), (self.avisos, 1.8), (self.rayos, 0.45)):
             for e in lista:
                 e[-1] += dt
             lista[:] = [e for e in lista if e[-1] < dur]
-        for b in self.burbujas.values():
-            b[2] += dt
-        self.burbujas = {k: b for k, b in self.burbujas.items() if b[2] < 2.8}
         for c in self.cadenas:
             c[1] += dt
         self.cadenas = [c for c in self.cadenas if c[1] < 0.8]
@@ -197,10 +195,6 @@ class Render:
             v[0] -= dt
             if v[0] <= 0:
                 del self.brillos[k_]
-        for b in self.banners:
-            b[3] += dt
-        if self.banners and self.banners[0][3] > 3.2:
-            self.banners.pop(0)
         self.t_guia -= dt
         if self.t_guia <= 0:
             self.t_guia = 0.5
@@ -215,10 +209,11 @@ class Render:
             if p.get("activa") and not p.get("fin"):
                 a, b = m.vecinos[p["a"]], m.vecinos[p["b"]]
                 return ((a.x + b.x) / 2, (a.y + b.y) / 2)
-        if j.estrella and j.estrella.revelada:
-            inf = m.infectados()
-            if inf:
-                return min(inf, key=lambda v: math.dist(v.pos, j.pos)).pos
+        inf = m.infectados()
+        if inf:
+            cerca = min(inf, key=lambda v: math.dist(v.pos, j.pos))
+            if not self.visible(*cerca.pos, -60):
+                return cerca.pos
         if m.antenas:
             a = min(m.antenas, key=lambda a: math.dist((a.x, a.y), j.pos))
             return (a.x, a.y + 4)
@@ -253,7 +248,6 @@ class Render:
         self._proyectiles(pant)
         self._efectos(pant)
         self._luz_del_dia(pant)
-        self._burbujas(pant)
         self._textos(pant)
         self._flechas(pant)
         if getattr(self, "flash", 0) > 0:
@@ -298,7 +292,7 @@ class Render:
             elif va.escudo > 0 and vb.escudo > 0:
                 color, alfa, grosor = (255, 214, 80), 190, 4
             else:
-                color, alfa, grosor = (255, 255, 255), 45 + 20 * peso, 2 + (peso >= 3)
+                color, alfa, grosor = (255, 255, 255), 22 + 8 * peso, 2
             (x0, y0), (x1, y1) = (va.x, va.y - 9), (vb.x, vb.y - 9)
             largo = math.dist((x0, y0), (x1, y1))
             curva = min(16, largo * 0.12)
@@ -386,7 +380,7 @@ class Render:
         cuadro = int(v.paso) % 4 if v.mov else 0
         img = sprites.vecino(v.tipo, v.variante, v.dir, cuadro)
         if v.bulo is not None:
-            img = sprites.desaturar(img)
+            img = sprites.morado(img)
         salto = math.sin(v.salto / 0.4 * math.pi) * 4 if v.salto > 0 else 0
         temblor = math.sin(self.t * 40) * 1 if (v.pelea and v.pelea.get("activa")) else 0
         self._sombra(pant, v.x, v.y, 10)
@@ -399,6 +393,14 @@ class Render:
         if v.escudo > 0:
             pant.blit(escalar(sprites.silueta(img, (255, 226, 110))), self.a_pantalla(x - 0.34, y))
             pant.blit(escalar(sprites.silueta(img, (255, 226, 110))), self.a_pantalla(x + 0.34, y))
+        if v.bulo is not None:
+            # un aura morada que palpita: "a este hay que curarlo"
+            sx, sy = self.a_pantalla(v.x, v.y - 10)
+            r = int(13 * ESC + math.sin(self.t * 6 + len(v.nombre)) * 4)
+            aura = pygame.Surface((r * 2, r * 2), pygame.SRCALPHA)
+            pygame.draw.circle(aura, (170, 90, 255, 55), (r, r), r)
+            pygame.draw.circle(aura, (200, 140, 255, 150), (r, r), r, 3)
+            pant.blit(aura, (sx - r, sy - r))
         pant.blit(escalar(img), self.a_pantalla(x, y))
         if v.bulo is not None and v.bulo in self.m.bulos:
             b = self.m.bulos[v.bulo]
@@ -406,10 +408,6 @@ class Render:
             bob = math.sin(self.t * 4 + b.id) * 1.2
             ib = sprites.bulo(int(self.t * 3 + b.id) % 2, corona, False, (0, 1))
             pant.blit(escalar(ib), self.a_pantalla(v.x - 8, v.y - 31 - salto + bob))
-        j = self.m.jugador
-        if math.dist(v.pos, j.pos) < 60 or (v.pelea and v.pelea.get("activa")):
-            sx, sy = self.a_pantalla(v.x, v.y - 33 if v.bulo is None else v.y - 37)
-            texto(pant, v.nombre, (sx, sy), 15, (255, 255, 255), "midbottom", 600)
         if v.pelea and v.pelea.get("activa") and v.pelea["a"] == v.nombre:
             otro = self.m.vecinos[v.pelea["b"]]
             mx, my = (v.x + otro.x) / 2, min(v.y, otro.y) - 34
@@ -420,9 +418,10 @@ class Render:
             cx_, cy_ = self.a_pantalla(mx, my - 12)
             pygame.draw.arc(pant, (255, 90, 90), (cx_ - 16, cy_ - 16, 32, 32), math.pi / 2, math.pi / 2 + frac * math.tau, 5)
             texto(pant, "!!", (cx_, cy_), 22, (255, 230, 80), "center")
+            for k in range(v.pelea.get("golpes", 0)):
+                pygame.draw.circle(pant, (140, 240, 160), (int(cx_ - 8 + k * 16), int(cy_ + 24)), 6)
 
     def _d_estrella(self, pant, s):
-        ana = self.m.jugador.clave == "ana"
         bob = math.sin(self.t * 3 + s.id) * 1.5
         sx, sy = self.a_pantalla(s.x, s.y)
         # columna de luz para verla de lejos
@@ -431,14 +430,12 @@ class Render:
             col.fill((255, 230, 120, int(70 * (yy / 60))), (0, yy, 10, 1))
         pant.blit(col, (sx - 5, sy - 80))
         self._sombra(pant, s.x, s.y + 6, 8)
-        img = sprites.estrella(falsa=s.falsa, revelada_falsa=s.falsa and ana, brillo=int(self.t * 2) % 2)
+        img = sprites.estrella(brillo=int(self.t * 2) % 2)
         if s.vida < 5 and int(self.t * 8) % 2:
             return
         if self.op.get("contraste"):
             self._borde(pant, img, s.x - 8, s.y - 10 + bob)
         pant.blit(escalar(img), self.a_pantalla(s.x - 8, s.y - 10 + bob))
-        if ana and s.falsa:
-            texto(pant, "BULO", (sx, sy - 40), 13, (210, 170, 255), "midbottom")
 
     def _d_antena(self, pant, a):
         luz = int(self.t * 3) % 2 == 0
@@ -468,8 +465,9 @@ class Render:
             self._borde(pant, img, b.x - 8, b.y - 9 + bob)
         pant.blit(escalar(img), self.a_pantalla(b.x - 8, b.y - 9 + bob))
         if b.candidato:
-            sx, sy = self.a_pantalla(b.x, b.y - 12 + bob)
-            texto(pant, f"rumor: {b.candidato}", (sx, sy), 13, (230, 200, 255), "midbottom", 600)
+            from .partida import CANDIDATOS as INFO
+            color = INFO.get(b.candidato, ("", "", (255, 255, 255)))[2]
+            pant.blit(escalar(sprites.bandera(color)), self.a_pantalla(b.x + 3, b.y - 15 + bob))
 
     def _d_viral(self, pant, v):
         img = sprites.bulo_gigante(self.t)
@@ -484,7 +482,8 @@ class Render:
         r = 26 + math.sin(self.t * 10) * 3
         pygame.draw.circle(pant, (255, 60, 110), (int(cx), int(cy)), int(r), 4)
         texto(pant, str(max(0, math.ceil(v.t))), (cx, cy), 30, (255, 255, 255), "center")
-        texto(pant, "¡VIRAL!", (cx, cy - 36), 18, (255, 120, 160), "center")
+        for k in range(v.vida):
+            pygame.draw.circle(pant, (255, 90, 140), (int(cx - 14 + k * 14), int(cy - 40)), 5)
         obj = self.m.vecinos[v.objetivo]
         for k in range(10):
             f = k / 10
@@ -515,24 +514,6 @@ class Render:
         pant.blit(escalar(img), self.a_pantalla(j.x - 8 + ox, j.y - 23 + bob))
         if (self.m.t < 4 or self.op.get("contraste")) and not self.op.get("demo"):
             texto(pant, "TÚ", (sx, sy - 27 * ESC), 18, color, "midbottom")
-        if j.estrella:
-            s = j.estrella
-            bob2 = math.sin(self.t * 4) * 1.5
-            img = sprites.estrella(falsa=s.falsa, revelada_falsa=s.falsa and s.revelada, brillo=1 if s.revelada else 0)
-            px_, py_ = self.a_pantalla(j.x - 8, j.y - 40 + bob2)
-            pant.blit(escalar(img), (px_, py_))
-            if not s.revelada:
-                frac = min(1.0, j.verif / 1.2)
-                c = (int(px_ + 24), int(py_ + 24))
-                pygame.draw.circle(pant, (30, 24, 60), c, 30, 5)
-                if frac > 0:
-                    pygame.draw.arc(pant, (255, 255, 255), (c[0] - 30, c[1] - 30, 60, 60), math.pi / 2,
-                                    math.pi / 2 + frac * math.tau, 5)
-                if j.mov:
-                    texto(pant, "¡quieto para mirarla!", (c[0], c[1] - 40), 14, (255, 255, 255), "midbottom", 600)
-            else:
-                pygame.draw.circle(pant, (255, 240, 150), (int(px_ + 24), int(py_ + 24)),
-                                   int(30 + math.sin(self.t * 8) * 4), 2)
 
     def _pulsos(self, pant):
         m = self.m
@@ -591,6 +572,12 @@ class Render:
             f = o[1] / 0.8
             sx, sy = self.a_pantalla(v.x, v.y - 10)
             pygame.draw.circle(pant, o[2], (int(sx), int(sy)), int(20 + 50 * f), max(1, int(6 * (1 - f))))
+        for x0, y0, x1, y1, t in self.rayos:
+            f = min(1.0, t / 0.25)
+            a = self.a_pantalla(x0, y0)
+            b = self.a_pantalla(x0 + (x1 - x0) * f, y0 + (y1 - y0) * f)
+            pygame.draw.line(pant, (255, 236, 150), a, b, 7)
+            pygame.draw.line(pant, (255, 255, 255), a, b, 3)
         for pos, t in self.cadenas:
             n = min(len(pos), int(t / 0.08) + 1)
             for (x0, y0), (x1, y1) in zip(pos[:n], pos[1:n]):
@@ -620,28 +607,6 @@ class Render:
                 s.blit(img, (sx - img.get_width() // 2, sy - img.get_height() // 2), special_flags=pygame.BLEND_RGBA_SUB)
             pant.blit(s, (0, 0))
 
-    def _burbujas(self, pant):
-        """Lo que dicen los vecinos (el rumor que creyeron o la noticia que recibieron)."""
-        for nombre, (txt, color, t) in self.burbujas.items():
-            v = self.m.vecinos.get(nombre)
-            if v is None or not self.visible(v.x, v.y, 0):
-                continue
-            sx, sy = self.a_pantalla(v.x, v.y - (40 if v.bulo is not None else 30))
-            alfa = int(255 * max(0.0, min(1.0, t / 0.15, (2.8 - t) / 0.3)))
-            img = render(txt, 16, (255, 255, 255), 700, None)
-            r = img.get_rect(midbottom=(sx, sy - 10 - min(1.0, t / 0.15) * 4))
-            caja = r.inflate(18, 10)
-            caja.clamp_ip(pygame.Rect(6, 6, ANCHO - 12, ALTO - 12))
-            s = pygame.Surface((caja.w, caja.h + 10), pygame.SRCALPHA)
-            pygame.draw.rect(s, (*color, min(235, alfa)), (0, 0, caja.w, caja.h), border_radius=10)
-            pygame.draw.rect(s, (255, 255, 255, alfa), (0, 0, caja.w, caja.h), 2, border_radius=10)
-            cx = max(10, min(caja.w - 10, int(sx - caja.x)))
-            pygame.draw.polygon(s, (*color, min(235, alfa)), [(cx - 7, caja.h - 1), (cx + 7, caja.h - 1), (cx, caja.h + 9)])
-            pant.blit(s, caja.topleft)
-            img2 = img.copy()
-            img2.set_alpha(alfa)
-            pant.blit(img2, img2.get_rect(center=caja.center))
-
     def _textos(self, pant):
         for x, y, s, color, grande, t in self.textos:
             f = t / 1.3
@@ -654,19 +619,20 @@ class Render:
             texto(pant, s, (sx, sy - t * 10), 16, (255, 255, 255), "center", 700, (90, 40, 140))
 
     def _flechas(self, pant):
+        """Flechas en el borde hacia lo importante que no se ve, con un dibujito (sin palabras)."""
         m = self.m
-        objetivos = [((a.x, a.y - 20), (255, 90, 90), "ANTENA") for a in m.antenas]
+        objetivos = [((a.x, a.y - 20), (255, 90, 90), sprites.antena()) for a in m.antenas]
         if m.viral:
-            objetivos.append(((m.viral.x, m.viral.y), (255, 80, 150), "VIRAL"))
+            objetivos.append(((m.viral.x, m.viral.y), (255, 80, 150), sprites.bulo(0, True, False, (0, 1), color=(200, 60, 200))))
         for p in m.peleas:
             if p.get("activa") and not p.get("fin"):
                 a = m.vecinos[p["a"]]
-                objetivos.append(((a.x, a.y), (255, 150, 80), "PELEA"))
-        if not m.jugador.estrella and m.estrellas:
-            s = min(m.estrellas, key=lambda s: math.dist((s.x, s.y), m.jugador.pos))
-            objetivos.append(((s.x, s.y), (255, 214, 70), "NOTICIA"))
+                objetivos.append(((a.x, a.y), (255, 150, 80), sprites.nube_pelea(self.t)))
+        if m.estrellas:
+            e = min(m.estrellas, key=lambda s: math.dist((s.x, s.y), m.jugador.pos))
+            objetivos.append(((e.x, e.y), (255, 214, 70), sprites.estrella()))
         cx, cy = ANCHO / 2, ALTO / 2
-        for (x, y), color, etiqueta in objetivos:
+        for (x, y), color, icono in objetivos:
             if self.visible(x, y, -30):
                 continue
             sx, sy = self.a_pantalla(x, y)
@@ -680,4 +646,11 @@ class Render:
                    (px_ + math.cos(ang - 2.4) * 16, py_ + math.sin(ang - 2.4) * 16)]
             pygame.draw.polygon(pant, (20, 14, 40), [(a + 2, b + 3) for a, b in pts])
             pygame.draw.polygon(pant, color, pts)
-            texto(pant, etiqueta, (px_ - math.cos(ang) * 26, py_ - math.sin(ang) * 26), 14, color, "center")
+            ix, iy = px_ - math.cos(ang) * 30, py_ - math.sin(ang) * 30
+            pygame.draw.circle(pant, (20, 14, 40), (int(ix), int(iy)), 19)
+            pygame.draw.circle(pant, color, (int(ix), int(iy)), 19, 3)
+            alto = 30
+            img = pygame.transform.scale(icono, (max(1, icono.get_width() * alto // icono.get_height()), alto))
+            if img.get_width() > 32:
+                img = pygame.transform.scale(icono, (32, max(1, icono.get_height() * 32 // icono.get_width())))
+            pant.blit(img, img.get_rect(center=(int(ix), int(iy))))

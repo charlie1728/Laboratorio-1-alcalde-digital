@@ -7,3 +7,4 @@ venv/
 *.log
 datos/
 cazabulos_error.log
+*.lnk

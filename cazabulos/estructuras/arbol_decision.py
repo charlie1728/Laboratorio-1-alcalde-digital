@@ -1,10 +1,12 @@
-"""Árbol de decisiones de una noticia (las estrellas del juego).
+"""Árbol de decisiones de cada publicación de Civitas (los Bulos y las estrellas del juego).
 
-Problema que resuelve: cada estrella que recoges pasa por decisiones (mirarla antes de
-compartirla, entregarla sin mirar o dejarla) y cada camino tiene consecuencias distintas en
-los puntos y en los indicadores de la ciudad. El árbol guarda esas reglas en un solo lugar:
-la partida baja por el árbol según lo que hace el jugador y la hoja dice qué pasa.
-Al final del turno se dibuja el árbol con cuántas veces pasaste por cada rama.
+Problema que resuelve: toda publicación que aparece en el barrio termina de una forma, y cada
+final tiene consecuencias distintas en los indicadores de la ciudad. Es exactamente el ejemplo
+del enunciado: una publicación puede ser falsa o verdadera, y con ella se puede REPORTAR (atrapar
+el Bulo en el aire), VERIFICAR (curar a quien se lo creyó), COMPARTIR (llevar la estrella a la
+gente) o IGNORAR (dejar que se pierda). El árbol guarda esas reglas en un solo lugar: el juego
+baja por el árbol según lo que pasó y la hoja dice qué consecuencias tiene. Al final del turno
+se dibuja con cuántas veces se pasó por cada rama.
 
 Variante: árbol general con aristas etiquetadas (cada hijo se llega por una etiqueta).
 Insertar: agregar un hijo con su etiqueta. Eliminar: quitar un nodo con su subárbol.
@@ -94,23 +96,31 @@ class ArbolDecision:
             n.veces = 0
 
 
-def arbol_noticia():
-    """El árbol que usa el juego. Las hojas traen puntos y cambios en los indicadores."""
+def arbol_publicacion():
+    """El árbol que usa el juego. Las hojas traen los puntos y los cambios en los indicadores.
+
+    Publicación
+    ├── falsa (un Bulo)
+    │   ├── atrapar  -> Reportar: lo atrapas antes de que llegue a alguien
+    │   └── llega    -> Alguien se la cree
+    │       ├── curar -> Verificar: le muestras la verdad y se cura
+    │       └── pasar -> Se la pasa a un amigo por la red social
+    └── verdadera (una estrella)
+        ├── compartir -> Compartir: la llevas y protege a la gente
+        └── ignorar   -> Ignorar: se pierde
+    """
     N = NodoDecision
-    a = ArbolDecision(N("noticia", "Encuentras una noticia"))
-    a.insertar("noticia", "mirar", N("mirar", "Te detienes a mirarla"))
-    a.insertar("noticia", "entregar", N("sin_mirar", "La compartes sin mirar"))
-    a.insertar("noticia", "ignorar", N("ignorar", "La dejas pasar",
-                                         {"puntos": 0}))
-    a.insertar("mirar", "real", N("real", "Es real"))
-    a.insertar("mirar", "falsa", N("reporte", "Era un Bulo: lo reportas",
-                                     {"puntos": 15, "informacion": 4, "desinformacion": -4}))
-    a.insertar("real", "entregar", N("verdad", "Compartes una verdad",
-                                       {"puntos": 25, "informacion": 6, "confianza": 4, "bienestar": 2}))
-    a.insertar("real", "ignorar", N("perdida", "Se te pasó entregarla", {"puntos": 0, "confianza": -1}))
-    a.insertar("sin_mirar", "real", N("suerte", "Era real: tuviste suerte",
-                                        {"puntos": 10, "informacion": 2}))
-    a.insertar("sin_mirar", "falsa", N("bulo", "Compartiste un Bulo",
-                                         {"puntos": -20, "informacion": -6, "confianza": -6,
-                                          "desinformacion": 8, "bienestar": -3}))
+    a = ArbolDecision(N("publicacion", "Aparece una publicación"))
+    a.insertar("publicacion", "falsa", N("falsa", "Es falsa (un Bulo)"))
+    a.insertar("publicacion", "verdadera", N("verdadera", "Es verdadera (una estrella)"))
+    a.insertar("falsa", "atrapar", N("reportada", "La atrapas: la reportas",
+                                      {"desinformacion": -0.6, "informacion": 0.3}))
+    a.insertar("falsa", "llega", N("creida", "Alguien se la cree"))
+    a.insertar("creida", "curar", N("verificada", "Lo curas: verificas",
+                                     {"confianza": 1.5, "bienestar": 1, "desinformacion": -0.4}))
+    a.insertar("creida", "pasar", N("regada", "Se la pasa a un amigo",
+                                     {"desinformacion": 1.5, "confianza": -1}))
+    a.insertar("verdadera", "compartir", N("compartida", "La compartes",
+                                            {"puntos": 20, "informacion": 5, "confianza": 2, "bienestar": 1}))
+    a.insertar("verdadera", "ignorar", N("perdida", "Se pierde: la ignoras", {"informacion": -1}))
     return a

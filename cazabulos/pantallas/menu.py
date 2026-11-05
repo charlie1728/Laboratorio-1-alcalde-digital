@@ -15,9 +15,7 @@ from .base import Botonera, Escena, FondoCiudad, es_aceptar, es_volver, pie, tit
 def piloto(m, rng):
     """Un jugador automático para el fondo del menú."""
     j = m.jugador
-    if j.estrella and not j.estrella.revelada:
-        return {}
-    objetivos = [v.pos for v in m.vecinos.values()] if j.estrella else m._blancos() + [(s.x, s.y) for s in m.estrellas]
+    objetivos = m._blancos() + [(s.x, s.y) for s in m.estrellas]
     e = {}
     if objetivos:
         t = min(objetivos, key=lambda p: math.dist(p, j.pos))
@@ -45,7 +43,7 @@ class Titulo(Escena):
         from .ayuda import Ayuda
         from .en_linea import EnLinea
         self.botones = Botonera([
-            ("¡Jugar ya!", lambda: self._con_historia(Seleccion(app, 1, 1, 60, True))),
+            ("¡Jugar ya!", lambda: self._con_historia(Seleccion(app, 1, 1, 90, True))),
             ("Con amigos (mismo PC)", lambda: self._con_historia(Preparar(app))),
             ("En línea", lambda: app.cambiar(EnLinea(app))),
             ("Ayuda", lambda: app.cambiar(Ayuda(app))),

@@ -63,8 +63,8 @@ def dibujar_arbol(pant, filas, rect, t=0.0):
     for c, n in nodos.items():
         x, y = pos[c]
         usado = n["veces"] > 0
-        bueno = c in ("verdad", "reporte", "suerte")
-        malo = c in ("bulo", "perdida")
+        bueno = c in ("reportada", "verificada", "compartida")
+        malo = c in ("regada", "perdida")
         color = (120, 220, 140) if (bueno and usado) else (255, 110, 110) if (malo and usado) else (255, 205, 50) if usado else (70, 62, 110)
         r = 15 if n["hoja"] else 12
         pygame.draw.circle(pant, TINTA, (int(x), int(y) + 2), r + 3)
@@ -77,9 +77,9 @@ def dibujar_arbol(pant, filas, rect, t=0.0):
             texto(pant, ln, (x, y + r + 3 + k * 15), 13, (240, 240, 250) if usado else (150, 144, 180), "midtop", 600)
 
 
-CORTOS = {"noticia": "Una noticia", "mirar": "La miras", "sin_mirar": "Sin mirar", "ignorar": "La dejas",
-          "real": "Es real", "reporte": "Bulo descubierto", "verdad": "Compartes verdad", "perdida": "Se te pasó",
-          "suerte": "Era real", "bulo": "Compartes Bulo"}
+CORTOS = {"publicacion": "Publicación", "falsa": "Falsa", "verdadera": "Verdadera", "reportada": "Reportas",
+          "creida": "Se la creen", "verificada": "Verificas", "regada": "Se riega", "compartida": "Compartes",
+          "perdida": "Ignoras"}
 
 
 def _partir(s):
@@ -90,15 +90,15 @@ def _partir(s):
 
 def mensaje(res):
     s = res["salvados"] / max(1, res["vecinos"])
-    if res["stats"]["compartidas_falsas"] >= 2:
-        return "Ojo: compartiste Bulos sin mirarlos. ¡Detente un segundo antes de compartir!"
+    if res["stats"]["regados"] >= 4:
+        return "Los Bulos saltaron de amigo en amigo. ¡Cura rápido a los morados para que no se los pasen!"
     if s >= 0.8:
         return "¡Increíble! El barrio confía en ti."
     if s >= 0.55:
         return "¡Muy bien! Salvaste a la mayoría de los vecinos."
     if s >= 0.3:
         return "¡Bien! Busca la raíz de las cadenas (el Bulo con corona) para tumbar muchos de una vez."
-    return "Los Bulos ganaron esta vez. Apaga la antena pronto y lánzales a las cabezas de los vecinos."
+    return "Los Bulos ganaron esta vez. Apaga la antena pronto y lánzales a los vecinos morados."
 
 
 def dibujar_red(pant, rect, res, t=0.0):
@@ -200,13 +200,13 @@ class ResultadoTurno(Escena):
         r = panel(pant, (420, 96, 400, 420), borde=p["color"])
         s = res["stats"]
         filas = [("Bulos atrapados", s["bulos"]), ("Vecinos curados", s["curados"]), ("Antenas apagadas", s["antenas"]),
-                 ("Noticias reales entregadas", s["entregadas"]), ("Bulos disfrazados descubiertos", s["reportadas"]),
-                 ("Bulos compartidos sin mirar", s["compartidas_falsas"]), ("Peleas calmadas", s["peleas"]),
+                 ("Estrellas compartidas", s["compartidas"]), ("Reenvíos cortados", s["pulsos"]),
+                 ("Bulos que se regaron", s["regados"]), ("Peleas calmadas", s["peleas"]),
                  ("Viral detenido", "sí" if s["viral"] else "no"), ("Cadena más larga", s["cadena"])]
         for k, (nombre, v) in enumerate(filas):
             y = r.y + 18 + k * 30
             texto(pant, nombre, (r.x + 20, y), 18, (230, 226, 245), peso=600)
-            mala = nombre.startswith("Bulos compartidos") and v
+            mala = nombre.startswith("Bulos que se regaron") and v
             texto(pant, str(v), (r.right - 20, y), 20, (255, 120, 120) if mala else (255, 255, 255), "topright")
         y = r.y + 300
         pygame.draw.line(pant, (90, 80, 140), (r.x + 16, y), (r.right - 16, y), 2)
@@ -219,7 +219,7 @@ class ResultadoTurno(Escena):
         texto(pant, str(round(res["total"] * cuenta)), (r.right - 20, y + 70), 34, (255, 230, 120), "topright")
         # árbol de decisiones
         ra = panel(pant, (840, 96, 420, 300), borde=(255, 205, 50, 120))
-        texto(pant, "Tu árbol de decisiones con las noticias", (ra.centerx, ra.y + 10), 17, (255, 230, 150), "midtop")
+        texto(pant, "Qué pasó con cada publicación", (ra.centerx, ra.y + 10), 17, (255, 230, 150), "midtop")
         dibujar_arbol(pant, res["arbol"], pygame.Rect(ra.x + 10, ra.y + 38, ra.w - 20, ra.h - 50), self.t)
         # logros
         rl = panel(pant, (840, 410, 420, 106))

@@ -1,8 +1,12 @@
 """La simulación de un turno de Cazabulos (sin dibujar nada).
 
-Un turno = un jugador, un barrio, 90 segundos. Todos los jugadores de una ronda reciben la
-misma semilla: los eventos, las estrellas del kiosco y las antenas salen igual para todos, así
-la competencia es justa y nadie depende de lo que haga el otro.
+La idea cabe en una frase: los Bulos se suben a la cabeza de los vecinos y los vuelven morados;
+tú los atrapas y curas a los morados lanzándoles tu herramienta. Las estrellas son noticias
+verdaderas: al recogerlas la verdad les llega al vecino más cercano y a sus amigos.
+
+Un turno = un jugador, un barrio, 2 minutos. Todos los jugadores de una ronda reciben la misma
+semilla: los eventos, las estrellas y las antenas salen igual para todos, así la competencia es
+justa y nadie depende de lo que haga el otro.
 """
 import math
 import random
@@ -11,32 +15,29 @@ import pygame
 
 from .ciudad import VECINOS, ZONAS_VECINO, grafo_ciudad, grafo_social, ruta
 from .config import DURACION_RONDA, TILE, VELOCIDAD_BULO, VELOCIDAD_JUGADOR
-from .estructuras.arbol_decision import arbol_noticia
+from .estructuras.arbol_decision import arbol_publicacion
 from .estructuras.arbol_mutaciones import ArbolMutaciones
 from .mapa import ANTENAS, NODOS, Mapa
 from .trafico import Trafico
 
 CANDIDATOS = ["Lucia", "Marcos", "Elena", "Emilio"]
-# Lo que dicen los vecinos: rumores (falsos) y noticias reales. Cortos para que se lean rápido.
+# Ejemplos de lo que dicen los Bulos (se ven en la ayuda y en la historia, no encima del juego).
 RUMORES = ["¡Van a cerrar el colegio!", "Dicen que el alcalde roba", "¡Mañana cierran los parques!",
-           "El agua tiene un virus", "Regalan celulares en la plaza", "¡Se cae el puente!",
-           "Ya no habrá recreo", "El bus 7 desaparece", "¡Prohíben los perros!", "Cierran el mercado"]
-REALES = ["La biblioteca abre el sábado", "Vacunas gratis en el parque", "Feria de ciencias el lunes",
-          "Arreglaron los semáforos", "Debate de candidatos el viernes", "Nueva ciclovía en la avenida",
-          "Concierto en la plaza", "El mercado abre más temprano"]
-T_VERIFICAR = 1.2
-ESCUDO = 15.0
-MAX_BULOS_LIBRES = 10
-MAX_VIRAL = 6           # a cuántos vecinos les llega el viral si no lo detienes
+           "El agua tiene un virus", "Regalan celulares en la plaza", "¡Se cae el puente!"]
+ESCUDO = 15.0           # segundos que protege una noticia verdadera
+INMUNE = 3.0            # al curarse, un ratito sin que le entren Bulos (con Dani dura mucho más)
+MAX_BULOS_LIBRES = 8
+MAX_VIRAL = 5           # a cuántos vecinos les llega el viral si no lo detienes
+GOLPES_PELEA = 2        # golpes para calmar una pelea (Caro la calma de uno)
 
 ROLES = {
-    "ana": {"poder": "Flash", "pasivo": "Ve los Bulos disfrazados y revisa las noticias al instante",
-            "poder_txt": "Congela a los Bulos cercanos 4 segundos"},
-    "beto": {"poder": "En vivo", "pasivo": "Lo que entrega les llega también a los amigos del vecino",
-             "poder_txt": "Protege a todos los vecinos cercanos"},
-    "caro": {"poder": "Red gigante", "pasivo": "Corre más rápido y protege a quienes reconcilia",
+    "ana": {"poder": "Flash", "pasivo": "Ve todos los Bulos en el mapa y su periódico atraviesa varios",
+            "poder_txt": "Congela a todos los Bulos de la pantalla"},
+    "beto": {"poder": "En vivo", "pasivo": "Cuando cura a alguien, la cura les llega también a sus amigos",
+             "poder_txt": "Protege a todos los vecinos de la pantalla"},
+    "caro": {"poder": "Red gigante", "pasivo": "Corre más rápido, su red es más ancha y calma peleas de un golpe",
              "poder_txt": "Atrapa de un golpe todos los Bulos cercanos"},
-    "dani": {"poder": "Discurso", "pasivo": "Su protección dura el doble",
+    "dani": {"poder": "Discurso", "pasivo": "A quien cura no le vuelven a entrar Bulos por un buen rato",
              "poder_txt": "Cura a los vecinos cercanos y empuja a los Bulos"},
 }
 
@@ -67,9 +68,9 @@ class Vecino:
         self.dir = "abajo"
         self.mov = False
         self.paso = 0.0
-        self.escudo = 0.0          # segundos con información verificada (no le entran Bulos)
-        self.bulo = None           # id del Bulo que tiene en la cabeza
-        self.t_prop = 0.0          # tiempo para reenviar el Bulo a un amigo
+        self.escudo = 0.0          # segundos protegido por la verdad (no le entran Bulos)
+        self.bulo = None           # id del Bulo que tiene en la cabeza (está "morado")
+        self.t_prop = 0.0          # tiempo para pasarle el Bulo a un amigo
         self.ruta = []
         self.espera = 0.0
         self.pelea = None
@@ -84,6 +85,10 @@ class Vecino:
     def cabeza(self):
         return (self.x, self.y - 19)
 
+    @property
+    def cuerpo(self):
+        return (self.x, self.y - 10)
+
     def rect(self):
         return pygame.Rect(int(self.x) - 4, int(self.y) - 3, 8, 4)
 
@@ -95,12 +100,11 @@ class Bulo:
         self.estado = estado       # libre, cabeza
         self.vecino = None
         self.objetivo = None
-        self.t = random.random() * 6
+        self.t = (ident * 0.37) % 6       # fase del bamboleo: fija, para que la misma semilla dé lo mismo
         self.congelado = 0.0
         self.aturdido = 0.0
         self.candidato = candidato
         self.vx = self.vy = 0.0
-        self.disfrazado = False
         self.reenvios = 0
 
     @property
@@ -121,14 +125,13 @@ class Pulso:
 
 
 class Estrella:
-    def __init__(self, ident, x, y, falsa):
+    """Una noticia verdadera. Al tocarla se comparte sola."""
+
+    def __init__(self, ident, x, y):
         self.id = ident
         self.x, self.y = x, y
-        self.falsa = falsa
-        self.vida = 30.0
-        self.revelada = False
+        self.vida = 22.0
         self.t = 0.0
-        self.titular = (RUMORES if falsa else REALES)[ident % (len(RUMORES) if falsa else len(REALES))]
 
 
 class Antena:
@@ -154,12 +157,16 @@ class Viral:
 
 
 class Proyectil:
-    def __init__(self, x, y, vx, vy, color, clave="caro"):
+    def __init__(self, x, y, vx, vy, color, clave="caro", vida=0.5, radio=10, perfora=1):
         self.x, self.y = x, y
         self.vx, self.vy = vx, vy
-        self.vida = 0.5
+        self.vida = vida
+        self.vida0 = vida
         self.color = color
         self.clave = clave
+        self.radio = radio
+        self.perfora = perfora     # a cuántas cosas puede darle antes de desaparecer (Ana: varias)
+        self.golpeados = set()
         self.rastro = []
 
 
@@ -176,14 +183,11 @@ class Jugador:
         self.combo = 0
         self.t_combo = 0.0
         self.carga = 0.0
-        self.estrella = None
-        self.verif = 0.0
         self.enfriar = 0.0
         self.lanzo = 0.0
         self.poder_t = 0.0
-        self.stats = {"bulos": 0, "cadena": 0, "antenas": 0, "entregadas": 0, "reportadas": 0,
-                      "compartidas_falsas": 0, "peleas": 0, "viral": 0, "curados": 0, "pulsos": 0,
-                      "verificadas": 0, "combo_max": 0, "poderes": 0}
+        self.stats = {"bulos": 0, "cadena": 0, "antenas": 0, "compartidas": 0, "peleas": 0, "viral": 0,
+                      "curados": 0, "pulsos": 0, "regados": 0, "combo_max": 0, "poderes": 0}
 
     @property
     def pos(self):
@@ -203,7 +207,7 @@ class Mundo:
         self.mapa, self.ciudad = mapa_compartido()
         self.social = grafo_social()
         self.arbol = ArbolMutaciones()
-        self.decisiones = arbol_noticia()
+        self.decisiones = arbol_publicacion()
         self.trafico = Trafico(semilla)
         self.rng = random.Random(semilla * 7919 + ronda)      # eventos (igual para todos)
         self.azar = random.Random(semilla * 31 + 5)           # detalles que no cambian la competencia
@@ -229,6 +233,7 @@ class Mundo:
         self.peleas = []
         self.viral = None
         self.antenas = []
+        self.pasaron = set()      # Bulos que ya se pasaron a un amigo (para el árbol al final)
         self._sig_id = 1
         self.rumores = {c: 0 for c in CANDIDATOS}
         self.defendidos = {c: 0 for c in CANDIDATOS}
@@ -247,23 +252,23 @@ class Mundo:
         self.orden_antenas = r.sample(range(len(ANTENAS)), len(ANTENAS))
         self.k_antena = 0
         self.t_antena = 3.0
-        # cada ronda es un poco más difícil: en la tarde hay más noticias falsas y en la noche dos antenas
-        falsas = 0.22 if self.ronda == 1 else 0.3
-        self.kiosco = [(r.uniform(-30, 30), r.uniform(-6, 18), r.random() < falsas) for _ in range(60)]
+        # cada ronda es un poco más difícil: la antena suelta Bulos más seguido y en la noche hay dos
+        self.ritmo_ronda = {1: 1.0, 2: 0.9}.get(self.ronda, 0.85)
+        self.kiosco = [(r.uniform(-30, 30), r.uniform(-6, 18)) for _ in range(40)]
         self.k_kiosco = 0
-        self.t_kiosco = 2.0
-        tipos = ["falsa", "pelea", "rumor", "verdad", "reporte", "campana", "pelea", "falsa", "rumor"]
+        self.t_kiosco = 6.0
+        tipos = ["pelea", "verdad", "rumor", "reporte", "falsa", "campana", "pelea", "verdad", "rumor"]
         r.shuffle(tipos)
         self.guion = []
-        t = 14.0
+        t = 16.0
         for tipo in tipos:
-            if t > d - 8:
+            if t > d - 10:
                 break
             self.guion.append([t, tipo, r.random()])
-            t += r.uniform(9, 14)
-        self.guion.append([d * r.uniform(0.38, 0.55), "viral", r.random()])
-        if d >= 80 or self.ronda >= 3:
-            self.guion.append([d * (0.45 if self.ronda >= 3 else 0.72), "antena2", r.random()])
+            t += r.uniform(13, 18)
+        self.guion.append([d * r.uniform(0.4, 0.55), "viral", r.random()])
+        if self.ronda >= 3 or d >= 150:
+            self.guion.append([d * (0.45 if self.ronda >= 3 else 0.7), "antena2", r.random()])
         self.guion.sort()
         puntos = []
         while len(puntos) < 40:
@@ -289,27 +294,25 @@ class Mundo:
     def texto(self, x, y, s, color=(255, 255, 255), grande=False):
         self.emitir("texto", x, y, s, color, grande)
 
-    def banner(self, titulo, texto, color=(255, 205, 50)):
-        self.emitir("banner", titulo, texto, color)
+    def aviso(self, palabra, color=(255, 205, 50)):
+        """Una o dos palabras grandes arriba de la pantalla (nunca párrafos encima del juego)."""
+        self.emitir("aviso", palabra, color)
 
     def sonar(self, nombre, x=None, y=None):
         self.emitir("sonido", nombre, x, y)
 
-    def decir(self, vecino, texto, color=(40, 30, 70)):
-        self.emitir("burbuja", vecino, texto, color)
-
-    def mostrar_pista(self, clave, texto, teclas=()):
+    def mostrar_pista(self, clave, texto):
         if not self.pistas_on or clave in self.pistas_vistas:
             return
         self.pistas_vistas.add(clave)
-        self.pista = [texto, teclas, 5.0]
+        self.pista = [texto, (), 3.5]
 
-    def sumar(self, puntos, x, y, motivo=""):
+    def sumar(self, puntos, x, y):
         j = self.jugador
         j.puntos += puntos
         if puntos:
             color = (255, 230, 90) if puntos > 0 else (255, 110, 110)
-            self.texto(x, y - 10, f"{'+' if puntos > 0 else ''}{puntos}{(' ' + motivo) if motivo else ''}", color)
+            self.texto(x, y - 10, f"{'+' if puntos > 0 else ''}{puntos}", color)
 
     def ajustar(self, **cambios):
         for k, v in cambios.items():
@@ -322,7 +325,15 @@ class Mundo:
         j.carga = min(100.0, j.carga + n)
         if antes < 100 <= j.carga:
             self.sonar("listo")
-            self.mostrar_pista("poder", f"¡Poder listo! Pulsa X para usar {ROLES[j.clave]['poder']}", ("X",))
+
+    def _hoja(self, camino, x=None, y=None):
+        """Baja por el árbol de decisiones de la publicación y aplica las consecuencias de la hoja."""
+        hoja = self.decisiones.recorrer(camino)
+        ef = hoja.efecto
+        if ef.get("puntos") and x is not None:
+            self.sumar(ef["puntos"], x, y)
+        self.ajustar(**{k: v for k, v in ef.items() if k != "puntos"})
+        return hoja
 
     # ------------------------------------------------------------- consultas
     def infectados(self):
@@ -360,8 +371,6 @@ class Mundo:
             self.pista[2] -= dt
             if self.pista[2] <= 0:
                 self.pista = None
-        if self.t < 1.5:
-            self.mostrar_pista("mover", "Muévete con las FLECHAS", ("FLECHAS",))
         self._jugador(dt, entrada)
         self._vecinos(dt)
         self._bulos(dt)
@@ -389,7 +398,7 @@ class Mundo:
         j = self.jugador
         dx = (1 if e.get("der") else 0) - (1 if e.get("izq") else 0)
         dy = (1 if e.get("abajo") else 0) - (1 if e.get("arriba") else 0)
-        vel = VELOCIDAD_JUGADOR * (1.15 if j.clave == "caro" else 1.0)
+        vel = VELOCIDAD_JUGADOR * (1.22 if j.clave == "caro" else 1.0)
         j.mov = bool(dx or dy)
         if j.mov:
             n = math.hypot(dx, dy)
@@ -408,29 +417,13 @@ class Mundo:
         j.t_combo -= dt
         if j.t_combo <= 0:
             j.combo = 0
-        # recoger estrellas
-        if j.estrella is None:
-            for s in list(self.estrellas):
-                if math.hypot(s.x - j.x, s.y - (j.y - 6)) < 13:
-                    self.estrellas.remove(s)
-                    j.estrella = s
-                    j.verif = 0.0
-                    self.sonar("recoger")
-                    if j.clave == "ana":
-                        self._revelar()
-                    else:
-                        self.mostrar_pista("mirar", "¡Una noticia! Quédate QUIETO un momento para ver si es real")
-                    break
-        # mirar la noticia antes de compartirla
-        if j.estrella and not j.estrella.revelada:
-            if j.mov:
-                j.verif = max(0.0, j.verif - dt * 1.5)
-            else:
-                j.verif += dt
-                if j.verif >= T_VERIFICAR:
-                    self._revelar()
-        if e.get("accion"):
-            self._accion()
+        # tocar una estrella = compartir una noticia verdadera
+        for s in list(self.estrellas):
+            if math.hypot(s.x - j.x, s.y - (j.y - 6)) < 15:
+                self.estrellas.remove(s)
+                self._compartir(s)
+        if e.get("accion") and j.enfriar <= 0:
+            self._lanzar()
         if e.get("poder"):
             self._poder()
 
@@ -460,58 +453,22 @@ class Mundo:
                 if hecho:
                     break
 
-    def _revelar(self):
-        j = self.jugador
-        s = j.estrella
-        s.revelada = True
-        j.stats["verificadas"] += 1
-        if s.falsa:
-            hoja = self.decisiones.recorrer(["mirar", "falsa"])
-            self._aplicar_hoja(hoja, j.x, j.y - 26)
-            j.stats["reportadas"] += 1
-            j.estrella = None
-            self.emitir("pop", j.x, j.y - 26, (150, 80, 240))
-            self.texto(j.x, j.y - 40, f"Bulo: \"{s.titular}\"", (210, 170, 255))
-            self.sonar("reporte")
-            self.cargar(10)
-        else:
-            self.sonar("real")
-            self.texto(j.x, j.y - 40, f"Real: {s.titular}", (255, 230, 90))
-            self.mostrar_pista("entregar", "Llévasela a un vecino y pulsa ESPACIO", ("ESPACIO",))
-
-    def _aplicar_hoja(self, hoja, x, y):
-        ef = hoja.efecto
-        self.sumar(ef.get("puntos", 0), x, y)
-        self.ajustar(**{k: v for k, v in ef.items() if k != "puntos"})
-        self.emitir("decision", hoja.clave, hoja.texto)
-
-    def _accion(self):
-        j = self.jugador
-        if j.estrella:
-            cerca = min(self.vecinos.values(), key=lambda v: _dist(v.pos, j.pos))
-            if _dist(cerca.pos, j.pos) < 24:
-                self._entregar(cerca)
-                return
-        for p in self.peleas:
-            if p.get("fin") or not p["activa"]:
-                continue
-            a, b = self.vecinos[p["a"]], self.vecinos[p["b"]]
-            medio = ((a.x + b.x) / 2, (a.y + b.y) / 2)
-            if _dist(medio, j.pos) < 34:
-                self._calmar(p)
-                return
-        if j.enfriar > 0:
-            return
-        self._lanzar()
-
     def _lanzar(self):
+        """Lanza la herramienta del personaje. Cada uno lanza distinto (ver ROLES)."""
         j = self.jugador
-        j.enfriar = 0.28
+        j.enfriar = {"ana": 0.22, "beto": 0.34}.get(j.clave, 0.28)
         j.lanzo = 0.18
         ox, oy = j.x + j.vec[0] * 6, j.y - 12 + j.vec[1] * 4
         vx, vy = j.vec
+        vel, vida, radio, perfora, alcance = 240, 0.5, 10, 1, 135
+        if j.clave == "ana":            # el periódico sale rápido, vuela lejos y atraviesa
+            vel, vida, radio, perfora, alcance = 290, 0.62, 12, 3, 175
+        elif j.clave == "beto":         # los corazones flotan más despacio
+            vel, vida = 200, 0.52
+        elif j.clave == "caro":         # la red es ancha
+            radio = 18
         # un poco de puntería automática: busca el blanco más cercano frente al jugador
-        mejor, dmin = None, 135
+        mejor, dmin = None, alcance
         for pos in self._blancos():
             d = _dist(pos, (ox, oy))
             if 4 < d < dmin:
@@ -523,64 +480,46 @@ class Mundo:
             d = _dist(mejor, (ox, oy))
             vx, vy = (mejor[0] - ox) / d, (mejor[1] - oy) / d
         from .personajes import PERSONAJES
-        self.proyectiles.append(Proyectil(ox, oy, vx * 240, vy * 240, PERSONAJES[j.clave]["color"], j.clave))
+        self.proyectiles.append(Proyectil(ox, oy, vx * vel, vy * vel, PERSONAJES[j.clave]["color"], j.clave,
+                                          vida, radio, perfora))
         self.sonar("lanzar")
 
     def _blancos(self):
+        """Todo lo que se arregla lanzándole algo."""
         res = [b.pos for b in self.bulos.values() if b.estado == "libre"]
-        res += [self.vecinos[b.vecino].cabeza for b in self.bulos.values() if b.estado == "cabeza"]
+        res += [self.vecinos[b.vecino].cuerpo for b in self.bulos.values() if b.estado == "cabeza"]
         res += [self._pos_pulso(p) for p in self.pulsos]
         res += [(a.x, a.y - 18) for a in self.antenas]
         if self.viral:
             res.append((self.viral.x, self.viral.y - 10))
+        res += [self._pos_pelea(p) for p in self.peleas if p.get("activa") and not p.get("fin")]
         return res
 
-    def _entregar(self, v):
+    def _compartir(self, s):
+        """Recoger una estrella es compartir una noticia verdadera: le llega al vecino más cercano y a sus
+        amigos por la red social (BFS de 1 nivel; con Beto, el influencer, 2 niveles). A quien tenía un
+        Bulo lo cura y a todos los protege un rato."""
         j = self.jugador
-        s = j.estrella
-        j.estrella = None
-        v.salto = 0.4
-        if s.revelada:
-            camino = ["mirar", "real", "entregar"]
-        else:
-            camino = ["entregar", "falsa" if s.falsa else "real"]
-        hoja = self.decisiones.recorrer(camino)
-        self._aplicar_hoja(hoja, v.x, v.y - 24)
-        beto = j.clave == "beto"
-        if s.falsa:
-            j.stats["compartidas_falsas"] += 1
-            self.sonar("mal")
-            self.texto(v.x, v.y - 44, "¡Era un Bulo disfrazado!", (255, 120, 140), True)
-            raiz = self._infectar(v, None)
-            self.decir(v.nombre, s.titular, (120, 60, 200))
-            if beto and raiz is not None:
-                for u, nivel, padre in self.social.bfs(v.nombre, max_nivel=1)[1:]:
-                    w = self.vecinos[u]
-                    if w.bulo is None and w.escudo <= 0:
-                        self._infectar(w, raiz)
-                self.texto(v.x, v.y - 56, "...y se lo pasó a sus seguidores", (255, 160, 170))
-            return
-        j.stats["entregadas"] += 1
+        self._hoja(["verdadera", "compartir"], s.x, s.y - 10)
+        j.stats["compartidas"] += 1
+        origen = min(self.vecinos.values(), key=lambda v: _dist(v.pos, j.pos))
+        niveles = 2 if j.clave == "beto" else 1
+        dur = ESCUDO * (1.6 if j.clave == "dani" else 1.0)
+        alcanzados = 0
+        for u, nivel, padre in self.social.bfs(origen.nombre, max_nivel=niveles):
+            w = self.vecinos[u]
+            if w.bulo is not None and w.bulo in self.bulos:
+                self._atrapar(w.bulo)
+            w.escudo = max(w.escudo, dur * (1.0 if nivel == 0 else 0.75))
+            w.salto = 0.4
+            alcanzados += 1
+            self.emitir("ola", u, nivel, (255, 214, 70))
+            if padre is not None:
+                self.emitir("hilo", padre, u, (255, 220, 80))
+        self.ajustar(informacion=0.5 * alcanzados)
+        self.emitir("verdad", s.x, s.y, origen.nombre)
         self.sonar("entregar")
-        self.emitir("chispas", v.x, v.y - 22, (255, 220, 80))
-        dur = ESCUDO * (2 if j.clave == "dani" else 1)
-        if v.bulo is not None:
-            self._atrapar(v.bulo, curar_bonus=True)
-            self.texto(v.x, v.y - 44, "¡La verdad cortó el rumor!", (255, 230, 120))
-        v.escudo = dur
-        self.decir(v.nombre, f"¡Gracias! {s.titular}", (190, 130, 20))
-        self.cargar(12)
-        if beto:
-            alcanzados = 0
-            for u, nivel, padre in self.social.bfs(v.nombre, max_nivel=1)[1:]:
-                w = self.vecinos[u]
-                w.escudo = max(w.escudo, dur * 0.7)
-                w.salto = 0.4
-                alcanzados += 1
-                self.emitir("hilo", v.nombre, u, (255, 220, 80))
-            if alcanzados:
-                self.sumar(3 * alcanzados, v.x, v.y - 34, f"x{alcanzados} seguidores")
-                self.ajustar(informacion=alcanzados)
+        self.cargar(14)
 
     def _calmar(self, p):
         j = self.jugador
@@ -592,10 +531,10 @@ class Mundo:
         else:
             self.social.agregar_arista(a.nombre, b.nombre, 1)
         j.stats["peleas"] += 1
-        self.sumar(20, (a.x + b.x) / 2, (a.y + b.y) / 2 - 20, "¡paz!")
+        self.sumar(20, (a.x + b.x) / 2, (a.y + b.y) / 2 - 20)
         self.ajustar(convivencia=8, conflictos=-4, bienestar=3)
         self.emitir("corazones", (a.x + b.x) / 2, (a.y + b.y) / 2 - 22)
-        self.decir(a.nombre, "Perdón, no lo había verificado", (40, 150, 80))
+        self.emitir("hilo", a.nombre, b.nombre, (120, 230, 140))
         self.sonar("paz")
         self.cargar(15)
         if j.clave == "caro":
@@ -605,8 +544,6 @@ class Mundo:
     def _poder(self):
         j = self.jugador
         if j.carga < 100:
-            if j.carga < 100 and j.carga > 0:
-                self.texto(j.x, j.y - 34, f"Poder al {int(j.carga)}%", (200, 200, 220))
             return
         j.carga = 0
         j.poder_t = 0.8
@@ -614,50 +551,46 @@ class Mundo:
         c = j.clave
         self.emitir("poder", c, j.x, j.y)
         self.sonar("poder")
+        nombre = ROLES[c]["poder"].upper()
         if c == "ana":
             for b in self.bulos.values():
-                if b.estado == "libre" and _dist(b.pos, j.pos) < 190:
-                    b.congelado = 4.0
+                if b.estado == "libre" and _dist(b.pos, j.pos) < 240:
+                    b.congelado = 6.0
             for p in self.pulsos:
-                p.congelado = 4.0
-            if self.viral and _dist((self.viral.x, self.viral.y), j.pos) < 190:
+                p.congelado = 6.0
+            if self.viral and _dist((self.viral.x, self.viral.y), j.pos) < 240:
                 self.viral.congelado = 3.0
-            self.texto(j.x, j.y - 40, "¡FLASH! Bulos congelados", (255, 250, 200), True)
         elif c == "beto":
             n = 0
             for v in self.vecinos.values():
-                if _dist(v.pos, j.pos) < 160:
+                if _dist(v.pos, j.pos) < 230:
                     v.escudo = max(v.escudo, 10.0)
                     v.salto = 0.4
                     n += 1
-            self.sumar(4 * n, j.x, j.y - 30, f"¡{n} vecinos en vivo!")
+            self.sumar(4 * n, j.x, j.y - 30)
             self.ajustar(informacion=n, confianza=2)
         elif c == "caro":
-            n = 0
             for b in list(self.bulos.values()):
-                if b.id in self.bulos and b.estado == "libre" and _dist(b.pos, j.pos) < 85:
+                if b.id in self.bulos and b.estado == "libre" and _dist(b.pos, j.pos) < 120:
                     self._atrapar(b.id)
-                    n += 1
             for p in list(self.pulsos):
-                if _dist(self._pos_pulso(p), j.pos) < 85:
+                if _dist(self._pos_pulso(p), j.pos) < 120:
                     self.pulsos.remove(p)
-                    n += 1
-            if self.viral and _dist((self.viral.x, self.viral.y), j.pos) < 85:
+            if self.viral and _dist((self.viral.x, self.viral.y), j.pos) < 120:
                 self._golpe_viral(2)
-            self.texto(j.x, j.y - 40, "¡RED GIGANTE!" if n else "¡RED GIGANTE! (nada cerca)", (180, 255, 190), True)
         elif c == "dani":
             for v in self.vecinos.values():
-                if v.bulo is not None and _dist(v.pos, j.pos) < 95 and v.bulo in self.bulos:
-                    self._atrapar(v.bulo, curar_bonus=True)
+                if v.bulo is not None and _dist(v.pos, j.pos) < 110 and v.bulo in self.bulos:
+                    self._atrapar(v.bulo)
             for b in self.bulos.values():
                 if b.estado == "libre":
                     d = _dist(b.pos, j.pos)
-                    if 0 < d < 120:
+                    if 0 < d < 130:
                         b.vx += (b.x - j.x) / d * 140
                         b.vy += (b.y - j.y) / d * 140
                         b.aturdido = 1.5
             self.ajustar(confianza=4)
-            self.texto(j.x, j.y - 40, "¡DISCURSO!", (180, 210, 255), True)
+        self.texto(j.x, j.y - 40, f"¡{nombre}!", (255, 250, 210), True)
 
     # ------------------------------------------------------------- vecinos
     def _vecinos(self, dt):
@@ -724,9 +657,13 @@ class Mundo:
                 return
         v.espera = 1.0
 
+    def _espera_reenvio(self, v):
+        """Cuánto tarda un vecino morado en pasarle el Bulo a un amigo: los más conectados, más rápido."""
+        return max(7.5, 14.0 - 0.7 * self.social.grado(v.nombre)) * (1.4 if self.tranquilo else 1.0)
+
     def _reenviar(self, v):
         """El vecino con Bulo se lo pasa a un amigo por un hilo del grafo social."""
-        v.t_prop = max(6.0, 12.5 - 0.7 * self.social.grado(v.nombre)) * (1.4 if self.tranquilo else 1.0)
+        v.t_prop = self._espera_reenvio(v)
         b = self.bulos.get(v.bulo)
         if b is None or b.reenvios >= 1:      # cada Bulo se reenvía una sola vez (la cadena crece en fila)
             return
@@ -739,9 +676,8 @@ class Mundo:
         u = self.azar.choice([u for u, p in opciones if p == mayor])
         dist = _dist(v.pos, self.vecinos[u].pos)
         b.reenvios += 1
-        self.pulsos.append(Pulso(v.bulo, v.nombre, u, max(2.2, min(4.0, dist / 75))))
+        self.pulsos.append(Pulso(v.bulo, v.nombre, u, max(2.4, min(4.2, dist / 70))))
         self.sonar("reenvio", v.x, v.y)
-        self.mostrar_pista("pulso", "¡Un Bulo viaja por el hilo! Lánzale antes de que llegue", ("ESPACIO",))
 
     # ------------------------------------------------------------- Bulos
     def nuevo_bulo(self, x, y, padre=None, candidato=None):
@@ -753,21 +689,27 @@ class Mundo:
         self.bulos[b.id] = b
         return b
 
-    def _infectar(self, v, padre):
-        """Le sube un Bulo a la cabeza al vecino (hijo de 'padre' en el árbol de mutaciones)."""
-        if v.bulo is not None:
-            return None
-        b = self.nuevo_bulo(v.x, v.y - 19, padre)
+    def _volver_morado(self, v, b):
+        """El vecino se creyó el Bulo: lo tiene en la cabeza y se pone morado."""
         b.estado = "cabeza"
         b.vecino = v.nombre
         v.bulo = b.id
-        v.t_prop = 9.0
+        v.t_prop = self._espera_reenvio(v)
         v.triste = 2.0
         v.salto = 0.3
         self.ajustar(confianza=-1.5, bienestar=-1)
+        if b.candidato:
+            self.rumores[b.candidato] += 1
         self.emitir("contagio", v.x, v.y - 22)
         self.sonar("contagio", v.x, v.y)
-        self.decir(v.nombre, RUMORES[b.id % len(RUMORES)], (120, 60, 200))
+        self.mostrar_pista("morado", "¡Lánzale al morado para curarlo!")
+
+    def _infectar(self, v, padre):
+        """Le sube un Bulo nuevo a la cabeza (hijo de 'padre' en el árbol de mutaciones)."""
+        if v.bulo is not None:
+            return None
+        b = self.nuevo_bulo(v.x, v.y - 19, padre)
+        self._volver_morado(v, b)
         return b.id
 
     def _bulos(self, dt):
@@ -805,7 +747,7 @@ class Mundo:
                 if obj.escudo > 0:
                     self._rebote(b)
                 else:
-                    self._subir(b, obj)
+                    self._volver_morado(obj, b)
                 continue
             vx, vy = ((tx - b.x) / d, (ty - b.y) / d) if d > 0 else (0, 0)
             # esquiva al jugador cuando lo tiene cerca
@@ -838,39 +780,26 @@ class Mundo:
                 mejor, puntaje = v, p
         return mejor
 
-    def _subir(self, b, v):
-        b.estado = "cabeza"
-        b.vecino = v.nombre
-        v.bulo = b.id
-        v.t_prop = 9.0
-        v.triste = 2.0
-        v.salto = 0.3
-        self.ajustar(confianza=-1.5, bienestar=-1)
-        if b.candidato:
-            self.rumores[b.candidato] += 1
-            self.decir(v.nombre, f"¿Supiste lo de {b.candidato}?", (120, 60, 200))
-        else:
-            self.decir(v.nombre, RUMORES[b.id % len(RUMORES)], (120, 60, 200))
-        self.emitir("contagio", v.x, v.y - 22)
-        self.sonar("contagio", v.x, v.y)
-        self.mostrar_pista("cabeza", "¡Un vecino tiene un Bulo! Lánzale a su cabeza para curarlo", ("ESPACIO",))
-
     def _rebote(self, b):
+        """El vecino protegido por la verdad no se lo cree: el Bulo revienta."""
         v = self.vecinos[b.objetivo]
-        self.decir(v.nombre, "¡Eso ya lo verifiqué!", (190, 130, 20))
         self.emitir("pop", b.x, b.y, (255, 220, 90))
+        v.salto = 0.3
+        self._hoja(["falsa", "atrapar"])
         self.sumar(5, v.x, v.y - 30)
-        self.ajustar(informacion=1)
         self.arbol.eliminar_subarbol(b.id)
         self.bulos.pop(b.id, None)
 
-    def _atrapar(self, ident, curar_bonus=False):
-        """Atrapa un Bulo y todo su subárbol de mutaciones (si era la raíz, cae toda la cadena)."""
+    def _atrapar(self, ident, puntos=True):
+        """Atrapa un Bulo y todo su subárbol de mutaciones (si era la raíz, cae toda la cadena).
+        Atrapar uno libre es REPORTARLO; quitárselo de la cabeza a un vecino es VERIFICAR (se cura).
+        puntos=False: la cura llegó sola (la cadena de Beto) y no suma puntos ni combo."""
         if ident not in self.arbol:
             return 0
         j = self.jugador
         ids = self.arbol.eliminar_subarbol(ident)
         cadena = []
+        extra = 0
         for i in ids:
             b = self.bulos.pop(i, None)
             if b is None:
@@ -880,16 +809,28 @@ class Mundo:
                 if v:
                     v.bulo = None
                     v.salto = 0.4
+                    v.escudo = max(v.escudo, INMUNE * (5 if j.clave == "dani" else 1))
                     j.stats["curados"] += 1
-                    self.decir(v.nombre, "¡Uy, era mentira!", (40, 150, 80))
-                    self.ajustar(confianza=1.5, bienestar=1)
+                    self._hoja(["falsa", "llega", "curar"])
+                    extra += 7 if j.clave == "dani" else 5       # el candidato gana confianza al curar
+            else:
+                self._hoja(["falsa", "atrapar"])
+                if j.clave == "ana":
+                    extra += 5          # la periodista detecta las publicaciones falsas antes de que lleguen
             if b.candidato:
                 self.defendidos[b.candidato] += 1
+                if j.clave == "dani":
+                    extra += 10          # el candidato enfrenta los rumores sobre los candidatos
             cadena.append(b.pos)
         # los reenvíos que venían de esos Bulos también se cortan
         self.pulsos = [p for p in self.pulsos if p.padre in self.arbol]
         if not cadena:
             return 0
+        if not puntos:
+            self.sumar(12 * len(cadena), *cadena[0])
+            self.emitir("cadena", cadena)
+            self.sonar("pop", *cadena[0])
+            return len(cadena)
         j.combo += 1
         j.t_combo = 2.5
         j.stats["combo_max"] = max(j.stats["combo_max"], j.combo)
@@ -897,19 +838,26 @@ class Mundo:
         n = len(cadena)
         j.stats["bulos"] += n
         j.stats["cadena"] = max(j.stats["cadena"], n)
-        puntos = (10 * n + 5 * (n - 1) + (5 if curar_bonus else 0)) * mult
+        puntos = (10 * n + 5 * (n - 1) + extra) * mult
         x, y = cadena[0]
-        self.sumar(puntos, x, y, f"x{n} cadena" if n > 1 else "")
-        if mult > 1:
-            self.texto(x, y - 24, f"COMBO x{mult}", (255, 160, 60), True)
-        self.ajustar(desinformacion=-0.6 * n, informacion=0.3 * n)
+        self.sumar(puntos, x, y)
         self.emitir("cadena", cadena)
         self.sonar("pop" if n == 1 else "cadena", x, y)
         if n >= 3:
             self.emitir("temblor", 4)
-            self.banner("¡Cortaste la raíz!", f"Cayeron {n} Bulos de la misma cadena", (190, 150, 255))
+            self.aviso(f"¡CADENA DE {n}!", (200, 160, 255))
         self.cargar(9 + 3 * n)
         return n
+
+    def _cura_en_cadena(self, v):
+        """Beto (influencer): cuando cura a alguien, la cura les llega también a sus amigos (BFS de 1 nivel)."""
+        for u, nivel, padre in self.social.bfs(v.nombre, max_nivel=1)[1:]:
+            w = self.vecinos[u]
+            if w.bulo is not None and w.bulo in self.bulos:
+                self._atrapar(w.bulo, puntos=False)
+            w.escudo = max(w.escudo, 5.0)
+            self.emitir("hilo", v.nombre, u, (255, 150, 200))
+            self.emitir("ola", u, 1, (255, 150, 200))
 
     def _pos_pulso(self, p):
         a, b = self.vecinos[p.desde], self.vecinos[p.hasta]
@@ -927,76 +875,100 @@ class Mundo:
                 self.pulsos.remove(p)
                 u = self.vecinos[p.hasta]
                 if u.escudo > 0:
-                    self.texto(u.x, u.y - 40, "¡No le creyó!", (255, 230, 120))
+                    self.emitir("pop", u.x, u.y - 22, (255, 220, 90))
                     continue
                 if u.bulo is None and p.padre in self.arbol:
                     self._infectar(u, p.padre)
+                    self.pasaron.add(p.padre)
+                    self._hoja(["falsa", "llega", "pasar"])
+                    self.jugador.stats["regados"] += 1
 
     # ------------------------------------------------------------- proyectiles
     def _proyectiles(self, dt):
-        j = self.jugador
         for pr in list(self.proyectiles):
             pr.rastro.append((pr.x, pr.y))
             pr.rastro = pr.rastro[-5:]
             pr.x += pr.vx * dt
             pr.y += pr.vy * dt
             pr.vida -= dt
-            golpe = False
-            for b in list(self.bulos.values()):
-                pos = b.pos if b.estado == "libre" else self.vecinos[b.vecino].cabeza
-                if math.hypot(pos[0] - pr.x, pos[1] - pr.y) < (10 if b.estado == "libre" else 9):
-                    self._atrapar(b.id, curar_bonus=b.estado == "cabeza")
-                    golpe = True
-                    break
-            if not golpe:
-                for p in list(self.pulsos):
-                    if _dist(self._pos_pulso(p), (pr.x, pr.y)) < 9:
-                        self.pulsos.remove(p)
-                        j.stats["pulsos"] += 1
-                        self.sumar(8, pr.x, pr.y, "¡cortaste el reenvío!")
-                        self.emitir("pop", pr.x, pr.y, (180, 110, 255))
-                        self.sonar("pop", pr.x, pr.y)
-                        self.cargar(6)
-                        golpe = True
-                        break
-            if not golpe:
-                for a in list(self.antenas):
-                    if a.rect().collidepoint(pr.x, pr.y):
-                        self._golpe_antena(a)
-                        golpe = True
-                        break
-            if not golpe and self.viral and _dist((self.viral.x, self.viral.y - 10), (pr.x, pr.y)) < 16:
-                self._golpe_viral(1)
-                golpe = True
+            if self._impacto(pr):
+                pr.perfora -= 1
             fuera = not (0 <= pr.x < self.mapa.superficie.get_width() and 0 <= pr.y < self.mapa.superficie.get_height())
-            if golpe or pr.vida <= 0 or fuera:
+            if pr.perfora <= 0 or pr.vida <= 0 or fuera:
                 self.proyectiles.remove(pr)
-                if not golpe:
+                if pr.perfora > 0:
                     self.emitir("puff", pr.x, pr.y)
 
-    # ------------------------------------------------------------- estrellas
+    def _impacto(self, pr):
+        """¿Le dio a algo? Bulos libres, vecinos morados (en cualquier parte del cuerpo), reenvíos en
+        el aire, antenas, el viral y las peleas: todo se arregla lanzándole."""
+        j = self.jugador
+        punto = (pr.x, pr.y)
+        r = pr.radio
+        for b in list(self.bulos.values()):
+            if b.estado == "libre":
+                if _dist(b.pos, punto) < r:
+                    self._atrapar(b.id)
+                    return True
+            else:
+                v = self.vecinos.get(b.vecino)
+                if v and (_dist(v.cabeza, punto) < r or _dist(v.cuerpo, punto) < r + 3):
+                    self._atrapar(b.id)
+                    if j.clave == "beto":
+                        self._cura_en_cadena(v)
+                    return True
+        for p in list(self.pulsos):
+            if _dist(self._pos_pulso(p), punto) < r:
+                self.pulsos.remove(p)
+                j.stats["pulsos"] += 1
+                self._hoja(["falsa", "atrapar"])
+                self.sumar(8, pr.x, pr.y)
+                self.emitir("pop", pr.x, pr.y, (180, 110, 255))
+                self.sonar("pop", pr.x, pr.y)
+                self.cargar(6)
+                return True
+        for a in list(self.antenas):
+            if id(a) not in pr.golpeados and a.rect().inflate(r - 6, r - 6).collidepoint(punto):
+                pr.golpeados.add(id(a))
+                self._golpe_antena(a)
+                return True
+        if self.viral and "viral" not in pr.golpeados and _dist((self.viral.x, self.viral.y - 10), punto) < 16 + r / 2:
+            pr.golpeados.add("viral")
+            self._golpe_viral(1)
+            return True
+        for p in self.peleas:
+            if p.get("activa") and not p.get("fin") and id(p) not in pr.golpeados:
+                a, b = self.vecinos[p["a"]], self.vecinos[p["b"]]
+                if min(_dist(a.cuerpo, punto), _dist(b.cuerpo, punto), _dist(self._pos_pelea(p), punto)) < r + 4:
+                    pr.golpeados.add(id(p))
+                    p["golpes"] = p.get("golpes", 0) + (GOLPES_PELEA if j.clave == "caro" else 1)
+                    self.emitir("chispas", pr.x, pr.y, (255, 230, 150))
+                    if p["golpes"] >= GOLPES_PELEA:
+                        self._calmar(p)
+                    else:
+                        self.sonar("golpe", pr.x, pr.y)
+                    return True
+        return False
+
+    # ------------------------------------------------------------- estrellas (noticias verdaderas)
     def _estrellas(self, dt):
         self.t_kiosco -= dt
         if self.t_kiosco <= 0:
-            self.t_kiosco = 7.5
-            if sum(1 for s in self.estrellas) < 3:
-                ox, oy, falsa = self.kiosco[self.k_kiosco % len(self.kiosco)]
+            self.t_kiosco = 12.0
+            if len(self.estrellas) < 2:
+                ox, oy = self.kiosco[self.k_kiosco % len(self.kiosco)]
                 self.k_kiosco += 1
                 x, y = 27.5 * TILE + ox, 37.2 * TILE + oy
                 if self.mapa.libre(pygame.Rect(int(x) - 5, int(y) - 5, 10, 8)):
-                    self.estrellas.append(Estrella(self._id(), x, y, falsa))
+                    self.estrellas.append(Estrella(self._id(), x, y))
                     self.emitir("aparece", x, y)
-                    if not self.pistas_vistas & {"estrella"}:
-                        self.mostrar_pista("estrella", "Salen noticias del KIOSCO del parque: ¡recógelas!")
         for s in list(self.estrellas):
             s.t += dt
             s.vida -= dt
             if s.vida <= 0:
                 self.estrellas.remove(s)
                 self.emitir("puff", s.x, s.y)
-        j = self.jugador
-        if j.estrella:
-            j.estrella.t += dt
+                self._hoja(["verdadera", "ignorar"])
 
     # ------------------------------------------------------------- antenas del Bot
     def _antenas(self, dt):
@@ -1008,14 +980,12 @@ class Mundo:
             a.golpe = max(0.0, a.golpe - dt)
             a.t -= dt
             if a.t <= 0:
-                ritmo = max(6.0, 9.5 - self.t * 0.035) * (1.4 if self.tranquilo else 1.0)
-                a.t = ritmo
+                a.t = max(6.5, 10.0 - self.t * 0.03) * self.ritmo_ronda * (1.4 if self.tranquilo else 1.0)
                 if len(self.bulos_libres()) < MAX_BULOS_LIBRES:
                     b = self.nuevo_bulo(a.x, a.y - 34)
                     b.vx, b.vy = 0, -30
                     self.emitir("onda", a.x, a.y - 30)
                     self.sonar("antena", a.x, a.y)
-                    self.mostrar_pista("bulo", "¡Bulos! Atrápalos lanzando con ESPACIO", ("ESPACIO",))
 
     def _poner_antena(self, extra=False):
         k = self.orden_antenas[self.k_antena % len(self.orden_antenas)]
@@ -1024,18 +994,8 @@ class Mundo:
         a = Antena(x * TILE + 8, y * TILE + 14, 4 if self.tranquilo else 6)
         self.antenas.append(a)
         self.emitir("aparece", a.x, a.y - 20)
-        zona = self._zona_de(a.x, a.y)
-        if self.t > 5:
-            self.banner("¡El Bot puso una antena!", f"Está en {zona}. Golpéala para apagarla", (255, 120, 120))
-        self.mostrar_pista("antena", "La ANTENA del Bot suelta Bulos: ¡golpéala varias veces!")
-
-    def _zona_de(self, x, y):
-        tx, ty = x / TILE, y / TILE
-        if ty < 18:
-            return "el Colegio" if tx < 15 else "la Plaza" if tx < 42 else "el Mercado"
-        if ty > 25:
-            return "el Parque" if tx < 42 else "la Terminal"
-        return "la avenida"
+        if extra:
+            self.aviso("¡OTRA ANTENA!", (255, 120, 120))
 
     def _golpe_antena(self, a):
         j = self.jugador
@@ -1046,7 +1006,7 @@ class Mundo:
         if a.vida <= 0:
             self.antenas.remove(a)
             j.stats["antenas"] += 1
-            self.sumar(50, a.x, a.y - 30, "¡antena apagada!")
+            self.sumar(50, a.x, a.y - 30)
             self.ajustar(desinformacion=-6, informacion=3)
             self.emitir("explosion", a.x, a.y - 16)
             self.emitir("temblor", 7)
@@ -1082,11 +1042,12 @@ class Mundo:
         if v.vida <= 0:
             j = self.jugador
             j.stats["viral"] += 1
-            self.sumar(60, v.x, v.y - 20, "¡viral detenido!")
+            self._hoja(["falsa", "atrapar"])
+            self.sumar(60, v.x, v.y - 20)
             self.ajustar(desinformacion=-8, informacion=5, confianza=4)
             self.emitir("explosion", v.x, v.y - 10)
             self.emitir("temblor", 6)
-            self.banner("¡Detuviste el viral!", "No le llegó a nadie. ¡Así se frena una cadena!", (120, 230, 140))
+            self.aviso("¡VIRAL DETENIDO!", (120, 230, 140))
             self.sonar("victoria")
             self.viral = None
             self.cargar(25)
@@ -1112,13 +1073,19 @@ class Mundo:
             if nuevo:
                 ids[u] = nuevo
                 alcanzados += 1
-                self.emitir("ola", u, nivel)
+                self._hoja(["falsa", "llega", "pasar"])
+                self.emitir("ola", u, nivel, (255, 110, 160))
+        self.jugador.stats["regados"] += alcanzados
         self.emitir("temblor", 6)
         self.sonar("viral_mal")
         self.ajustar(desinformacion=10, confianza=-6, bienestar=-4)
-        self.banner("¡Se hizo viral!", f"Le llegó a {alcanzados} vecinos en segundos", (255, 110, 140))
+        self.aviso("¡SE REGÓ!", (255, 110, 140))
 
     # ------------------------------------------------------------- peleas
+    def _pos_pelea(self, p):
+        a, b = self.vecinos[p["a"]], self.vecinos[p["b"]]
+        return ((a.x + b.x) / 2, min(a.y, b.y) - 34)
+
     def _peleas(self, dt):
         for p in self.peleas:
             if p.get("fin"):
@@ -1137,10 +1104,8 @@ class Mundo:
                     p["t"] = 15.0 if not self.tranquilo else 20.0
                     a.ruta, b.ruta = [], []
                     self.emitir("pelea", a.nombre, b.nombre)
-                    self.decir(a.nombre, "¡Eso es mentira!", (200, 70, 60))
-                    self.decir(b.nombre, "¡Lo leí en Civitas!", (200, 70, 60))
+                    self.aviso("¡PELEA!", (255, 150, 90))
                     self.sonar("pelea", a.x, a.y)
-                    self.mostrar_pista("pelea", "¡Una pelea! Acércate y pulsa ESPACIO para calmarlos", ("ESPACIO",))
                 continue
             p["t"] -= dt
             if p["t"] <= 0:
@@ -1150,7 +1115,7 @@ class Mundo:
                 if self.social.eliminar_arista(a.nombre, b.nombre):
                     self.rotos.append((a.nombre, b.nombre))
                 self.ajustar(convivencia=-10, conflictos=8, bienestar=-4)
-                self.banner("Se rompió una amistad", f"{a.nombre} y {b.nombre} dejaron de hablarse", (255, 130, 110))
+                self.aviso("¡AMISTAD ROTA!", (255, 130, 110))
                 self.sonar("mal")
 
     def _empezar_pelea(self, azar):
@@ -1160,7 +1125,7 @@ class Mundo:
         if not opciones:
             return
         a, b = opciones[int(azar * len(opciones)) % len(opciones)]
-        p = {"a": a, "b": b, "activa": False, "espera": 6.0, "t": 0}
+        p = {"a": a, "b": b, "activa": False, "espera": 6.0, "t": 0, "golpes": 0}
         self.peleas.append(p)
         va, vb = self.vecinos[a], self.vecinos[b]
         va.pelea = vb.pelea = p
@@ -1168,7 +1133,6 @@ class Mundo:
         vb.ruta, vb.espera = [], 6.0
         va.espera = 0
         self._nuevo_destino(va)
-        self.banner("¡Discusión en el barrio!", f"{a} y {b} están peleando por un rumor", (255, 150, 90))
 
     # ------------------------------------------------------------- eventos al azar
     def _guion(self, dt):
@@ -1177,28 +1141,27 @@ class Mundo:
             self._evento(tipo, azar)
 
     def _evento(self, tipo, azar):
-        if tipo == "falsa":
+        if tipo == "falsa":                 # aparece una noticia falsa: un grupito de Bulos
+            x, y = self._punto_suelto()
+            for k in range(3):
+                self.nuevo_bulo(x + (k - 1) * 14, y - 20)
+            self.emitir("aparece", x, y - 20)
+            self.sonar("antena", x, y)
+        elif tipo == "verdad":              # se publica una noticia verdadera
             for _ in range(2):
                 x, y = self._punto_suelto()
-                self.estrellas.append(Estrella(self._id(), x, y, True))
+                self.estrellas.append(Estrella(self._id(), x, y))
                 self.emitir("aparece", x, y)
-            self.banner("¡Llegaron noticias raras!", "Algunas estrellas son Bulos disfrazados. Míralas antes de compartir")
-        elif tipo == "verdad":
-            for _ in range(3):
-                x, y = self._punto_suelto()
-                self.estrellas.append(Estrella(self._id(), x, y, False))
-                self.emitir("aparece", x, y)
-            self.banner("¡Lluvia de noticias reales!", "Aparecieron estrellas por el barrio", (255, 220, 90))
-        elif tipo == "rumor":
+            self.aviso("¡NOTICIAS!", (255, 220, 90))
+        elif tipo == "rumor":               # rumor sobre un candidato (se ve su color en el Bulo)
             cand = CANDIDATOS[int(azar * 3)]
             for k in range(2):
                 x, y = self._punto_suelto()
                 self.nuevo_bulo(x, y - 20, candidato=cand)
                 self.emitir("aparece", x, y - 20)
-            self.banner(f"Rumor sobre {cand}", f"Dicen cosas falsas de la candidata/o {cand}. ¡Atrápalos!", (200, 160, 255))
         elif tipo == "pelea":
             self._empezar_pelea(azar)
-        elif tipo == "reporte":
+        elif tipo == "reporte":             # un vecino reporta el Bulo por su cuenta
             inf = sorted(self.infectados(), key=lambda v: v.nombre)
             if inf:
                 v = inf[int(azar * len(inf)) % len(inf)]
@@ -1207,13 +1170,13 @@ class Mundo:
                     b = self.bulos.pop(i, None)
                     if b and b.estado == "cabeza" and b.vecino in self.vecinos:
                         self.vecinos[b.vecino].bulo = None
+                        self._hoja(["falsa", "llega", "curar"])
                 self.pulsos = [p for p in self.pulsos if p.padre in self.arbol]
                 self.emitir("pop", v.x, v.y - 20, (255, 255, 255))
                 self.ajustar(informacion=3, confianza=2)
-                self.banner(f"¡{v.nombre} reportó un Bulo!", "Los vecinos también ayudan cuando saben reconocerlos", (130, 220, 255))
             else:
                 self._evento("verdad", azar)
-        elif tipo == "campana":
+        elif tipo == "campana":             # campaña de convivencia digital: nuevas amistades
             for p in self.peleas:
                 if not p.get("fin"):
                     p["fin"] = "paz"
@@ -1231,7 +1194,6 @@ class Mundo:
                     if hechas == 2:
                         break
             self.ajustar(convivencia=8, conflictos=-6, bienestar=5)
-            self.banner("Campaña de convivencia digital", "Se acabaron las peleas y hay nuevas amistades", (120, 230, 140))
             self.sonar("paz")
         elif tipo == "viral":
             sanos = [v for v in self.vecinos.values() if v.bulo is None and v.escudo <= 0]
@@ -1240,22 +1202,19 @@ class Mundo:
             obj = max(sanos, key=lambda v: (self.social.grado(v.nombre), v.nombre))
             x, y = obj.x + (60 if obj.x < 900 else -60), obj.y - 50
             self.viral = Viral(x, y, obj.nombre)
-            self.banner("¡INFORMACIÓN VIRAL!", f"Un Bulo gigante va hacia {obj.nombre}. ¡Tienes 10 segundos!", (255, 90, 140))
+            self.aviso("¡VIRAL!", (255, 90, 140))
             self.sonar("alarma", x, y)
             self.emitir("temblor", 3)
         elif tipo == "antena2":
             self._poner_antena(extra=True)
-            self.banner("¡El Bot contraataca!", "Puso otra antena en el barrio", (255, 110, 110))
 
     # ------------------------------------------------------------- fin del turno
     def _cerrar(self):
         self.terminado = True
-        j = self.jugador
-        if j.estrella is not None:
-            camino = ["mirar", "real", "ignorar"] if j.estrella.revelada else ["ignorar"]
-            hoja = self.decisiones.recorrer(camino)
-            self._aplicar_hoja(hoja, j.x, j.y)
-            j.estrella = None
+        # los que se quedaron con el Bulo sin pasarlo: "alguien se la creyó" y quedó así
+        for v in self.infectados():
+            if v.bulo not in self.pasaron:
+                self.decisiones.recorrer(["falsa", "llega"])
         self.sonar("fin")
 
     def resumen(self):
@@ -1263,21 +1222,17 @@ class Mundo:
         salvados = self.salvados()
         bono = salvados * 10
         total = j.puntos + bono
-        if total >= 520 and j.stats["compartidas_falsas"] == 0:
-            reputacion = 3
-        elif total >= 300:
-            reputacion = 2
-        else:
-            reputacion = 1
-        return {"personaje": j.clave, "puntos": j.puntos, "salvados": salvados, "vecinos": len(self.vecinos),
+        n = len(self.vecinos)
+        reputacion = 3 if salvados >= n * 0.78 else 2 if salvados >= n * 0.5 else 1
+        return {"personaje": j.clave, "puntos": j.puntos, "salvados": salvados, "vecinos": n,
                 "bono": bono, "total": total, "reputacion": reputacion, "stats": dict(j.stats),
                 "indicadores": self.indicadores(), "rumores": dict(self.rumores),
                 "defendidos": dict(self.defendidos), "rotos": list(self.rotos), "nuevos": list(self.nuevos),
-                "arbol": [(n.clave, n.texto, n.veces, n.padre.clave if n.padre else None, n.es_hoja)
-                          for n in self.decisiones.preorden()],
+                "arbol": [(n_.clave, n_.texto, n_.veces, n_.padre.clave if n_.padre else None, n_.es_hoja)
+                          for n_ in self.decisiones.preorden()],
                 "cadena_max": self.arbol.mayor_cadena,
-                "red": {"estados": {n: ("bulo" if v.bulo is not None else "protegido" if v.escudo > 0 else "sano")
-                                    for n, v in self.vecinos.items()},
+                "red": {"estados": {nom: ("bulo" if v.bulo is not None else "protegido" if v.escudo > 0 else "sano")
+                                    for nom, v in self.vecinos.items()},
                         "aristas": [list(a) for a in self.social.aristas()],
                         "comunidades": len(self.social.componentes()),
                         "mas_conectado": self.social.mas_conectado()}}

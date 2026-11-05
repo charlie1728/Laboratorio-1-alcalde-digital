@@ -5,9 +5,13 @@ import time
 from .config import DATOS
 from .estructuras.avl import AVL
 
-OPCIONES_BASE = {"musica": 0.45, "efectos": 0.8, "subtitulos": True, "contraste": False,
-                 "tranquilo": False, "pantalla_completa": False, "pistas": True, "duracion": 90, "rondas": 2,
-                 "historia_vista": False, "volver_inicio": True}
+VERSION_OPCIONES = 2
+OPCIONES_BASE = {"musica": 0.45, "efectos": 0.8, "subtitulos": False, "contraste": False,
+                 "tranquilo": False, "pantalla_completa": True, "pistas": True, "duracion": 120, "rondas": 2,
+                 "historia_vista": False, "volver_inicio": True, "version": VERSION_OPCIONES}
+# Lo que cambió de una versión a otra y debe aplicarse aunque ya hubiera opciones guardadas:
+# en la versión 2 el juego abre en pantalla completa, sin subtítulos de sonidos y con turnos de 2 minutos.
+NUEVOS_EN_V2 = {"pantalla_completa": True, "subtitulos": False, "duracion": 120}
 
 
 def _leer(nombre, defecto):
@@ -27,7 +31,11 @@ def _escribir(nombre, datos):
 
 def cargar_opciones():
     op = dict(OPCIONES_BASE)
-    op.update(_leer("opciones.json", {}))
+    guardadas = _leer("opciones.json", {})
+    op.update(guardadas)
+    if guardadas and guardadas.get("version", 1) < 2:
+        op.update(NUEVOS_EN_V2)
+    op["version"] = VERSION_OPCIONES
     return op
 
 
@@ -64,13 +72,13 @@ LOGROS = [
     ("raiz", "Cortaste la raíz", "Tumba una cadena de 3 o más Bulos de un golpe", lambda r: r["stats"]["cadena"] >= 3),
     ("antena", "Señal cortada", "Apaga una antena del Bot", lambda r: r["stats"]["antenas"] >= 1),
     ("dos_antenas", "Sin señal", "Apaga 2 antenas en un turno", lambda r: r["stats"]["antenas"] >= 2),
-    ("ojo", "Ojo de periodista", "Revisa 4 noticias antes de compartirlas", lambda r: r["stats"]["verificadas"] >= 4),
-    ("cartero", "Cartero de la verdad", "Entrega 4 noticias reales", lambda r: r["stats"]["entregadas"] >= 4),
+    ("tijeras", "Tijeras", "Corta 3 Bulos que viajaban por los hilos", lambda r: r["stats"]["pulsos"] >= 3),
+    ("cartero", "Cartero de la verdad", "Comparte 3 estrellas", lambda r: r["stats"]["compartidas"] >= 3),
     ("paz", "Paz en el barrio", "Calma 2 peleas", lambda r: r["stats"]["peleas"] >= 2),
     ("viral", "Freno al viral", "Detén el Bulo viral", lambda r: r["stats"]["viral"] >= 1),
     ("salvador", "Barrio a salvo", "Termina con 15 vecinos o más a salvo", lambda r: r["salvados"] >= 15),
-    ("limpio", "Cero cadenas", "Termina sin compartir ningún Bulo y con más de 200 puntos",
-     lambda r: r["stats"]["compartidas_falsas"] == 0 and r["total"] >= 200),
+    ("limpio", "Cero cadenas", "Que nadie le pase un Bulo a un amigo (y más de 200 puntos)",
+     lambda r: r["stats"]["regados"] == 0 and r["total"] >= 200),
     ("combo", "Imparable", "Haz un combo de 10", lambda r: r["stats"]["combo_max"] >= 10),
     ("medico", "Doctor de rumores", "Cura a 10 vecinos", lambda r: r["stats"]["curados"] >= 10),
     ("tres", "Tres estrellas", "Gana 3 estrellas de reputación", lambda r: r["reputacion"] >= 3),

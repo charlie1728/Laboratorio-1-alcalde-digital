@@ -5,10 +5,9 @@ import pygame
 from ..config import ALTO, ANCHO
 from ..hud import Hud
 from ..mundo import Mundo
-from ..personajes import PERSONAJES
 from ..render import Render
 from ..ui import render, tecla, texto
-from .base import Botonera, Escena
+from .base import Botonera, Escena, instrucciones
 
 TECLAS_ACCION = (pygame.K_SPACE, pygame.K_RETURN, pygame.K_z, pygame.K_KP_ENTER)
 TECLAS_PODER = (pygame.K_x, pygame.K_LSHIFT, pygame.K_RSHIFT)
@@ -42,6 +41,7 @@ class PantallaJuego(Escena):
         self.pausa = None
         self.t_red = 0.0
         self.entrada = {}
+        self.paso_cuenta = 1.1 if partida.ronda == 1 else 0.8
 
     # ------------------------------------------------------------- entrada
     def evento(self, e):
@@ -89,7 +89,7 @@ class PantallaJuego(Escena):
              "arriba": k[pygame.K_UP] or k[pygame.K_w] or pad["arriba"], "abajo": k[pygame.K_DOWN] or k[pygame.K_s] or pad["abajo"]}
         # mantener ESPACIO (o A) presionado también lanza (a los niños pequeños les pasa mucho)
         sostenido = k[pygame.K_SPACE] or k[pygame.K_z] or pad["accion"]
-        if sostenido and self.m.jugador.enfriar <= 0 and not self.m.jugador.estrella:
+        if sostenido and self.m.jugador.enfriar <= 0:
             e["accion"] = True
         e.update(self.entrada)
         self.entrada = {}
@@ -102,11 +102,11 @@ class PantallaJuego(Escena):
             return
         self.t_estado += dt
         if self.estado == "cuenta":
-            n = 3 - int(self.t_estado / 0.8)
+            n = 3 - int(self.t_estado / self.paso_cuenta)
             if n != self.ultimo_num:
                 self.ultimo_num = n
                 self.app.son.tocar("cuenta" if n > 0 else "ya")
-            if self.t_estado >= 3.2:
+            if self.t_estado >= self.paso_cuenta * 4:
                 self.estado = "juego"
                 self.t_estado = 0.0
         elif self.estado == "juego":
@@ -130,7 +130,7 @@ class PantallaJuego(Escena):
             self.r.fantasmas = self.red.fantasmas()
             self.hud.marcador = self.red.marcador()
             for aviso in self.red.avisos():
-                self.r.toasts.append([aviso, 0.0])
+                self.r.avisos.append([aviso, (200, 220, 255), 0.0])
 
     def _terminar(self):
         pa = self.partida
@@ -150,15 +150,17 @@ class PantallaJuego(Escena):
         self.r.dibujar(pant)
         self.hud.dibujar(pant)
         if self.estado == "cuenta":
-            n = 3 - int(self.t_estado / 0.8)
-            f = (self.t_estado % 0.8) / 0.8
+            n = 3 - int(self.t_estado / self.paso_cuenta)
+            f = (self.t_estado % self.paso_cuenta) / self.paso_cuenta
+            velo = pygame.Surface((ANCHO, ALTO), pygame.SRCALPHA)
+            velo.fill((16, 10, 36, 120))
+            pant.blit(velo, (0, 0))
             s = "¡YA!" if n <= 0 else str(n)
-            tam = int(150 + 60 * (1 - f))
+            tam = int(130 + 50 * (1 - f))
             color = (255, 205, 50) if n > 0 else (120, 240, 150)
-            texto(pant, s, (ANCHO // 2, ALTO // 2 - 30), tam, color, "center", grosor=6)
+            texto(pant, s, (ANCHO // 2, 210), tam, color, "center", grosor=6)
             if n > 0:
-                p = PERSONAJES[self.m.jugador.clave]
-                texto(pant, f"{self.hud.nombre}, ¡salva a los vecinos!", (ANCHO // 2, ALTO // 2 + 80), 30, p["color"], "center")
+                instrucciones(pant, (ANCHO // 2, 440), self.t, self.app.mando.en_uso)
         elif self.estado == "fin":
             velo = pygame.Surface((ANCHO, ALTO), pygame.SRCALPHA)
             velo.fill((20, 14, 46, min(170, int(self.t_estado * 300))))
@@ -173,8 +175,8 @@ class PantallaJuego(Escena):
             if self.red:
                 texto(pant, "En línea el tiempo sigue corriendo", (ANCHO // 2, 220), 22, (255, 200, 200), "center", 600)
             self.pausa.dibujar(pant, self.t)
-            filas = ((("CRUCETA", "moverse"), ("A", "lanzar / entregar / calmar"), ("B / X", "poder")) if self.app.mando.en_uso
-                     else (("FLECHAS", "moverse"), ("ESPACIO", "lanzar / entregar / calmar"), ("X", "poder")))
+            filas = ((("CRUCETA", "moverse"), ("A", "lanzar"), ("B / X", "poder")) if self.app.mando.en_uso
+                     else (("FLECHAS", "moverse"), ("ESPACIO", "lanzar"), ("X", "poder")))
             medidas = [(max(render(t_, 16, peso=700, borde=None).get_width() + 18, 30), render(d, 18, peso=600).get_width())
                        for t_, d in filas]
             x = ANCHO // 2 - (sum(a + 8 + b for a, b in medidas) + 36 * (len(filas) - 1)) // 2
