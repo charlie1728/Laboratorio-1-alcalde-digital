@@ -1125,6 +1125,12 @@ class Mundo:
                 p["espera"] -= dt
                 if _dist(a.pos, b.pos) < 30 or p["espera"] <= 0:
                     p["activa"] = True
+                    if _dist(a.pos, b.pos) > 50:
+                        # no alcanzó a llegar: se ponen frente a frente
+                        for dx in (16, -16, 0):
+                            if self.mapa.libre(pygame.Rect(int(a.x + dx) - 4, int(a.y) - 3, 8, 4)):
+                                b.x, b.y = a.x + dx, a.y
+                                break
                     p["t"] = 15.0 if not self.tranquilo else 20.0
                     a.ruta, b.ruta = [], []
                     self.emitir("pelea", a.nombre, b.nombre)

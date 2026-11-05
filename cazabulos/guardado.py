@@ -6,7 +6,8 @@ from .config import DATOS
 from .estructuras.avl import AVL
 
 OPCIONES_BASE = {"musica": 0.45, "efectos": 0.8, "subtitulos": True, "contraste": False,
-                 "tranquilo": False, "pantalla_completa": False, "pistas": True, "duracion": 90, "rondas": 2}
+                 "tranquilo": False, "pantalla_completa": False, "pistas": True, "duracion": 90, "rondas": 2,
+                 "historia_vista": False}
 
 
 def _leer(nombre, defecto):

@@ -43,8 +43,8 @@ class Titulo(Escena):
         from .ayuda import Ayuda
         from .en_linea import EnLinea
         self.botones = Botonera([
-            ("¡Jugar ya!", lambda: app.cambiar(Seleccion(app, 1, 1, 60, True))),
-            ("Con amigos (mismo PC)", lambda: app.cambiar(Preparar(app))),
+            ("¡Jugar ya!", lambda: self._con_historia(Seleccion(app, 1, 1, 60, True))),
+            ("Con amigos (mismo PC)", lambda: self._con_historia(Preparar(app))),
             ("En línea", lambda: app.cambiar(EnLinea(app))),
             ("Ayuda", lambda: app.cambiar(Ayuda(app))),
             ("Opciones", lambda: app.cambiar(Opciones(app))),
@@ -54,6 +54,14 @@ class Titulo(Escena):
 
     def _salir(self):
         self.app.corriendo = False
+
+    def _con_historia(self, siguiente):
+        """La primera vez se cuenta la historia de Ciudad Nova (3 escenas cortas)."""
+        if self.app.op.get("historia_vista"):
+            self.app.cambiar(siguiente)
+        else:
+            from .historia import Historia
+            self.app.cambiar(Historia(self.app, siguiente))
 
     def evento(self, e):
         if es_volver(e) and e.key == pygame.K_ESCAPE:
