@@ -42,26 +42,71 @@ class Hud:
         self.marcador = []          # en línea: [(nombre, clave, puntos)]
         self.mando = False          # True si hay un control USB conectado (cambia las teclas que se muestran)
         self.sin_controles = False  # en la cuenta regresiva y en la pausa las teclas ya se ven en el centro
+        self.alfas = {}             # qué tan visible está cada panel (se aclaran si tapan algo importante)
+        self._lienzo = None
         self.retrato = escalar(personajes.retrato(mundo.jugador.clave, mundo.jugador.piel, mundo.jugador.pelo), 5)
+
+    def _zonas(self):
+        """Dónde está cada panel en la pantalla (con un poco de margen)."""
+        base = minimapa_base(self.m.mapa)
+        alto_reloj = 76 + (58 if self.m.viral else 0)
+        return {"tarjeta": pygame.Rect(10, 8, 310, 106),
+                "reloj": pygame.Rect(ANCHO // 2 - 176, 6, 352, alto_reloj + 10),
+                "mapa": pygame.Rect(ANCHO - base.get_width() - 32, 4, base.get_width() + 30, 330),
+                "poder": pygame.Rect(ANCHO - 140, ALTO - 160, 136, 156)}
+
+    def _importantes(self):
+        """Lo que no debe quedar escondido detrás de un panel: tú, los morados, el viral, las estrellas y la antena."""
+        r, m = self.r, self.m
+        j = m.jugador
+        x, y = r.a_pantalla(j.x - 9, j.y - 26)
+        res = [pygame.Rect(int(x), int(y), 54, 84)]
+        puntos = [v.cuerpo for v in m.infectados()] + [(s.x, s.y) for s in m.estrellas]
+        puntos += [(a.x, a.y - 20) for a in m.antenas]
+        if m.viral:
+            puntos.append((m.viral.x, m.viral.y))
+        for px, py in puntos:
+            sx, sy = r.a_pantalla(px, py)
+            res.append(pygame.Rect(int(sx) - 24, int(sy) - 30, 48, 60))
+        return res
 
     def actualizar(self, dt):
         self.t += dt
+        importantes = self._importantes()
+        for clave, zona in self._zonas().items():
+            meta = 0.22 if zona.collidelist(importantes) != -1 else 1.0
+            a = self.alfas.get(clave, 1.0)
+            self.alfas[clave] = a + (meta - a) * min(1.0, dt * 7)
         objetivo = self.m.jugador.puntos
         self.puntos_vis += (objetivo - self.puntos_vis) * min(1.0, dt * 8)
         if abs(objetivo - self.puntos_vis) < 1:
             self.puntos_vis = objetivo
 
     def dibujar(self, pant):
-        self._tarjeta(pant)
-        self._reloj(pant)
-        self._minimapa(pant)
-        self._indicadores(pant)
-        self._poder(pant)
+        zonas = self._zonas()
+        self._pieza(pant, "tarjeta", zonas["tarjeta"], self._tarjeta)
+        self._pieza(pant, "reloj", zonas["reloj"], self._reloj)
+        self._pieza(pant, "mapa", zonas["mapa"], lambda p: (self._minimapa(p), self._indicadores(p)))
+        self._pieza(pant, "poder", zonas["poder"], self._poder)
         self._controles(pant)
         self._avisos(pant)
         self._pista(pant)
         if self.marcador:
             self._marcador(pant)
+
+    def _pieza(self, pant, clave, zona, dibujar):
+        """Dibuja un panel; si algo importante quedó debajo, el panel se vuelve casi transparente."""
+        a = self.alfas.get(clave, 1.0)
+        if a > 0.97:
+            dibujar(pant)
+            return
+        if self._lienzo is None:
+            self._lienzo = pygame.Surface((ANCHO, ALTO), pygame.SRCALPHA)
+        zona = zona.clip(pant.get_rect())
+        self._lienzo.fill((0, 0, 0, 0), zona)
+        dibujar(self._lienzo)
+        self._lienzo.set_alpha(int(255 * a))
+        pant.blit(self._lienzo, zona, zona)
 
     # ------------------------------------------------------------- piezas
     def _tarjeta(self, pant):

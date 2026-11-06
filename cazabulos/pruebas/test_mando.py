@@ -201,6 +201,18 @@ class TestFeria(unittest.TestCase):
         self.assertFalse(self.app.corriendo)
         self.app.corriendo = True
 
+    def test_las_opciones_viejas_pasan_a_ventana_grande(self):
+        import json
+        (guardado.DATOS / "opciones.json").write_text(json.dumps({"pantalla_completa": True, "version": 2}),
+                                                       encoding="utf-8")
+        op = guardado.cargar_opciones()
+        self.assertFalse(op["pantalla_completa"])
+        self.assertEqual(op["version"], guardado.VERSION_OPCIONES)
+        (guardado.DATOS / "opciones.json").write_text(json.dumps({"pantalla_completa": True, "version": 3}),
+                                                       encoding="utf-8")
+        self.assertTrue(guardado.cargar_opciones()["pantalla_completa"])      # si la eligió después, se respeta
+        (guardado.DATOS / "opciones.json").unlink()
+
     def test_el_control_mueve_al_jugador(self):
         from cazabulos.pantallas.juego import PantallaJuego
         from cazabulos.partida import Partida

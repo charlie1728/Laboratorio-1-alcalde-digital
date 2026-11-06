@@ -378,5 +378,35 @@ class TestMensajeFinal(unittest.TestCase):
         self.assertNotIn("bien", mensaje(dict(base, salvados=2, reputacion=1)).lower().split("!")[0])
 
 
+class TestPantalla(unittest.TestCase):
+    def test_en_la_orilla_los_paneles_no_tapan_al_jugador(self):
+        from cazabulos.hud import Hud
+        from cazabulos.render import Render
+        m = nuevo("ana")
+        r = Render(m, None, {})
+        h = Hud(m, r, None, 1, 1, {})
+        zonas = h._zonas()
+        for tx, ty in ((62, 9), (62, 40), (4, 7), (60, 44)):          # las cuatro esquinas del mapa
+            m.jugador.x, m.jugador.y = tx * 16, ty * 16
+            for _ in range(120):
+                r.actualizar(1 / 60)
+            x, y = r.a_pantalla(m.jugador.x - 9, m.jugador.y - 26)
+            jugador = pygame.Rect(int(x), int(y), 54, 84)
+            self.assertEqual(jugador.collidelist(list(zonas.values())), -1, (tx, ty))
+
+    def test_un_panel_se_aclara_si_tapa_algo_importante(self):
+        from cazabulos.hud import Hud
+        from cazabulos.render import Render
+        m = nuevo("ana")
+        r = Render(m, None, {})
+        h = Hud(m, r, None, 1, 1, {})
+        h.actualizar(1 / 60)
+        self.assertGreater(h.alfas["mapa"], 0.9)
+        m.estrellas.append(Estrella(1, (r.cam[0] + 1160) / 3, (r.cam[1] + 250) / 3))
+        for _ in range(60):
+            h.actualizar(1 / 60)
+        self.assertLess(h.alfas["mapa"], 0.3)
+
+
 if __name__ == "__main__":
     unittest.main()

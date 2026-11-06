@@ -254,7 +254,9 @@ class Opciones(Formulario):
             Selector("Modo tranquilo (para peques)", SI_NO, 0 if op["tranquilo"] else 1,
                      "Los Bulos van más despacio y las peleas duran más. Para niños pequeños o para aprender a jugar."),
             Selector("Pistas en pantalla", SI_NO, 0 if op["pistas"] else 1, "Muestra mensajes que explican qué hacer la primera vez."),
-            Selector("Pantalla completa", SI_NO, 0 if op["pantalla_completa"] else 1, "También se cambia con F11."),
+            Selector("Pantalla completa", SI_NO, 0 if op["pantalla_completa"] else 1,
+                     "No: una ventana grande que llena la pantalla (se ven la barra de título y la de tareas). "
+                     "Sí: todo el monitor. También se cambia con F11."),
             Selector("Volver solo al inicio (feria)", SI_NO, 0 if op.get("volver_inicio", True) else 1,
                      "Si nadie toca nada en 90 segundos, el juego vuelve a la pantalla de inicio para el siguiente niño."),
         ]
@@ -267,8 +269,7 @@ class Opciones(Formulario):
         op["subtitulos"], op["contraste"], op["tranquilo"] = f[2].valor, f[3].valor, f[4].valor
         op["pistas"] = f[5].valor
         if op["pantalla_completa"] != f[6].valor:
-            op["pantalla_completa"] = f[6].valor
-            pygame.display.toggle_fullscreen()
+            self.app.poner_pantalla(f[6].valor)
         op["volver_inicio"] = f[7].valor
         self.app.aplicar_volumen()
         self.app.guardar_opciones()

@@ -36,11 +36,17 @@ class App:
         pygame.display.set_caption(TITULO)
         self._icono()                       # antes de abrir la ventana, para que Windows lo tome
         self.op = cargar_opciones()
-        flags = pygame.SCALED | (pygame.FULLSCREEN if self.op.get("pantalla_completa") else 0)
+        # Ventana que se puede agrandar: el juego (1280x720) se escala solo al tamaño que tenga.
         try:
-            self.pantalla = pygame.display.set_mode((ANCHO, ALTO), flags)
+            self.pantalla = pygame.display.set_mode((ANCHO, ALTO), pygame.SCALED | pygame.RESIZABLE)
         except pygame.error:
             self.pantalla = pygame.display.set_mode((ANCHO, ALTO))
+        try:
+            from pygame._sdl2.video import Window
+            self.ventana = Window.from_display_module()
+        except Exception:
+            self.ventana = None
+        self.poner_pantalla(self.op.get("pantalla_completa", False))
         self.reloj = pygame.time.Clock()
         self.son = Sonido()
         self.aplicar_volumen()
@@ -69,6 +75,26 @@ class App:
             pygame.display.set_icon(pygame.transform.scale(ico, (64, 64)))
         except (pygame.error, FileNotFoundError):
             pass
+
+    def poner_pantalla(self, completa):
+        """Ventana grande (maximizada: se ven la barra de título y la de tareas) o pantalla completa.
+        La pantalla completa es "de escritorio" (no cambia la resolución del monitor): así, al volver a
+        la ventana con F11, no queda pegada en el fondo la imagen vieja del juego."""
+        self.op["pantalla_completa"] = bool(completa)
+        w = self.ventana
+        try:
+            if w is None:
+                if bool(completa) != bool(pygame.display.is_fullscreen()):
+                    pygame.display.toggle_fullscreen()
+            elif completa:
+                w.set_fullscreen(desktop=True)
+            else:
+                w.set_windowed()
+                w.maximize()
+        except (pygame.error, AttributeError):
+            pass
+        self.pantalla.fill((16, 10, 36))
+        pygame.display.flip()
 
     def aplicar_volumen(self):
         self.son.vol_efectos = self.op["efectos"]
@@ -127,7 +153,8 @@ class App:
             if e.type == pygame.QUIT:
                 self.corriendo = False
             elif e.type == pygame.KEYDOWN and e.key == pygame.K_F11:
-                pygame.display.toggle_fullscreen()
+                self.poner_pantalla(not self.op.get("pantalla_completa", False))
+                self.guardar_opciones()
             elif e.type == pygame.KEYDOWN and e.key == pygame.K_m and getattr(self.escena, "permite_mute", True):
                 self.op["musica"] = 0.0 if self.op["musica"] > 0 else 0.45
                 self.aplicar_volumen()

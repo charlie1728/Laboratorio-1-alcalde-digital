@@ -150,7 +150,8 @@ La primera versión jugable tenía demasiadas cosas a la vez: noticias que habí
 - **Sin textos encima del juego:** se quitaron los globos de diálogo, los nombres y los banners. Quedan avisos de una o dos palabras, flechas con dibujos y una sola pista.
 - **Solo se ven los hilos que importan en ese momento:** el que lleva un Bulo y el aviso de a quién se lo van a pasar. Antes se dibujaban todas las amistades y la pantalla se llenaba de líneas.
 - **Más tiempo:** turnos de 2 minutos (90 segundos en "¡Jugar ya!").
-- **Abre en pantalla completa, con su propio ícono** y sin consola.
+- **Abre en una ventana grande que llena la pantalla, con su propio ícono** y sin consola; F11 la pasa a pantalla completa.
+- **Los paneles no tapan el juego:** en las orillas del mapa la cámara se corre un poco más allá del borde, y si un vecino morado, una estrella, la antena o el viral queda debajo de un panel, el panel se vuelve casi transparente.
 
 ## 7. Respuestas para la sustentación
 
@@ -178,7 +179,7 @@ La primera versión jugable tenía demasiadas cosas a la vez: noticias que habí
 
 ## 8. Pruebas
 
-`python -m unittest discover -s cazabulos/pruebas -t .` corre 56 pruebas.
+`python -m unittest discover -s cazabulos/pruebas -t .` corre 59 pruebas.
 
 - **Estructuras:** BFS por niveles y con filtro, componentes, Dijkstra, subárboles, recorridos, AVL y el árbol de decisiones (sus caminos, las cuatro acciones del enunciado y eliminar ramas).
 - **Juego:**
@@ -195,6 +196,7 @@ La primera versión jugable tenía demasiadas cosas a la vez: noticias que habí
   - Botones que cambian según la pantalla y palanca con margen para que no tiemble.
   - Cruceta que mueve al jugador.
   - Puntero del mouse que no selecciona botones solo y "Salir" que pregunta antes de cerrar.
+  - Las opciones viejas pasan a ventana grande; en las esquinas del mapa los paneles no tapan al jugador; un panel se aclara si tapa algo importante.
   - Regreso solo al inicio sin interrumpir un turno ni el modo en línea.
   - Rescate que vuelve al inicio si una pantalla falla.
 

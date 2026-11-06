@@ -18,7 +18,7 @@ Antes de cada turno, la cuenta regresiva explica el juego en tres dibujos: **atr
 | **Flechas** (o WASD) | Caminar por el barrio |
 | **Espacio** (se puede mantener) | Lanzar tu herramienta. Todo se arregla lanzándole: los Bulos, los vecinos morados, la antena, las peleas y el Bulo viral |
 | **X** | El poder de tu personaje, cuando el círculo se llena |
-| **Esc** | Pausa · **M** silencia la música · **F11** pantalla completa |
+| **Esc** | Pausa · **M** silencia la música · **F11** cambia entre ventana grande y pantalla completa |
 
 **Con control USB** (tipo Xbox): cruceta o palanca para caminar, **A** para lanzar o aceptar, **B** o **X** para el poder (en los menús B es volver), **Start** para pausa. Las ayudas en pantalla cambian solas a los botones del control.
 
@@ -50,7 +50,7 @@ La piel y el color de pelo se pueden cambiar al elegir. Con jugadores automátic
 
 Al final viene la **elección del alcalde**: si la desinformación promedio quedó por debajo de 50 gana un candidato con propuestas; si llegó a 50 (la mitad del barrio se creyó los Bulos) gana Emilio Bot. Luego el podio con el ganador de la partida.
 
-**Para la feria:** el juego abre en pantalla completa y si nadie toca nada durante 90 segundos vuelve solo a la pantalla de inicio (no pasa a mitad de un turno ni en el modo en línea). Si una pantalla falla, el error se guarda en `cazabulos_error.log` y el juego vuelve al inicio en vez de cerrarse. "Salir" pregunta antes de cerrar, por si un niño lo toca sin querer.
+**Para la feria:** el juego abre en una ventana grande que llena la pantalla (F11 la pasa a pantalla completa y la devuelve). Cerca de las orillas del mapa la cámara se corre para que los paneles no tapen al jugador, y si algo importante queda debajo de un panel, el panel se vuelve casi transparente. Si nadie toca nada durante 90 segundos vuelve solo a la pantalla de inicio (no pasa a mitad de un turno ni en el modo en línea). Si una pantalla falla, el error se guarda en `cazabulos_error.log` y el juego vuelve al inicio en vez de cerrarse. "Salir" pregunta antes de cerrar, por si un niño lo toca sin querer.
 
 ## Las estructuras de datos y para qué sirven
 
@@ -87,7 +87,7 @@ Otros comandos: `python -m cazabulos.acceso_directo --escritorio` pone el acceso
 
 Para jugar en línea, los computadores deben estar en la misma red. La primera vez, Windows puede preguntar si deja que Python use la red: hay que dar **Permitir** en el computador que crea la sala.
 
-Pruebas (56):
+Pruebas (59):
 
 ```bash
 python -m unittest discover -s cazabulos/pruebas -t .

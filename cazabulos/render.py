@@ -13,6 +13,11 @@ from .sonido import SUBTITULOS
 from .ui import render, texto
 
 _suelo_escalado = None
+# Cuánto puede pasarse la cámara del borde del mapa (en pixeles de pantalla). Así, cuando el jugador
+# está en una orilla, los paneles del HUD (minimapa e indicadores a la derecha, reloj y tarjeta arriba)
+# quedan encima de "las afueras" y no encima de donde se está jugando.
+MARGEN_CAMARA = {"izq": 0, "der": 250, "arr": 110, "aba": 40}
+AFUERAS = (26, 30, 44)
 
 
 def suelo_escalado(mapa):
@@ -65,8 +70,9 @@ class Render:
     def _limitar(self):
         mw = self.m.mapa.superficie.get_width() * ESC
         mh = self.m.mapa.superficie.get_height() * ESC
-        self.cam[0] = max(0, min(mw - ANCHO, self.cam[0]))
-        self.cam[1] = max(0, min(mh - ALTO, self.cam[1]))
+        g = {"izq": 0, "der": 0, "arr": 0, "aba": 0} if self.op.get("demo") else MARGEN_CAMARA
+        self.cam[0] = max(-g["izq"], min(mw - ANCHO + g["der"], self.cam[0]))
+        self.cam[1] = max(-g["arr"], min(mh - ALTO + g["aba"], self.cam[1]))
 
     def a_pantalla(self, x, y):
         return (x * ESC - self.cam[0] + self.sx, y * ESC - self.cam[1] + self.sy)
@@ -242,7 +248,15 @@ class Render:
         self.sx = int(self.rng.uniform(-self.temblor, self.temblor)) if self.temblor > 0.5 else 0
         self.sy = int(self.rng.uniform(-self.temblor, self.temblor)) if self.temblor > 0.5 else 0
         cx, cy = int(self.cam[0]), int(self.cam[1])
-        pant.blit(self.suelo, (self.sx, self.sy), pygame.Rect(cx, cy, ANCHO, ALTO))
+        mw, mh = self.suelo.get_size()
+        if 0 <= cx <= mw - ANCHO and 0 <= cy <= mh - ALTO:
+            pant.blit(self.suelo, (self.sx, self.sy), pygame.Rect(cx, cy, ANCHO, ALTO))
+        else:
+            # en la orilla se ven las afueras de la ciudad, con un borde oscuro alrededor del mapa
+            pant.fill(AFUERAS)
+            borde = pygame.Rect(-cx + self.sx, -cy + self.sy, mw, mh)
+            pygame.draw.rect(pant, (14, 16, 26), borde.inflate(12, 12), 6, border_radius=6)
+            pant.blit(self.suelo, borde.topleft)
         self.capa.fill((0, 0, 0, 0))
         self._guia(self.capa)
         self._hilos(self.capa)

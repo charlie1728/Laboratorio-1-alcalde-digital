@@ -5,13 +5,14 @@ import time
 from .config import DATOS
 from .estructuras.avl import AVL
 
-VERSION_OPCIONES = 2
+VERSION_OPCIONES = 3
 OPCIONES_BASE = {"musica": 0.45, "efectos": 0.8, "subtitulos": False, "contraste": False,
-                 "tranquilo": False, "pantalla_completa": True, "pistas": True, "duracion": 120, "rondas": 2,
+                 "tranquilo": False, "pantalla_completa": False, "pistas": True, "duracion": 120, "rondas": 2,
                  "historia_vista": False, "volver_inicio": True, "version": VERSION_OPCIONES}
 # Lo que cambió de una versión a otra y debe aplicarse aunque ya hubiera opciones guardadas:
-# en la versión 2 el juego abre en pantalla completa, sin subtítulos de sonidos y con turnos de 2 minutos.
-NUEVOS_EN_V2 = {"pantalla_completa": True, "subtitulos": False, "duracion": 120}
+# - versión 2: sin subtítulos de sonidos y con turnos de 2 minutos;
+# - versión 3: abre en una ventana grande que llena la pantalla (no en pantalla completa).
+NUEVOS = {2: {"subtitulos": False, "duracion": 120}, 3: {"pantalla_completa": False}}
 
 
 def _leer(nombre, defecto):
@@ -33,8 +34,10 @@ def cargar_opciones():
     op = dict(OPCIONES_BASE)
     guardadas = _leer("opciones.json", {})
     op.update(guardadas)
-    if guardadas and guardadas.get("version", 1) < 2:
-        op.update(NUEVOS_EN_V2)
+    if guardadas:
+        for version, cambios in sorted(NUEVOS.items()):
+            if guardadas.get("version", 1) < version:
+                op.update(cambios)
     op["version"] = VERSION_OPCIONES
     return op
 

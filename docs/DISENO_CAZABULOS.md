@@ -8,7 +8,7 @@ Los **Bulos** (rumores morados) se suben a la cabeza de los vecinos y los vuelve
 
 ## Estado
 
-El juego está completo y jugable (ver README y `docs/ENTREGA_FINAL.md`): mundo, render, HUD, todas las pantallas, ayuda, opciones, récords, elección, podio, modo en línea, control USB y modo feria, con 56 pruebas.
+El juego está completo y jugable (ver README y `docs/ENTREGA_FINAL.md`): mundo, render, HUD, todas las pantallas, ayuda, opciones, récords, elección, podio, modo en línea, control USB y modo feria, con 59 pruebas.
 
 ## Lo que pidió el usuario al probarlo
 
