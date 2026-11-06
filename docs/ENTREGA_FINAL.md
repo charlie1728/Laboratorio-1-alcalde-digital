@@ -178,7 +178,7 @@ La primera versión jugable tenía demasiadas cosas a la vez: noticias que habí
 
 ## 8. Pruebas
 
-`python -m unittest discover -s tests` corre 55 pruebas.
+`python -m unittest discover -s tests` corre 56 pruebas.
 
 - **Estructuras:** BFS por niveles y con filtro, componentes, Dijkstra, subárboles, recorridos, AVL y el árbol de decisiones (sus caminos, las cuatro acciones del enunciado y eliminar ramas).
 - **Juego:**
@@ -194,7 +194,7 @@ La primera versión jugable tenía demasiadas cosas a la vez: noticias que habí
 - **Control USB y feria:**
   - Botones que cambian según la pantalla y palanca con margen para que no tiemble.
   - Cruceta que mueve al jugador.
-  - Puntero del mouse que no selecciona botones solo.
+  - Puntero del mouse que no selecciona botones solo y "Salir" que pregunta antes de cerrar.
   - Regreso solo al inicio sin interrumpir un turno ni el modo en línea.
   - Rescate que vuelve al inicio si una pantalla falla.
 

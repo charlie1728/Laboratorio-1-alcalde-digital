@@ -50,7 +50,7 @@ La piel y el color de pelo se pueden cambiar al elegir. Con jugadores automátic
 
 Al final viene la **elección del alcalde**: si la desinformación promedio quedó por debajo de 50 gana un candidato con propuestas; si llegó a 50 (la mitad del barrio se creyó los Bulos) gana Emilio Bot. Luego el podio con el ganador de la partida.
 
-**Para la feria:** el juego abre en pantalla completa y si nadie toca nada durante 90 segundos vuelve solo a la pantalla de inicio (no pasa a mitad de un turno ni en el modo en línea). Si una pantalla falla, el error se guarda en `cazabulos_error.log` y el juego vuelve al inicio en vez de cerrarse.
+**Para la feria:** el juego abre en pantalla completa y si nadie toca nada durante 90 segundos vuelve solo a la pantalla de inicio (no pasa a mitad de un turno ni en el modo en línea). Si una pantalla falla, el error se guarda en `cazabulos_error.log` y el juego vuelve al inicio en vez de cerrarse. "Salir" pregunta antes de cerrar, por si un niño lo toca sin querer.
 
 ## Las estructuras de datos y para qué sirven
 
@@ -75,7 +75,7 @@ En Windows basta con doble clic en `jugar.bat`. La primera vez crea en la carpet
 
 Para jugar en línea, los computadores deben estar en la misma red. La primera vez, Windows puede preguntar si deja que Python use la red: hay que dar **Permitir** en el computador que crea la sala.
 
-Pruebas (55):
+Pruebas (56):
 
 ```bash
 python -m unittest discover -s tests
