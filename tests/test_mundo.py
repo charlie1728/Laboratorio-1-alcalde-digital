@@ -12,7 +12,8 @@ pygame.display.set_mode((1, 1))
 
 from cazabulos.ciudad import linea_libre, ruta  # noqa: E402
 from cazabulos.mapa import H, W  # noqa: E402
-from cazabulos.mundo import MAX_VIRAL, Estrella, Mundo, Proyectil, mapa_compartido  # noqa: E402
+from cazabulos.mundo import (AVISO_REENVIO, MAX_VIRAL, Estrella, Mundo, Proyectil, mapa_compartido,  # noqa: E402
+                             umbrales_reputacion)
 from cazabulos.partida import Partida, calcular_eleccion  # noqa: E402
 from cazabulos.trafico import Trafico  # noqa: E402
 
@@ -126,12 +127,22 @@ class TestEstrellas(unittest.TestCase):
         for u, n, _ in m.social.bfs("Rosa", max_nivel=2):
             self.assertGreater(m.vecinos[u].escudo, 0)
 
-    def test_estrella_que_se_pierde_es_ignorar(self):
+    def test_estrella_que_se_deja_pasar_es_ignorar(self):
         m = nuevo()
-        m.estrellas.append(Estrella(5, 10, 10))
+        j = m.jugador
+        m.estrellas.append(Estrella(5, j.x + 60, j.y))             # en la pantalla del jugador
         m.estrellas[0].vida = 0.001
         m._estrellas(1 / 60)
         self.assertEqual(m.decisiones.buscar("perdida").veces, 1)
+
+    def test_estrella_que_nunca_se_vio_no_cuenta_como_ignorada(self):
+        m = nuevo()
+        j = m.jugador
+        m.estrellas.append(Estrella(6, j.x + 600, j.y + 300))      # al otro lado del mapa
+        m.estrellas[0].vida = 0.001
+        m._estrellas(1 / 60)
+        self.assertEqual(m.estrellas, [])
+        self.assertEqual(m.decisiones.buscar("perdida").veces, 0)
 
 
 class TestLanzar(unittest.TestCase):
@@ -179,6 +190,32 @@ class TestLanzar(unittest.TestCase):
             for _ in range(golpes):
                 lanzar_a(m, m.vecinos[p["a"]].cuerpo)
             self.assertEqual(p.get("fin"), "paz", clave)
+
+    def test_el_morado_avisa_a_quien_se_lo_va_a_pasar(self):
+        m = nuevo()
+        rosa = m.vecinos["Rosa"]
+        m._infectar(rosa, None)
+        rosa.t_prop = AVISO_REENVIO - 0.5
+        m._vecinos(1 / 60)
+        u = rosa.siguiente
+        self.assertIn(u, m.social.vecinos("Rosa"))
+        self.assertEqual(m.social.peso("Rosa", u), max(m.social.vecinos("Rosa").values()))   # el de más confianza
+        rosa.t_prop = 0
+        m._vecinos(1 / 60)
+        self.assertEqual(m.pulsos[0].hasta, u)          # se lo pasa justo a quien se marcó
+        self.assertIsNone(rosa.siguiente)
+
+    def test_si_el_amigo_queda_protegido_avisa_a_otro(self):
+        m = nuevo()
+        rosa = m.vecinos["Rosa"]
+        m._infectar(rosa, None)
+        rosa.t_prop = 1.0
+        m._vecinos(1 / 60)
+        primero = rosa.siguiente
+        m.vecinos[primero].escudo = 20
+        m._vecinos(1 / 60)
+        self.assertNotEqual(rosa.siguiente, primero)
+        self.assertEqual(m.vecinos[primero].bulo, None)
 
     def test_reenvio_que_llega_es_regar(self):
         m = nuevo()
@@ -262,6 +299,15 @@ class TestMapa(unittest.TestCase):
 
 
 class TestPartida(unittest.TestCase):
+    def test_estrellas_de_reputacion(self):
+        self.assertEqual(umbrales_reputacion(18), (14, 9))
+        m = nuevo()
+        for nombre in sorted(m.vecinos)[:5]:      # 5 morados: quedan 13 a salvo
+            m._infectar(m.vecinos[nombre], None)
+        self.assertEqual(m.resumen()["reputacion"], 2)
+        m._atrapar(m.vecinos[sorted(m.vecinos)[0]].bulo)       # 14 a salvo
+        self.assertEqual(m.resumen()["reputacion"], 3)
+
     def test_turnos_rotan_y_terminan(self):
         js = [{"clave": c, "piel": None, "pelo": None, "nombre": c} for c in ("ana", "beto", "caro")]
         pa = Partida(js, rondas=2, semilla=1)
@@ -321,6 +367,15 @@ class TestRed(unittest.TestCase):
             for c in (a, b):
                 c.cerrar()
             srv.cerrar()
+
+
+class TestMensajeFinal(unittest.TestCase):
+    def test_el_mensaje_va_con_las_estrellas(self):
+        from cazabulos.pantallas.final import mensaje
+        base = {"vecinos": 18, "stats": {"regados": 6}}
+        self.assertIn("Increíble", mensaje(dict(base, salvados=18, reputacion=3)))      # nunca regaña si ganó 3
+        self.assertIn("Muy bien", mensaje(dict(base, salvados=10, reputacion=2)))
+        self.assertNotIn("bien", mensaje(dict(base, salvados=2, reputacion=1)).lower().split("!")[0])
 
 
 if __name__ == "__main__":

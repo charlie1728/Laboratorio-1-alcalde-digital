@@ -1,20 +1,34 @@
-# Cazabulos: diseño y estado de la reconstrucción
+# Cazabulos: diseño
 
-Rama `cazabulos`. El juego nuevo vive en `cazabulos/`. El código viejo (`alcalde/`, "Corta la mentira") sigue en el historial de git y se quitará cuando el juego nuevo funcione.
+Rama `cazabulos`. El juego vive en `cazabulos/`. El código viejo (`alcalde/`, "Corta la mentira") se quitó de la carpeta y queda en el historial de git; las entregas anteriores están en `docs/historial/`.
 
 ## La idea en 4 frases
 
-Caminas con las flechas por el barrio cazando **Bulos** (rumores morados que vuelan) y les lanzas tu herramienta con **Espacio** antes de que se suban a la cabeza de los vecinos. Recoges **estrellas** (noticias) y se las llevas a la gente; si te quedas quieto un momento con la estrella, ves si es real o un Bulo disfrazado. La **antena del Bot** suelta Bulos y se apaga a golpes. Cada jugador juega su turno en el mismo barrio y gana quien salve a más gente.
+Los **Bulos** (rumores morados) se suben a la cabeza de los vecinos y los vuelven morados; un vecino morado, si nadie lo cura, se lo pasa a un amigo por la red social. Tú caminas con las flechas y con **Espacio** lanzas tu herramienta: atrapas los Bulos y curas a los morados. Las **estrellas** son noticias verdaderas: con solo tocarlas, la verdad les llega al vecino más cercano y a sus amigos. Cada jugador juega su turno en el mismo barrio y gana quien salve a más gente.
 
 ## Estado
 
-El juego está completo y jugable (ver README y `docs/ENTREGA_FINAL.md`): mundo, render, HUD, todas las pantallas, ayuda, opciones, récords, elección, podio y modo en línea, con 31 pruebas. El código viejo (`alcalde/`) se quitó de la carpeta y queda en el historial de git; las entregas anteriores están en `docs/historial/`.
+El juego está completo y jugable (ver README y `docs/ENTREGA_FINAL.md`): mundo, render, HUD, todas las pantallas, ayuda, opciones, récords, elección, podio, modo en línea, control USB y modo feria, con 55 pruebas.
 
-## Correcciones que pidió el usuario sobre el render
+## Lo que pidió el usuario al probarlo
+
+**Primera ronda (render):**
 
 1. Personajes que se distingan: hecho (silueta, color y objeto propios, más altos que los vecinos).
 2. Hitbox y carros: los carros de lado ocupan **3x2 tiles** (antes se usaba solo la fila de abajo y se veían cortados y montados en el andén). Cada carril mide 2 tiles y el carro va centrado en su carril. Los carros frenan ante peatones y en el semáforo; nunca salen del carril.
 3. Mapa que no sea un cubículo: mapa de 64x46 tiles (unas 2,5 x 3 pantallas) con cámara que sigue al jugador. Tiene 4 zonas de tamaños distintos, avenidas, cebras, un parque con laguna y caminos que serpentean.
+
+**Segunda ronda (después de jugarlo):**
+
+4. Pantalla completa al abrir: hecho (y F11 para cambiar).
+5. Que abra con el símbolo del juego y no con el de Python: ícono propio (Bulo con corona), identificador de Windows para la barra de tareas y acceso directo con pythonw (sin consola).
+6. Demasiados mensajes y demasiadas cosas a la vez:
+   - Se quitaron los globos de diálogo, los nombres y los banners.
+   - Quedan avisos de una o dos palabras y flechas con dibujos.
+   - Solo se dibujan los hilos que importan en ese momento.
+   - La cuenta regresiva explica el juego en tres dibujos.
+7. Juego más simple: los Bulos infectan (vuelven morada a la gente) y uno los atrapa y cura. Se quitó mirar las noticias quieto y las estrellas falsas, y todo se arregla lanzando.
+8. Más tiempo: turnos de 2 minutos (90 segundos en "¡Jugar ya!").
 
 ## Mapa (en tiles)
 
@@ -41,9 +55,9 @@ El juego está completo y jugable (ver README y `docs/ENTREGA_FINAL.md`): mundo,
 
 | Estructura | Problema que resuelve en el juego |
 |---|---|
-| Grafo social (lista de adyacencia con peso = confianza) | Hilos entre vecinos. Un vecino con Bulo se lo pasa a sus amigos por los hilos (BFS: quién lo recibe, cuántos y en qué orden). Las peleas borran hilos y las campañas de convivencia crean hilos nuevos. Los Bulos buscan al vecino con más amigos (grado). DFS para ver las comunidades al final. |
+| Grafo social (lista de adyacencia con peso = confianza) | Hilos entre vecinos. Un vecino morado se lo pasa al amigo en quien más confía (mayor peso). La verdad de las estrellas y el viral se riegan con BFS (quién lo recibe, cuántos y en qué orden). Las peleas borran hilos y las campañas de convivencia crean hilos nuevos. Los Bulos buscan al vecino con más amigos (grado). DFS para ver las comunidades al final. |
 | Grafo de la ciudad (zonas y esquinas, peso = distancia) | Dijkstra para la flecha que guía al jugador hacia lo más urgente y para que los vecinos caminen entre zonas sin atravesar edificios. |
 | Árbol n-ario de mutaciones | Cada Bulo que salta a otro vecino es hijo del anterior. Si atrapas la raíz (el Bulo con corona) caen todos sus hijos (eliminar subárbol, recorrido en preorden para la cadena). |
-| Árbol de decisiones de la noticia | Encuentras una estrella: la miras (verificar), la entregas sin mirar (compartir) o la dejas (ignorar); si la miras: ¿es real? sí, la entregas / no, se reporta sola. Cada hoja guarda puntos y cambios en los indicadores. Al final se dibuja el árbol con cuántas veces pasaste por cada rama. |
+| Árbol de decisiones de cada publicación | Publicación falsa (Bulo): la atrapas (reportar) o alguien se la cree; si se la cree, lo curas (verificar) o se la pasa a un amigo. Publicación verdadera (estrella): la compartes o la ignoras. Cada hoja guarda puntos y cambios en los indicadores. Al final se dibuja el árbol con cuántas veces se pasó por cada rama. |
 | AVL | Tabla de récords ordenada (recorrido en orden para el top 10). |
 

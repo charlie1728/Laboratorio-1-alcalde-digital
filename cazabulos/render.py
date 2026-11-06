@@ -59,6 +59,7 @@ class Render:
         self.rng = random.Random(3)
         self.sx = self.sy = 0
         self.flash = 0.0
+        self.cuenta = False        # durante la cuenta regresiva no se muestra el "TÚ" (lo tapan las tarjetas)
 
     # ------------------------------------------------------------- coordenadas
     def _limitar(self):
@@ -122,7 +123,10 @@ class Render:
                                       "vy": self.rng.uniform(-40, -20), "vida": 1.4, "max": 1.4, "img": "corazon",
                                       "grav": 0, "ret": k * 0.08, "color": None, "tam": 1})
             elif tipo == "hilo":
-                self.brillos[tuple(sorted((fx[1], fx[2])))] = [2.0, fx[3]]
+                # el hilo se ilumina creciendo desde quien lo manda; por niveles del BFS, uno tras otro
+                retraso = 0.28 * max(0, (fx[4] if len(fx) > 4 else 1) - 1)
+                self.brillos[tuple(sorted((fx[1], fx[2])))] = {"t": 0.0, "fin": retraso + 1.5, "color": fx[3],
+                                                               "desde": fx[1], "hasta": fx[2], "retraso": retraso}
             elif tipo == "ola":
                 v = m.vecinos.get(fx[1])
                 if v:
@@ -192,8 +196,8 @@ class Render:
             o[1] += dt
         self.olas = [o for o in self.olas if o[1] < 0.8]
         for k_, v in list(self.brillos.items()):
-            v[0] -= dt
-            if v[0] <= 0:
+            v["t"] += dt
+            if v["t"] >= v["fin"]:
                 del self.brillos[k_]
         self.t_guia -= dt
         if self.t_guia <= 0:
@@ -276,41 +280,81 @@ class Render:
                 self._px(capa, x0 + (x1 - x0) * f, y0 + (y1 - y0) * f, (255, 255, 255, max(0, alfa)), 1)
             dist_total += largo
 
+    def _curva(self, va, vb):
+        (x0, y0), (x1, y1) = (va.x, va.y - 9), (vb.x, vb.y - 9)
+        largo = math.dist((x0, y0), (x1, y1))
+        return x0, y0, x1, y1, largo, min(16, largo * 0.12)
+
+    @staticmethod
+    def _en_hilo(c, f):
+        x0, y0, x1, y1, _, curva = c
+        return x0 + (x1 - x0) * f, y0 + (y1 - y0) * f - math.sin(f * math.pi) * curva
+
+    def _linea_hilo(self, capa, c, color, alfa, grosor, punteada=False):
+        n = max(4, int(c[4] / 12))
+        pts = [self.a_pantalla(*self._en_hilo(c, k / n)) for k in range(n + 1)]
+        if not punteada:
+            pygame.draw.lines(capa, (*color, alfa), False, pts, grosor)
+            return
+        for k in range(0, n, 2):
+            pygame.draw.line(capa, (*color, alfa), pts[k], pts[k + 1], grosor)
+
+    def _brillo(self, capa, br):
+        """Un hilo que se ilumina: crece desde quien manda (la verdad, una amistad nueva) y se apaga."""
+        crece = min(1.0, max(0.0, (br["t"] - br["retraso"]) / 0.3))
+        if crece <= 0:
+            return
+        c = self._curva(self.m.vecinos[br["desde"]], self.m.vecinos[br["hasta"]])
+        alfa = int(255 * min(1.0, (br["fin"] - br["t"]) / 0.5))
+        n = max(4, int(c[4] / 12))
+        hasta = max(1, int(n * crece))
+        pts = [self.a_pantalla(*self._en_hilo(c, k / n)) for k in range(hasta + 1)]
+        pygame.draw.lines(capa, (*br["color"], alfa), False, pts, 5)
+        if crece < 1:
+            pygame.draw.circle(capa, (255, 255, 255, alfa), (int(pts[-1][0]), int(pts[-1][1])), 6)
+
     def _hilos(self, capa):
-        """Grafo social: cada amistad es un hilo. Morado si pasa un Bulo, dorado si ambos están informados."""
+        """Grafo social. Para no llenar la pantalla de líneas solo resalta lo que importa en ese momento:
+        - las amistades normales se ven tenues, y solo si los dos amigos están en pantalla;
+        - el hilo por donde viaja un Bulo es morado;
+        - en los últimos segundos antes de pasar el Bulo, el vecino morado marca con una línea punteada
+          a qué amigo se lo va a pasar (así se alcanza a curarlo antes);
+        - la verdad (dorado), las amistades nuevas (verde) y la cura de Beto (rosa) brillan un momento."""
+        from .mundo import AVISO_REENVIO
         m = self.m
+        activos = {tuple(sorted((p.desde, p.hasta))) for p in m.pulsos}
         for a, b, peso in m.social.aristas():
             va, vb = m.vecinos[a], m.vecinos[b]
-            if not (self.visible(va.x, va.y, 40) or self.visible(vb.x, vb.y, 40)):
-                continue
+            vis_a, vis_b = self.visible(va.x, va.y, 40), self.visible(vb.x, vb.y, 40)
             clave = tuple(sorted((a, b)))
-            infectado = va.bulo is not None or vb.bulo is not None
             if clave in self.brillos:
-                color, alfa, grosor = self.brillos[clave][1], 255, 5
-            elif infectado:
-                color, alfa, grosor = (176, 110, 255), 190, 4
-            elif va.escudo > 0 and vb.escudo > 0:
-                color, alfa, grosor = (255, 214, 80), 190, 4
+                if vis_a or vis_b:
+                    self._brillo(capa, self.brillos[clave])
+                continue
+            if clave in activos:
+                if not (vis_a or vis_b):
+                    continue
+                color, alfa, grosor = (176, 110, 255), 200, 4
             else:
+                if not (vis_a and vis_b):
+                    continue
                 color, alfa, grosor = (255, 255, 255), 22 + 8 * peso, 2
-            (x0, y0), (x1, y1) = (va.x, va.y - 9), (vb.x, vb.y - 9)
-            largo = math.dist((x0, y0), (x1, y1))
-            curva = min(16, largo * 0.12)
-            n = max(4, int(largo / 12))
-            pts = []
-            for k in range(n + 1):
-                f = k / n
-                pts.append(self.a_pantalla(x0 + (x1 - x0) * f, y0 + (y1 - y0) * f - math.sin(f * math.pi) * curva))
-            pygame.draw.lines(capa, (*color, alfa), False, pts, grosor)
-            if infectado:
-                # bolitas que corren por el hilo desde el vecino con Bulo
-                desde_a = va.bulo is not None
-                for k in range(3):
-                    f = (self.t * 0.6 + k / 3) % 1.0
-                    f = f if desde_a else 1 - f
-                    x, y = x0 + (x1 - x0) * f, y0 + (y1 - y0) * f - math.sin(f * math.pi) * curva
-                    sx, sy = self.a_pantalla(x, y)
-                    pygame.draw.circle(capa, (*color, 230), (int(sx), int(sy)), 4)
+            self._linea_hilo(capa, self._curva(va, vb), color, alfa, grosor)
+        # el aviso: a quién le va a pasar el Bulo este vecino morado
+        for v in m.vecinos.values():
+            if v.bulo is None or not v.siguiente or v.t_prop >= AVISO_REENVIO:
+                continue
+            u = m.vecinos[v.siguiente]
+            if not (self.visible(v.x, v.y, 40) or self.visible(u.x, u.y, 40)):
+                continue
+            urgencia = 1 - v.t_prop / AVISO_REENVIO
+            c = self._curva(v, u)
+            alfa = int(150 + 90 * math.sin(self.t * (6 + 10 * urgencia)) ** 2)
+            self._linea_hilo(capa, c, (190, 120, 255), alfa, 3, punteada=True)
+            for k in range(2):
+                f = (self.t * (0.5 + urgencia) + k / 2) % 1.0
+                sx, sy = self.a_pantalla(*self._en_hilo(c, f))
+                pygame.draw.circle(capa, (200, 140, 255, 230), (int(sx), int(sy)), 4)
         # peleas: hilo rojo que tiembla
         for p in m.peleas:
             if p.get("activa") and not p.get("fin"):
@@ -418,8 +462,13 @@ class Render:
             cx_, cy_ = self.a_pantalla(mx, my - 12)
             pygame.draw.arc(pant, (255, 90, 90), (cx_ - 16, cy_ - 16, 32, 32), math.pi / 2, math.pi / 2 + frac * math.tau, 5)
             texto(pant, "!!", (cx_, cy_), 22, (255, 230, 80), "center")
-            for k in range(v.pelea.get("golpes", 0)):
-                pygame.draw.circle(pant, (140, 240, 160), (int(cx_ - 8 + k * 16), int(cy_ + 24)), 6)
+            # cuántos golpes faltan para calmarlos: casillas que se llenan de verde
+            from .mundo import GOLPES_PELEA
+            for k in range(GOLPES_PELEA):
+                px_ = int(cx_ - 10 * (GOLPES_PELEA - 1) + k * 20)
+                lleno = k < v.pelea.get("golpes", 0)
+                pygame.draw.circle(pant, (20, 14, 40), (px_, int(cy_ + 38)), 8)
+                pygame.draw.circle(pant, (120, 235, 150) if lleno else (90, 84, 110), (px_, int(cy_ + 38)), 6)
 
     def _d_estrella(self, pant, s):
         bob = math.sin(self.t * 3 + s.id) * 1.5
@@ -512,7 +561,7 @@ class Render:
         ox = j.vec[0] * 1.5 if j.lanzo > 0 else 0
         bob = -1 if (j.mov and cuadro in (1, 3)) else 0
         pant.blit(escalar(img), self.a_pantalla(j.x - 8 + ox, j.y - 23 + bob))
-        if (self.m.t < 4 or self.op.get("contraste")) and not self.op.get("demo"):
+        if (self.m.t < 4 or self.op.get("contraste")) and not self.op.get("demo") and not self.cuenta:
             texto(pant, "TÚ", (sx, sy - 27 * ESC), 18, color, "midbottom")
 
     def _pulsos(self, pant):
@@ -632,14 +681,17 @@ class Render:
             e = min(m.estrellas, key=lambda s: math.dist((s.x, s.y), m.jugador.pos))
             objetivos.append(((e.x, e.y), (255, 214, 70), sprites.estrella()))
         cx, cy = ANCHO / 2, ALTO / 2
+        # zona segura: las flechas nunca tapan la tarjeta, el minimapa, los indicadores ni el botón de poder
+        x0, x1, y0, y1 = 70, 1040, 185, 595
         for (x, y), color, icono in objetivos:
             if self.visible(x, y, -30):
                 continue
             sx, sy = self.a_pantalla(x, y)
             ang = math.atan2(sy - cy, sx - cx)
-            mx, my = ANCHO / 2 - 60, ALTO / 2 - 70
-            k = min(mx / max(1e-3, abs(math.cos(ang))), my / max(1e-3, abs(math.sin(ang))))
-            px_, py_ = cx + math.cos(ang) * k, cy + math.sin(ang) * k + 10
+            ca, sa = math.cos(ang), math.sin(ang)
+            k = min((x1 - cx) / ca if ca > 1e-3 else (x0 - cx) / ca if ca < -1e-3 else 1e9,
+                    (y1 - cy) / sa if sa > 1e-3 else (y0 - cy) / sa if sa < -1e-3 else 1e9)
+            px_, py_ = cx + ca * k, cy + sa * k
             pulso = 4 * math.sin(self.t * 8)
             pts = [(px_ + math.cos(ang) * (22 + pulso), py_ + math.sin(ang) * (22 + pulso)),
                    (px_ + math.cos(ang + 2.4) * 16, py_ + math.sin(ang + 2.4) * 16),

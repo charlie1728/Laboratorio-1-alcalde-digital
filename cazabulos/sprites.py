@@ -72,9 +72,9 @@ def sombra(ancho=10):
     return _guardar(("sombra", ancho), hacer)
 
 
-# ----------------------------------------------------------------- estrellas (noticias)
-def estrella(falsa=False, revelada_falsa=False, brillo=0):
-    clave = ("estrella", falsa, revelada_falsa, brillo)
+# ----------------------------------------------------------------- estrellas (noticias verdaderas)
+def estrella(brillo=0):
+    clave = ("estrella", brillo)
 
     def hacer():
         s = pygame.Surface((16, 16), pygame.SRCALPHA)
@@ -83,21 +83,11 @@ def estrella(falsa=False, revelada_falsa=False, brillo=0):
             r = 7 if i % 2 == 0 else 3.2
             a = -math.pi / 2 + i * math.pi / 5
             pts.append((7.5 + math.cos(a) * r, 8 + math.sin(a) * r))
-        cuerpo = (180, 120, 250) if revelada_falsa else (255, 212, 60)
-        borde = (90, 40, 150) if revelada_falsa else (176, 108, 0)
-        pygame.draw.polygon(s, borde, [(x, y + 1) for x, y in pts])
-        pygame.draw.polygon(s, cuerpo, pts)
+        pygame.draw.polygon(s, (176, 108, 0), [(x, y + 1) for x, y in pts])
+        pygame.draw.polygon(s, (255, 212, 60), pts)
         s.fill((255, 252, 220), (6, 5, 2, 2))
         if brillo:
             s.fill((255, 255, 255), (7, 0, 1, 2))
-        if falsa:
-            # la pista del disfraz: un ojito que asoma y una gota morada
-            s.fill((255, 255, 255), (8, 8, 2, 2))
-            s.fill((26, 16, 51), (9, 9, 1, 1))
-            s.fill((128, 66, 232), (4, 12, 1, 2))
-        if revelada_falsa:
-            s.fill((26, 16, 51), (5, 8, 1, 1))
-            s.fill((26, 16, 51), (9, 8, 1, 1))
         return s
     return _guardar(clave, hacer)
 

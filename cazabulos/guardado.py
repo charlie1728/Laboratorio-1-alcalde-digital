@@ -76,7 +76,7 @@ LOGROS = [
     ("cartero", "Cartero de la verdad", "Comparte 3 estrellas", lambda r: r["stats"]["compartidas"] >= 3),
     ("paz", "Paz en el barrio", "Calma 2 peleas", lambda r: r["stats"]["peleas"] >= 2),
     ("viral", "Freno al viral", "Detén el Bulo viral", lambda r: r["stats"]["viral"] >= 1),
-    ("salvador", "Barrio a salvo", "Termina con 15 vecinos o más a salvo", lambda r: r["salvados"] >= 15),
+    ("salvador", "Barrio a salvo", "Termina con todos los vecinos a salvo", lambda r: r["salvados"] >= r["vecinos"]),
     ("limpio", "Cero cadenas", "Que nadie le pase un Bulo a un amigo (y más de 200 puntos)",
      lambda r: r["stats"]["regados"] == 0 and r["total"] >= 200),
     ("combo", "Imparable", "Haz un combo de 10", lambda r: r["stats"]["combo_max"] >= 10),

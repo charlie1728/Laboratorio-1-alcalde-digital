@@ -14,6 +14,9 @@ from .base import Escena, FondoCiudad, es_aceptar, es_volver, titulo_pantalla
 from .menu import SI_NO, Formulario, Selector, Titulo
 
 
+LANZA = {"ana": "Lanza periódicos", "beto": "Lanza corazones", "caro": "Lanza su red", "dani": "Lanza volantes"}
+
+
 class Preparar(Formulario):
     titulo = "Nueva partida"
 
@@ -42,8 +45,12 @@ class Preparar(Formulario):
 def tarjeta_personaje(pant, clave, rect, t, activo=False, tomado=None, piel=None, pelo=None, escala=6):
     p = PERSONAJES[clave]
     color = p["color"] if not tomado else (90, 86, 110)
+    # en tarjetas bajitas (la sala en línea) todo se achica un poco para que nada se salga
+    compacto = rect.h < 480
+    t_nombre, t_rol, t_pasivo, t_poder, t_poder_txt = (28, 17, 14, 16, 13) if compacto else (34, 20, 16, 18, 15)
+    d_rol, d_pasivo = (36, 62) if compacto else (50, 82)
     panel(pant, rect, (40, 30, 84) if activo else (26, 20, 52), 240, 18, color if activo else None, 4)
-    foco = pygame.Rect(rect.x + 14, rect.y + 14, rect.w - 28, 210)
+    foco = pygame.Rect(rect.x + 14, rect.y + 14, rect.w - 28, 150 if compacto else 210)
     pygame.draw.rect(pant, tuple(int(c * 0.45) for c in color), foco, border_radius=14)
     if activo:
         for k in range(8):
@@ -62,12 +69,22 @@ def tarjeta_personaje(pant, clave, rect, t, activo=False, tomado=None, piel=None
     grande = pygame.transform.scale(img, (16 * escala, 24 * escala))
     pygame.draw.ellipse(pant, (0, 0, 0), (foco.centerx - 50, foco.bottom - 26, 100, 18))
     pant.blit(grande, grande.get_rect(midbottom=(foco.centerx, foco.bottom - 14 + (-4 if activo and cuadro in (1, 3) else 0))))
-    texto(pant, p["nombre"], (rect.centerx, foco.bottom + 10), 34, color, "midtop")
-    texto(pant, p["rol"], (rect.centerx, foco.bottom + 50), 20, (235, 230, 250), "midtop", 600)
+    texto(pant, p["nombre"], (rect.centerx, foco.bottom + 8), t_nombre, color, "midtop")
+    texto(pant, p["rol"], (rect.centerx, foco.bottom + d_rol), t_rol, (235, 230, 250), "midtop", 600)
     rol = ROLES[clave]
-    y = parrafo(pant, rol["pasivo"], (rect.centerx, foco.bottom + 82), 16, rect.w - 30, (220, 214, 240), ancla="midtop")
-    texto(pant, f"Poder: {rol['poder']}", (rect.centerx, y + 8), 18, color, "midtop")
-    parrafo(pant, rol["poder_txt"], (rect.centerx, y + 32), 15, rect.w - 30, (200, 196, 225), ancla="midtop")
+    y = parrafo(pant, rol["pasivo"], (rect.centerx, foco.bottom + d_pasivo), t_pasivo, rect.w - 26, (220, 214, 240),
+                ancla="midtop")
+    texto(pant, f"Poder: {rol['poder']}", (rect.centerx, y + 8), t_poder, color, "midtop")
+    y = parrafo(pant, rol["poder_txt"], (rect.centerx, y + 8 + t_poder + 6), t_poder_txt, rect.w - 26, (200, 196, 225),
+                ancla="midtop")
+    # lo que lanza: así se distinguen también en el juego
+    from .. import sprites
+    img = escalar(sprites.herramienta(clave), 4)
+    fila = pygame.Rect(0, 0, img.get_width() + 12 + render(LANZA[clave], 16, peso=700).get_width(), max(img.get_height(), 20))
+    fila.midtop = (rect.centerx, max(y + 14, rect.bottom - 54))
+    if fila.bottom < rect.bottom - 6:
+        pant.blit(img, img.get_rect(midleft=(fila.x, fila.centery)))
+        texto(pant, LANZA[clave], (fila.x + img.get_width() + 12, fila.centery), 16, (240, 236, 255), "midleft")
     if tomado:
         texto(pant, tomado, (rect.centerx, foco.centery), 22, (255, 255, 255), "center")
 

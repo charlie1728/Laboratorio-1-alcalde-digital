@@ -72,7 +72,7 @@ class Botonera:
                     app.son.tocar("click")
                 self.opciones[self.sel][1]()
                 return True
-        elif e.type == pygame.MOUSEMOTION:
+        elif e.type == pygame.MOUSEMOTION and pygame.mouse.get_visible():
             for i, r in enumerate(self.rects):
                 if r.collidepoint(e.pos):
                     self.sel = i
@@ -103,7 +103,9 @@ class FondoCiudad:
         self.suelo = suelo_escalado(mapa)
         self.velo = pygame.Surface((ANCHO, ALTO), pygame.SRCALPHA)
         for y in range(0, ALTO, 4):
-            a = int(oscuro * (0.7 + 0.3 * y / ALTO))
+            # más oscuro arriba y abajo, donde van los títulos y las ayudas, para que se lean siempre
+            borde = abs(y - ALTO / 2) / (ALTO / 2)
+            a = int(min(235, oscuro * (0.85 + 0.35 * borde ** 2)))
             self.velo.fill((20, 14, 46, a), (0, y, ANCHO, 4))
 
     def dibujar(self, pant, dt):
@@ -137,7 +139,7 @@ def pie(pant, s, app=None):
     texto(pant, con_mando(app, s), (ANCHO // 2, ALTO - 30), 18, (220, 214, 240), "center", 600)
 
 
-def instrucciones(pant, centro, t=0.0, mando=False):
+def instrucciones(pant, centro, t=0.0, mando=False, teclas=True):
     """Todo el juego en tres dibujos (se ve en la cuenta regresiva, antes de empezar a jugar):
     atrapa los Bulos, cura a los morados y recoge las estrellas."""
     from .. import sprites
@@ -159,11 +161,13 @@ def instrucciones(pant, centro, t=0.0, mando=False):
         if k == 0:
             pant.blit(bulo, bulo.get_rect(midbottom=(r.centerx, icono_y)))
         elif k == 1:
-            pant.blit(vecino, vecino.get_rect(midbottom=(r.centerx, r.y + 112)))
-            pant.blit(cabeza, cabeza.get_rect(midbottom=(r.centerx, r.y + 112 - 62 + math.sin(t * 5) * 2)))
+            pant.blit(vecino, vecino.get_rect(midbottom=(r.centerx, r.y + 124)))
+            pant.blit(cabeza, cabeza.get_rect(midbottom=(r.centerx, r.y + 124 - 60 + math.sin(t * 5) * 2)))
         else:
             pant.blit(estrella, estrella.get_rect(midbottom=(r.centerx, icono_y)))
         texto(pant, txt, (r.centerx, r.bottom - 50), 24, color, "midtop")
+    if not teclas:
+        return
     filas = ((("A", "lanzar"), ("B / X", "poder")) if mando else (("ESPACIO", "lanzar"), ("X", "poder")))
     x = cx - 150
     for t_, d in filas:

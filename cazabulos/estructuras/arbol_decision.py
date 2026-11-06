@@ -2,11 +2,11 @@
 
 Problema que resuelve: toda publicación que aparece en el barrio termina de una forma, y cada
 final tiene consecuencias distintas en los indicadores de la ciudad. Es exactamente el ejemplo
-del enunciado: una publicación puede ser falsa o verdadera, y con ella se puede REPORTAR (atrapar
-el Bulo en el aire), VERIFICAR (curar a quien se lo creyó), COMPARTIR (llevar la estrella a la
-gente) o IGNORAR (dejar que se pierda). El árbol guarda esas reglas en un solo lugar: el juego
-baja por el árbol según lo que pasó y la hoja dice qué consecuencias tiene. Al final del turno
-se dibuja con cuántas veces se pasó por cada rama.
+del enunciado: una publicación puede ser falsa o verdadera, y con ella se puede REPORTAR
+(atrapar el Bulo en el aire), VERIFICAR (curar a quien se lo creyó), COMPARTIR (llevar la
+estrella a la gente) o IGNORAR (dejar pasar una estrella que se tuvo en frente). El árbol guarda
+esas reglas en un solo lugar: el juego baja por el árbol según lo que pasó y la hoja dice qué
+consecuencias tiene. Al final del turno se dibuja con cuántas veces se pasó por cada rama.
 
 Variante: árbol general con aristas etiquetadas (cada hijo se llega por una etiqueta).
 Insertar: agregar un hijo con su etiqueta. Eliminar: quitar un nodo con su subárbol.
@@ -107,7 +107,7 @@ def arbol_publicacion():
     │       └── pasar -> Se la pasa a un amigo por la red social
     └── verdadera (una estrella)
         ├── compartir -> Compartir: la llevas y protege a la gente
-        └── ignorar   -> Ignorar: se pierde
+        └── ignorar   -> Ignorar: la tuviste en frente y la dejaste pasar
     """
     N = NodoDecision
     a = ArbolDecision(N("publicacion", "Aparece una publicación"))

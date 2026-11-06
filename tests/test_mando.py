@@ -148,6 +148,43 @@ class TestFeria(unittest.TestCase):
         finally:
             modulo.REGISTRO = antes
 
+    def test_el_puntero_no_selecciona_botones_solo(self):
+        import time
+        from cazabulos.pantallas.menu import Titulo
+        app = self.app
+        pygame.mouse.set_visible(False)
+        titulo = Titulo(app)
+        app.escena = titulo
+        boton = titulo.botones.rects[5]
+        quieto = E(pygame.MOUSEMOTION, pos=boton.center, rel=(640, 360), buttons=(0, 0, 0))
+        app.t_inicio = time.monotonic()                 # recién abierta la ventana
+        app._raton(quieto)
+        titulo.evento(quieto)
+        self.assertFalse(pygame.mouse.get_visible())
+        self.assertEqual(titulo.botones.sel, 0)          # sigue en "¡Jugar ya!"
+        app.t_inicio = time.monotonic() - 5
+        movido = E(pygame.MOUSEMOTION, pos=boton.center, rel=(12, 3), buttons=(0, 0, 0))
+        app._raton(movido)
+        titulo.evento(movido)
+        self.assertTrue(pygame.mouse.get_visible())
+        self.assertEqual(titulo.botones.sel, 5)          # ahora sí lo movieron a propósito
+        app._raton(E(pygame.KEYDOWN, key=pygame.K_DOWN, mod=0, unicode="", scancode=0))
+        self.assertFalse(pygame.mouse.get_visible())
+
+    def test_jugando_solo_no_muestra_tabla_de_una_fila(self):
+        from cazabulos.mundo import Mundo
+        from cazabulos.pantallas.final import Eleccion, ResultadoTurno, TablaRonda
+        from cazabulos.partida import Partida
+        res = Mundo(3, "caro", duracion=1, pistas=False).resumen()
+        for jugadores, esperado in ((1, Eleccion), (2, TablaRonda)):
+            js = [{"clave": c, "piel": None, "pelo": None, "nombre": c} for c in ("caro", "beto")[:jugadores]]
+            pa = Partida(js, 1, 90, semilla=3)
+            pa.paso = jugadores - 1                       # ya jugó el último turno de la ronda
+            pa.guardar(pa.actual, res)
+            self.app.siguiente = None
+            ResultadoTurno(self.app, pa, pa.actual, res)._seguir()
+            self.assertIsInstance(self.app.siguiente, esperado)
+
     def test_el_control_mueve_al_jugador(self):
         from cazabulos.pantallas.juego import PantallaJuego
         from cazabulos.partida import Partida

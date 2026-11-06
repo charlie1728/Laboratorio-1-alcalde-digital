@@ -72,7 +72,7 @@ def dibujar_arbol(pant, filas, rect, t=0.0):
         if n["veces"]:
             texto(pant, str(n["veces"]), (x, y), 15, TINTA, "center", borde=None)
         etiqueta = CORTOS.get(c, n["texto"])
-        lineas = [etiqueta] if len(etiqueta) < 11 else _partir(etiqueta)
+        lineas = [etiqueta] if len(etiqueta) < 12 or " " not in etiqueta else _partir(etiqueta)
         for k, ln in enumerate(lineas):
             texto(pant, ln, (x, y + r + 3 + k * 15), 13, (240, 240, 250) if usado else (150, 144, 180), "midtop", 600)
 
@@ -89,15 +89,20 @@ def _partir(s):
 
 
 def mensaje(res):
-    s = res["salvados"] / max(1, res["vecinos"])
-    if res["stats"]["regados"] >= 4:
-        return "Los Bulos saltaron de amigo en amigo. ¡Cura rápido a los morados para que no se los pasen!"
-    if s >= 0.8:
+    """El mensaje va con las estrellas de reputación (así todo dice lo mismo): primero se felicita
+    lo bueno y el consejo solo aparece cuando hay algo que mejorar."""
+    estrellas = res.get("reputacion", 1)
+    regados = res["stats"]["regados"] >= 4
+    if estrellas >= 3:
         return "¡Increíble! El barrio confía en ti."
-    if s >= 0.55:
-        return "¡Muy bien! Salvaste a la mayoría de los vecinos."
-    if s >= 0.3:
-        return "¡Bien! Busca la raíz de las cadenas (el Bulo con corona) para tumbar muchos de una vez."
+    if estrellas == 2:
+        if regados:
+            return "¡Muy bien! Para salvar aún más, cura a los morados antes de que se lo pasen a un amigo."
+        return "¡Muy bien! Para la tercera estrella, busca el Bulo con corona: tumba toda la cadena."
+    if res["salvados"] >= res["vecinos"] * 0.3:
+        if regados:
+            return "Los Bulos saltaron de amigo en amigo. ¡Cura rápido a los morados para que no se los pasen!"
+        return "¡Bien! Busca el Bulo con corona: si lo atrapas caen todas sus copias."
     return "Los Bulos ganaron esta vez. Apaga la antena pronto y lánzales a los vecinos morados."
 
 
@@ -167,6 +172,9 @@ class ResultadoTurno(Escena):
         if paso == "turno":
             from .seleccion import Relevo
             self.app.cambiar(Relevo(self.app, pa))
+        elif paso == "fin" and len(pa.jugadores) == 1:
+            # jugando solo (¡Jugar ya!), una tabla de una sola fila no dice nada: directo a la elección
+            self.app.cambiar(Eleccion(self.app, pa))
         else:
             self.app.cambiar(TablaRonda(self.app, pa, final=paso == "fin"))
 
@@ -193,7 +201,7 @@ class ResultadoTurno(Escena):
                 self.app.son.tocar("recoger")
             on = aparece and k < res["reputacion"]
             esc = 6 if on else 5
-            img_s = escalar(sprites.estrella(revelada_falsa=False) if on else sprites.desaturar(sprites.estrella()), esc)
+            img_s = escalar(sprites.estrella() if on else sprites.desaturar(sprites.estrella()), esc)
             pant.blit(img_s, img_s.get_rect(center=(140 + k * 75, 150 + (0 if k == 1 else 16))))
         parrafo(pant, mensaje(res), (215, 520), 19, 360, (255, 255, 255), ancla="midtop")
         # números
@@ -343,7 +351,7 @@ class Eleccion(Escena):
             nombre, lema, color = CANDIDATOS[c]
             x = 80 + k * ancho + ancho // 2
             v = round(votos[c] * cuenta)
-            alto = int(min(230, 230 * v / max(votos.values()))) if max(votos.values()) else 0
+            alto = int(min(190, 190 * v / max(votos.values()))) if max(votos.values()) else 0
             alto = int(alto * cuenta) if cuenta < 1 else alto
             base_y = 450
             gana = self.anunciado and c == self.ganador

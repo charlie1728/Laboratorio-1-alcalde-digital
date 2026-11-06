@@ -53,6 +53,11 @@ class App:
         self.red = None            # conexión en línea activa (si hay)
         self.mando = Mandos()      # controles USB (si hay alguno conectado)
         self.quieto = 0.0          # segundos sin que nadie toque nada
+        # el puntero del mouse empieza escondido: solo aparece si alguien mueve el mouse de verdad
+        # (en pantalla completa quedaba encima de un botón y lo seleccionaba solo)
+        self.t_inicio = time.monotonic()
+        self.recorrido_raton = 0.0
+        pygame.mouse.set_visible(False)
         from .pantallas.menu import Titulo
         self.escena = Titulo(self)
         self.escena.al_entrar()
@@ -99,8 +104,24 @@ class App:
             from .pantallas.menu import Titulo
             self.cambiar(Titulo(self))
 
+    def _raton(self, e):
+        """Muestra el puntero solo cuando se usa el mouse y lo esconde al usar el teclado o el control."""
+        if e.type == pygame.MOUSEMOTION:
+            if time.monotonic() - self.t_inicio < 1.0:     # el movimiento falso que llega al abrir la ventana
+                return
+            self.recorrido_raton += abs(e.rel[0]) + abs(e.rel[1])
+            if self.recorrido_raton > 8 and not pygame.mouse.get_visible():
+                pygame.mouse.set_visible(True)
+        elif e.type == pygame.MOUSEBUTTONDOWN:
+            pygame.mouse.set_visible(True)
+        elif e.type == pygame.KEYDOWN:
+            self.recorrido_raton = 0.0
+            if pygame.mouse.get_visible():
+                pygame.mouse.set_visible(False)
+
     def _cuadro(self, dt, velo):
         for e in self._eventos():
+            self._raton(e)
             if e.type in TOQUES:
                 self.quieto = 0.0
             if e.type == pygame.QUIT:

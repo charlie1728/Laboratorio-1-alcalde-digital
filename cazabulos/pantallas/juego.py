@@ -35,6 +35,7 @@ class PantallaJuego(Escena):
         self.r = Render(self.m, app.son, op)
         self.hud = Hud(self.m, self.r, j["nombre"], partida.ronda, partida.rondas, op)
         self.hud.mando = app.mando.en_uso
+        self.r.cuenta = True
         self.estado = "cuenta"
         self.t_estado = 0.0
         self.ultimo_num = None
@@ -117,6 +118,7 @@ class PantallaJuego(Escena):
         elif self.estado == "fin" and self.t_estado > 2.0:
             self._terminar()
             return
+        self.r.cuenta = self.estado == "cuenta"
         self.r.actualizar(dt)
         self.hud.mando = self.app.mando.en_uso
         self.hud.actualizar(dt)
@@ -148,6 +150,7 @@ class PantallaJuego(Escena):
     # ------------------------------------------------------------- dibujo
     def dibujar(self, pant):
         self.r.dibujar(pant)
+        self.hud.sin_controles = self.estado == "cuenta" or bool(self.pausa)
         self.hud.dibujar(pant)
         if self.estado == "cuenta":
             n = 3 - int(self.t_estado / self.paso_cuenta)

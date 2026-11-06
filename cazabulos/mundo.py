@@ -29,6 +29,8 @@ INMUNE = 3.0            # al curarse, un ratito sin que le entren Bulos (con Dan
 MAX_BULOS_LIBRES = 8
 MAX_VIRAL = 5           # a cuántos vecinos les llega el viral si no lo detienes
 GOLPES_PELEA = 2        # golpes para calmar una pelea (Caro la calma de uno)
+AVISO_REENVIO = 3.5     # segundos antes de pasar el Bulo en que se ve a qué amigo se lo va a pasar
+VISTA = (200, 115)      # media pantalla alrededor del jugador, en pixeles del mapa (la cámara lo sigue)
 
 ROLES = {
     "ana": {"poder": "Flash", "pasivo": "Ve todos los Bulos en el mapa y su periódico atraviesa varios",
@@ -42,6 +44,11 @@ ROLES = {
 }
 
 _mapa_cache = None
+
+
+def umbrales_reputacion(n):
+    """Vecinos a salvo que hacen falta para 3 y para 2 estrellas de reputación (con 18 vecinos: 14 y 9)."""
+    return round(n * 0.78), round(n * 0.5)
 
 
 def mapa_compartido():
@@ -71,6 +78,7 @@ class Vecino:
         self.escudo = 0.0          # segundos protegido por la verdad (no le entran Bulos)
         self.bulo = None           # id del Bulo que tiene en la cabeza (está "morado")
         self.t_prop = 0.0          # tiempo para pasarle el Bulo a un amigo
+        self.siguiente = None      # el amigo al que se lo va a pasar (se ve en los últimos segundos)
         self.ruta = []
         self.espera = 0.0
         self.pelea = None
@@ -132,6 +140,7 @@ class Estrella:
         self.x, self.y = x, y
         self.vida = 22.0
         self.t = 0.0
+        self.vista = False         # si alguna vez estuvo en la pantalla del jugador
 
 
 class Antena:
@@ -515,10 +524,10 @@ class Mundo:
             alcanzados += 1
             self.emitir("ola", u, nivel, (255, 214, 70))
             if padre is not None:
-                self.emitir("hilo", padre, u, (255, 220, 80))
+                self.emitir("hilo", padre, u, (255, 220, 80), nivel)
         self.ajustar(informacion=0.5 * alcanzados)
         self.emitir("verdad", s.x, s.y, origen.nombre)
-        self.sonar("entregar")
+        self.sonar("compartir")
         self.cargar(14)
 
     def _calmar(self, p):
@@ -600,6 +609,9 @@ class Mundo:
             v.triste = max(0.0, v.triste - dt)
             if v.bulo is not None:
                 v.t_prop -= dt
+                if v.t_prop < AVISO_REENVIO and self._puede_reenviar(v):
+                    if v.siguiente is None or not self._amigo_valido(v, v.siguiente):
+                        v.siguiente = self._elegir_amigo(v)
                 if v.t_prop <= 0:
                     self._reenviar(v)
             if v.pelea and v.pelea.get("activa"):
@@ -661,19 +673,34 @@ class Mundo:
         """Cuánto tarda un vecino morado en pasarle el Bulo a un amigo: los más conectados, más rápido."""
         return max(7.5, 14.0 - 0.7 * self.social.grado(v.nombre)) * (1.4 if self.tranquilo else 1.0)
 
+    def _puede_reenviar(self, v):
+        b = self.bulos.get(v.bulo)
+        return b is not None and b.reenvios == 0      # cada Bulo se reenvía una sola vez (la cadena crece en fila)
+
+    def _amigo_valido(self, v, u):
+        w = self.vecinos[u]
+        return (self.social.tiene_arista(v.nombre, u) and w.bulo is None and w.escudo <= 0
+                and not any(pl.hasta == u for pl in self.pulsos))
+
+    def _elegir_amigo(self, v):
+        """A quién le pasa el Bulo: al amigo en quien más confía (la arista de mayor peso)."""
+        opciones = [(u, p) for u, p in self.social.vecinos(v.nombre).items() if self._amigo_valido(v, u)]
+        if not opciones:
+            return None
+        mayor = max(p for _, p in opciones)
+        return self.azar.choice(sorted(u for u, p in opciones if p == mayor))
+
     def _reenviar(self, v):
         """El vecino con Bulo se lo pasa a un amigo por un hilo del grafo social."""
         v.t_prop = self._espera_reenvio(v)
-        b = self.bulos.get(v.bulo)
-        if b is None or b.reenvios >= 1:      # cada Bulo se reenvía una sola vez (la cadena crece en fila)
+        if not self._puede_reenviar(v):
+            v.siguiente = None
             return
-        opciones = [(u, p) for u, p in self.social.vecinos(v.nombre).items()
-                    if self.vecinos[u].bulo is None and self.vecinos[u].escudo <= 0
-                    and not any(pl.hasta == u for pl in self.pulsos)]
-        if not opciones:
+        u = v.siguiente if v.siguiente and self._amigo_valido(v, v.siguiente) else self._elegir_amigo(v)
+        v.siguiente = None
+        if u is None:
             return
-        mayor = max(p for _, p in opciones)
-        u = self.azar.choice([u for u, p in opciones if p == mayor])
+        b = self.bulos[v.bulo]
         dist = _dist(v.pos, self.vecinos[u].pos)
         b.reenvios += 1
         self.pulsos.append(Pulso(v.bulo, v.nombre, u, max(2.4, min(4.2, dist / 70))))
@@ -694,6 +721,7 @@ class Mundo:
         b.estado = "cabeza"
         b.vecino = v.nombre
         v.bulo = b.id
+        v.siguiente = None
         v.t_prop = self._espera_reenvio(v)
         v.triste = 2.0
         v.salto = 0.3
@@ -808,6 +836,7 @@ class Mundo:
                 v = self.vecinos.get(b.vecino)
                 if v:
                     v.bulo = None
+                    v.siguiente = None
                     v.salto = 0.4
                     v.escudo = max(v.escudo, INMUNE * (5 if j.clave == "dani" else 1))
                     j.stats["curados"] += 1
@@ -856,7 +885,7 @@ class Mundo:
             if w.bulo is not None and w.bulo in self.bulos:
                 self._atrapar(w.bulo, puntos=False)
             w.escudo = max(w.escudo, 5.0)
-            self.emitir("hilo", v.nombre, u, (255, 150, 200))
+            self.emitir("hilo", v.nombre, u, (255, 150, 200), 1)
             self.emitir("ola", u, 1, (255, 150, 200))
 
     def _pos_pulso(self, p):
@@ -962,13 +991,17 @@ class Mundo:
                 if self.mapa.libre(pygame.Rect(int(x) - 5, int(y) - 5, 10, 8)):
                     self.estrellas.append(Estrella(self._id(), x, y))
                     self.emitir("aparece", x, y)
+        j = self.jugador
         for s in list(self.estrellas):
             s.t += dt
             s.vida -= dt
+            if abs(s.x - j.x) < VISTA[0] and abs(s.y - j.y) < VISTA[1]:
+                s.vista = True
             if s.vida <= 0:
                 self.estrellas.remove(s)
                 self.emitir("puff", s.x, s.y)
-                self._hoja(["verdadera", "ignorar"])
+                if s.vista:          # IGNORAR es dejar pasar una noticia que tuviste en frente, no una que nunca viste
+                    self._hoja(["verdadera", "ignorar"])
 
     # ------------------------------------------------------------- antenas del Bot
     def _antenas(self, dt):
@@ -1170,6 +1203,7 @@ class Mundo:
                     b = self.bulos.pop(i, None)
                     if b and b.estado == "cabeza" and b.vecino in self.vecinos:
                         self.vecinos[b.vecino].bulo = None
+                        self.vecinos[b.vecino].siguiente = None
                         self._hoja(["falsa", "llega", "curar"])
                 self.pulsos = [p for p in self.pulsos if p.padre in self.arbol]
                 self.emitir("pop", v.x, v.y - 20, (255, 255, 255))
@@ -1201,8 +1235,7 @@ class Mundo:
                 return
             obj = max(sanos, key=lambda v: (self.social.grado(v.nombre), v.nombre))
             x, y = obj.x + (60 if obj.x < 900 else -60), obj.y - 50
-            self.viral = Viral(x, y, obj.nombre)
-            self.aviso("¡VIRAL!", (255, 90, 140))
+            self.viral = Viral(x, y, obj.nombre)        # el reloj del viral ya se ve arriba, sin otro aviso
             self.sonar("alarma", x, y)
             self.emitir("temblor", 3)
         elif tipo == "antena2":
@@ -1223,7 +1256,8 @@ class Mundo:
         bono = salvados * 10
         total = j.puntos + bono
         n = len(self.vecinos)
-        reputacion = 3 if salvados >= n * 0.78 else 2 if salvados >= n * 0.5 else 1
+        tres, dos = umbrales_reputacion(n)
+        reputacion = 3 if salvados >= tres else 2 if salvados >= dos else 1
         return {"personaje": j.clave, "puntos": j.puntos, "salvados": salvados, "vecinos": n,
                 "bono": bono, "total": total, "reputacion": reputacion, "stats": dict(j.stats),
                 "indicadores": self.indicadores(), "rumores": dict(self.rumores),

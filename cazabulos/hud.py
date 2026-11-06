@@ -41,6 +41,7 @@ class Hud:
         self.puntos_vis = 0.0
         self.marcador = []          # en línea: [(nombre, clave, puntos)]
         self.mando = False          # True si hay un control USB conectado (cambia las teclas que se muestran)
+        self.sin_controles = False  # en la cuenta regresiva y en la pausa las teclas ya se ven en el centro
         self.retrato = escalar(personajes.retrato(mundo.jugador.clave, mundo.jugador.piel, mundo.jugador.pelo), 5)
 
     def actualizar(self, dt):
@@ -164,7 +165,7 @@ class Hud:
             texto(pant, "¡LISTO!", (cx, cy - r - 4), 18, p["color"], "midbottom")
 
     def _controles(self, pant):
-        if self.m.t > 25 and not self.op.get("contraste"):
+        if self.sin_controles or (self.m.t > 25 and not self.op.get("contraste")):
             return
         r = panel(pant, (14, ALTO - 62, 520, 48), radio=12)
         x = r.x + 12
@@ -182,6 +183,8 @@ class Hud:
             entra = min(1.0, t / 0.15)
             sale = min(1.0, max(0.0, (1.8 - t) / 0.3))
             tam = int(44 + 14 * (1 - entra))
+            while tam > 20 and render(palabra, tam, peso=700).get_width() > 760:   # avisos largos del modo en línea
+                tam -= 4
             texto(pant, palabra, (ANCHO // 2, y), tam, color, "midtop", grosor=4, alfa=int(255 * sale))
 
     def _pista(self, pant):

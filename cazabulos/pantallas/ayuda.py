@@ -1,4 +1,5 @@
 """AYUDA: objetivo, controles, personajes, cómo ganar, indicadores y las estructuras de datos."""
+import math
 
 import pygame
 
@@ -8,10 +9,10 @@ from ..config import ALTO, ANCHO, TINTA
 from ..estructuras.arbol_decision import arbol_publicacion
 from ..hud import INDICADORES
 from ..mapa import NODOS
-from ..personajes import ORDEN
+from ..personajes import ORDEN, PERSONAJES
 from ..recursos import escalar
 from ..ui import panel, parrafo, tecla, texto
-from .base import Escena, FondoCiudad, es_volver, pie
+from .base import Escena, FondoCiudad, es_volver, instrucciones, pie
 from .final import dibujar_arbol
 from .seleccion import tarjeta_personaje
 
@@ -92,15 +93,17 @@ class Ayuda(Escena):
         texto(pant, "¡Gana quien salve a más vecinos!", (c.right - 220, c.y + 420), 22, (140, 240, 160), "midtop")
 
     def _p1(self, pant, c):
+        # lo mismo que se ve en la cuenta regresiva: el juego en tres dibujos
+        instrucciones(pant, (c.centerx, c.y + 118), self.t, teclas=False)
         filas = [("FLECHAS", "Caminar por el barrio (también W A S D)."),
-                 ("ESPACIO", "Lanzar tu herramienta (puedes dejarla presionada). Todo se arregla lanzándole: Bulos, vecinos morados, la antena y las peleas."),
+                 ("ESPACIO", "Lanzar tu herramienta (puedes dejarla presionada). Todo se arregla lanzándole: Bulos, morados, la antena y las peleas."),
                  ("X", "Usar el poder de tu personaje cuando el círculo se llena."),
                  ("ESC", "Pausa.  ·  M: silenciar la música.  ·  F11: pantalla completa.")]
-        for k, (t_, d) in enumerate(filas):
-            y = c.y + 30 + k * 64
+        y = c.y + 232
+        for t_, d in filas:
             tecla(pant, t_, (c.x + 40, y), 18)
-            parrafo(pant, d, (c.x + 200, y + 2), 21, c.w - 260, (240, 240, 250))
-        r = panel(pant, (c.x + 40, c.y + 420, c.w - 80, 110), (60, 40, 110), 230, borde=(255, 205, 50))
+            y = max(y + 44, parrafo(pant, d, (c.x + 200, y + 2), 20, c.w - 260, (240, 240, 250)) + 14)
+        r = panel(pant, (c.x + 40, c.y + 424, c.w - 80, 104), (60, 40, 110), 230, borde=(255, 205, 50))
         texto(pant, "Las estrellas", (r.x + 20, r.y + 12), 22, (255, 230, 150))
         parrafo(pant, "Una estrella es una noticia VERDADERA. Con solo tocarla la compartes: la verdad le llega al vecino más "
                       "cercano y a sus amigos por la red social, los cura y los protege un rato (brillan dorado).",
@@ -109,9 +112,10 @@ class Ayuda(Escena):
               (c.centerx, r.bottom + 16), 19, (200, 230, 255), "midtop", 600)
 
     def _p2(self, pant, c):
-        w = 270
+        w, sep = 276, 16
+        x0 = c.centerx - (4 * w + 3 * sep) // 2
         for k, clave in enumerate(ORDEN):
-            r = pygame.Rect(c.x + 30 + k * (w + 14), c.y + 20, w, c.h - 40)
+            r = pygame.Rect(x0 + k * (w + sep), c.y + 20, w, c.h - 40)
             tarjeta_personaje(pant, clave, r, self.t, True, escala=6)
 
     def _p3(self, pant, c):
@@ -125,10 +129,21 @@ class Ayuda(Escena):
             texto(pant, a, (c.x + 40, y), 20, (240, 240, 250), peso=600)
             texto(pant, b, (c.x + 560, y), 20, (255, 120, 120) if b.startswith("-") else (140, 240, 160), "topright")
         parrafo(pant, "Cada jugador juega su turno en el MISMO barrio, con los mismos eventos. Al final de todas las rondas gana "
-                      "quien sume más puntos. Las estrellas de reputación (1 a 3) dependen de cuántos vecinos terminan a salvo.",
-                (c.x + 620, c.y + 80), 20, c.w - 660, (240, 240, 250))
+                      "quien sume más puntos.", (c.x + 620, c.y + 80), 20, c.w - 660, (240, 240, 250))
+        # estrellas de reputación: cuántos vecinos a salvo hacen falta
+        from ..mundo import umbrales_reputacion
+        tres, dos = umbrales_reputacion(len(VECINOS))
+        r = panel(pant, (c.x + 620, c.y + 170, c.w - 660, 190), (40, 30, 84), 235, borde=(255, 205, 50))
+        texto(pant, "Estrellas de reputación", (r.x + 20, r.y + 12), 22, (255, 230, 150))
+        filas = [(3, f"{tres} o más vecinos a salvo"), (2, f"{dos} o más vecinos a salvo"), (1, f"menos de {dos}")]
+        llena, vacia = escalar(sprites.estrella(), 2), escalar(sprites.desaturar(sprites.estrella()), 2)
+        for k, (n, txt) in enumerate(filas):
+            y = r.y + 54 + k * 42
+            for e in range(3):
+                pant.blit(llena if e < n else vacia, (r.x + 20 + e * 36, y))
+            texto(pant, txt, (r.x + 140, y + 6), 20, (240, 240, 250), peso=600)
         parrafo(pant, "Después viene la ELECCIÓN: si el barrio terminó informado, gana un candidato con propuestas. Si quedó lleno "
-                      "de Bulos, gana Emilio Bot, el de las cadenas.", (c.x + 620, c.y + 300), 20, c.w - 660, (255, 230, 150))
+                      "de Bulos, gana Emilio Bot, el de las cadenas.", (c.x + 620, c.y + 384), 20, c.w - 660, (255, 230, 150))
 
     def _p4(self, pant, c):
         texto(pant, "Los indicadores del barrio", (c.x + 40, c.y + 26), 32, (255, 205, 50))
@@ -150,19 +165,23 @@ class Ayuda(Escena):
         texto(pant, "Grafo social: quién le pasa el Bulo a quién", (c.x + 30, c.y + 16), 22, (255, 205, 50))
         area = pygame.Rect(c.x + 30, c.y + 50, 560, 400)
         pygame.draw.rect(pant, (20, 16, 44), area, border_radius=12)
-        pos = {n: (area.x + 20 + p[0] / 64 * (area.w - 40), area.y + 20 + (p[1] - 6) / 40 * (area.h - 40)) for n, _, _, _, p in VECINOS}
-        orden = self.social.bfs("Rosa")
-        nivel = {v: n for v, n, _ in orden}
+        pos, nivel = self._anillos_bfs(area, "Rosa")
         paso = int(self.t * 1.2) % 5
+        colores = [(255, 90, 150), (255, 160, 70), (255, 220, 80), (140, 220, 140), (120, 180, 255)]
+        cx, cy = area.center
+        for n, (rx, ry) in enumerate(self.RADIOS[1:max(nivel.values()) + 1], start=1):
+            caja = pygame.Rect(0, 0, rx * 2, ry * 2)
+            caja.center = (cx, cy)
+            pygame.draw.ellipse(pant, colores[n] if n <= paso else (50, 44, 84), caja, 1)
         for a, b, p in self.social.aristas():
             pygame.draw.line(pant, (110, 100, 160), pos[a], pos[b], p)
-        colores = [(255, 90, 150), (255, 160, 70), (255, 220, 80), (140, 220, 140), (120, 180, 255)]
         for v, (x, y) in pos.items():
-            n = nivel.get(v, 9)
+            n = nivel[v]
             col = colores[min(n, 4)] if n <= paso else (90, 84, 130)
+            pygame.draw.circle(pant, TINTA, (int(x), int(y) + 1), 11)
             pygame.draw.circle(pant, col, (int(x), int(y)), 9)
             texto(pant, v, (x, y + 10), 12, (230, 226, 245), "midtop", 600)
-        parrafo(pant, f"Recorrido BFS desde Rosa (la más conectada, {self.social.grado('Rosa')} amigos): los colores muestran el nivel. "
+        parrafo(pant, f"Recorrido BFS desde Rosa (la más conectada, {self.social.grado('Rosa')} amigos): cada anillo es un nivel. "
                       "Así viaja un Bulo viral: primero a los amigos, luego a los amigos de los amigos.",
                 (area.x, area.bottom + 8), 16, area.w, (230, 226, 245))
         texto(pant, "Grafo de la ciudad: la ruta más corta", (c.x + 630, c.y + 16), 22, (255, 205, 50))
@@ -183,6 +202,29 @@ class Ayuda(Escena):
         parrafo(pant, "Dijkstra encuentra el camino más corto por las calles. Lo usa la línea que te guía hacia el viral, una "
                       "pelea o el vecino morado más cercano, y lo usan los vecinos para ir de una zona a otra sin atravesar edificios.",
                 (area2.x, area2.bottom + 8), 16, area2.w, (230, 226, 245))
+
+    RADIOS = [(0, 0), (92, 62), (176, 118), (254, 168), (270, 185)]
+
+    def _anillos_bfs(self, area, origen):
+        """Dibujo del grafo social en anillos: el origen en el centro y cada nivel del BFS en un anillo.
+        Cada vecino se pone cerca de quien lo descubrió, así se cruzan pocas líneas y los nombres no se tapan."""
+        orden = self.social.bfs(origen)
+        nivel = {v: n for v, n, _ in orden}
+        padre = {v: p for v, _, p in orden}
+        ultimo = max(nivel.values()) + 1
+        for v in self.social.vertices():
+            nivel.setdefault(v, ultimo)            # los que el BFS no alcanza (otra comunidad), afuera
+        cx, cy = area.center
+        pos, ang = {origen: (cx, cy)}, {origen: 0.0}
+        for n in range(1, max(nivel.values()) + 1):
+            del_nivel = sorted((v for v in nivel if nivel[v] == n),
+                               key=lambda v: (ang.get(padre.get(v), 0.0) % math.tau, v))
+            rx, ry = self.RADIOS[min(n, len(self.RADIOS) - 1)]
+            for i, v in enumerate(del_nivel):
+                a = -math.pi / 2 + (i + 0.5) * math.tau / len(del_nivel) + 0.35 * (n - 1)
+                ang[v] = a
+                pos[v] = (cx + math.cos(a) * rx, cy + math.sin(a) * ry)
+        return pos, nivel
 
     def _p6(self, pant, c):
         texto(pant, "Árbol de mutaciones de los Bulos", (c.x + 30, c.y + 16), 22, (255, 205, 50))
@@ -215,12 +257,46 @@ class Ayuda(Escena):
 
     def _p7(self, pant, c):
         texto(pant, "Jugar con amigos", (c.x + 40, c.y + 26), 32, (255, 205, 50))
-        parrafo(pant, "MISMO COMPUTADOR (2 a 4): no se comparte el teclado. Cada uno juega su turno y le pasa el teclado al "
-                      "siguiente. En cada ronda todos juegan el mismo barrio con los mismos eventos, así es justo. El orden de "
-                      "los turnos cambia en cada ronda.", (c.x + 40, c.y + 90), 21, c.w - 80, (240, 240, 250))
-        parrafo(pant, "EN LÍNEA (2 a 4 computadores en la misma red): uno crea la sala (es el servidor) y los demás se unen con "
-                      "la dirección que aparece en pantalla. Todos juegan a la vez su propio barrio, ven a los rivales como "
-                      "fantasmas y el marcador en vivo. El servidor lleva los jugadores, las rondas, los puntajes y la elección.",
-                (c.x + 40, c.y + 240), 21, c.w - 80, (240, 240, 250))
-        parrafo(pant, "Nadie depende de otro: cada uno gana por su cuenta salvando a más vecinos.", (c.x + 40, c.y + 420), 22, c.w - 80,
-                (140, 240, 160))
+        mitad = c.w // 2
+        # mismo computador: los turnos pasan de uno a otro
+        texto(pant, "Mismo computador (2 a 4)", (c.x + mitad // 2, c.y + 90), 24, (255, 230, 150), "midtop")
+        caras = [escalar(personajes.retrato(k), 4) for k in ORDEN]
+        x0 = c.x + mitad // 2 - (4 * 70 + 3 * 34) // 2
+        activo = int(self.t * 1.2) % 4
+        for k, img in enumerate(caras):
+            x = x0 + k * 104
+            caja = pygame.Rect(x - 6, c.y + 150, 82, 74)
+            pygame.draw.rect(pant, PERSONAJES[ORDEN[k]]["color"] if k == activo else (46, 38, 90), caja, border_radius=12)
+            pant.blit(img, img.get_rect(center=caja.center))
+            if k < 3:
+                texto(pant, "›", (caja.right + 16, caja.centery), 34, (220, 214, 240), "center")
+        parrafo(pant, "Cada uno juega su turno y le pasa el teclado al siguiente. En cada ronda todos juegan el MISMO barrio "
+                      "con los mismos eventos: así es justo.", (c.x + mitad // 2, c.y + 250), 19, mitad - 80,
+                (240, 240, 250), ancla="midtop")
+        # en línea: un servidor y varios computadores
+        sx = c.x + mitad + mitad // 2
+        texto(pant, "En línea (2 a 4 computadores)", (sx, c.y + 90), 24, (255, 230, 150), "midtop")
+        srv = pygame.Rect(0, 0, 150, 52)
+        srv.center = (sx, c.y + 170)
+        clientes = []
+        for k in range(3):
+            r = pygame.Rect(0, 0, 96, 70)
+            r.center = (sx - 170 + k * 170, c.y + 300)
+            clientes.append(r)
+            fase = (self.t * 0.8 + k * 0.33) % 1.0
+            pygame.draw.line(pant, (110, 100, 160), srv.center, r.center, 3)
+            px = srv.centerx + (r.centerx - srv.centerx) * fase
+            py = srv.centery + (r.centery - srv.centery) * fase
+            pygame.draw.circle(pant, (255, 205, 50), (int(px), int(py)), 6)
+        pygame.draw.rect(pant, (255, 205, 50), srv, border_radius=12)
+        texto(pant, "Servidor", srv.center, 20, TINTA, "center", borde=None)
+        for k, r in enumerate(clientes):
+            pygame.draw.rect(pant, (46, 38, 90), r, border_radius=12)
+            pygame.draw.rect(pant, (200, 196, 230), r, 2, border_radius=12)
+            img = escalar(personajes.retrato(ORDEN[k]), 3)
+            pant.blit(img, img.get_rect(center=r.center))
+        parrafo(pant, "Uno crea la sala y los demás escriben la dirección que aparece. Todos juegan a la vez, ven a los rivales "
+                      "como fantasmas y el marcador en vivo.", (sx, c.y + 360), 19, mitad - 80, (240, 240, 250),
+                ancla="midtop")
+        parrafo(pant, "Nadie depende de otro: cada uno gana por su cuenta salvando a más vecinos.", (c.centerx, c.y + 480), 22,
+                c.w - 80, (140, 240, 160), ancla="midtop")
