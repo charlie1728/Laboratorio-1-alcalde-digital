@@ -213,6 +213,18 @@ class TestFeria(unittest.TestCase):
         self.assertTrue(guardado.cargar_opciones()["pantalla_completa"])      # si la eligió después, se respeta
         (guardado.DATOS / "opciones.json").unlink()
 
+    def test_el_mouse_apunta_bien_en_la_ventana_estirada(self):
+        pygame.display.set_mode((1920, 1009))                       # como la ventana grande de 1920x1080
+        try:
+            clic = self.app._al_lienzo(E(pygame.MOUSEBUTTONDOWN, pos=(960, 1008), button=1))
+            self.assertEqual(clic.pos, (640, 719))                   # el mismo punto en el lienzo de 1280x720
+            movido = self.app._al_lienzo(E(pygame.MOUSEMOTION, pos=(1919, 0), rel=(30, 14), buttons=(0, 0, 0)))
+            self.assertEqual(movido.pos, (1279, 0))
+            self.assertEqual(movido.rel, (20, 10))
+            self.app._presentar()                                   # el lienzo se estira sin errores
+        finally:
+            pygame.display.set_mode((1280, 720))
+
     def test_el_control_mueve_al_jugador(self):
         from cazabulos.pantallas.juego import PantallaJuego
         from cazabulos.partida import Partida

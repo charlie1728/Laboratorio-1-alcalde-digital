@@ -179,7 +179,7 @@ La primera versión jugable tenía demasiadas cosas a la vez: noticias que habí
 
 ## 8. Pruebas
 
-`python -m unittest discover -s cazabulos/pruebas -t .` corre 59 pruebas.
+`python -m unittest discover -s cazabulos/pruebas -t .` corre 60 pruebas.
 
 - **Estructuras:** BFS por niveles y con filtro, componentes, Dijkstra, subárboles, recorridos, AVL y el árbol de decisiones (sus caminos, las cuatro acciones del enunciado y eliminar ramas).
 - **Juego:**

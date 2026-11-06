@@ -36,11 +36,13 @@ class App:
         pygame.display.set_caption(TITULO)
         self._icono()                       # antes de abrir la ventana, para que Windows lo tome
         self.op = cargar_opciones()
-        # Ventana que se puede agrandar: el juego (1280x720) se escala solo al tamaño que tenga.
+        # El juego se dibuja siempre en un lienzo de 1280x720 y, al final de cada cuadro, se estira al
+        # tamaño exacto de la ventana: así llena la ventana grande sin franjas negras a los lados.
         try:
-            self.pantalla = pygame.display.set_mode((ANCHO, ALTO), pygame.SCALED | pygame.RESIZABLE)
+            pygame.display.set_mode((ANCHO, ALTO), pygame.RESIZABLE)
         except pygame.error:
-            self.pantalla = pygame.display.set_mode((ANCHO, ALTO))
+            pygame.display.set_mode((ANCHO, ALTO))
+        self.pantalla = pygame.Surface((ANCHO, ALTO)).convert()
         try:
             from pygame._sdl2.video import Window
             self.ventana = Window.from_display_module()
@@ -94,7 +96,31 @@ class App:
         except (pygame.error, AttributeError):
             pass
         self.pantalla.fill((16, 10, 36))
+        self._presentar()
+
+    def _presentar(self):
+        """Muestra el lienzo del juego estirado al tamaño de la ventana (sin franjas negras)."""
+        ventana = pygame.display.get_surface()
+        if ventana is None:
+            return
+        if ventana.get_size() == (ANCHO, ALTO):
+            ventana.blit(self.pantalla, (0, 0))
+        else:
+            pygame.transform.scale(self.pantalla, ventana.get_size(), ventana)
         pygame.display.flip()
+
+    def _al_lienzo(self, e):
+        """El mouse se mueve en la ventana estirada: su posición se pasa a la del lienzo de 1280x720."""
+        ventana = pygame.display.get_surface()
+        w, h = ventana.get_size() if ventana else (ANCHO, ALTO)
+        if (w, h) == (ANCHO, ALTO) or not hasattr(e, "pos"):
+            return e
+        fx, fy = ANCHO / w, ALTO / h
+        datos = dict(e.dict)
+        datos["pos"] = (int(e.pos[0] * fx), int(e.pos[1] * fy))
+        if "rel" in datos:
+            datos["rel"] = (round(e.rel[0] * fx), round(e.rel[1] * fy))
+        return pygame.event.Event(e.type, datos)
 
     def aplicar_volumen(self):
         self.son.vol_efectos = self.op["efectos"]
@@ -116,6 +142,8 @@ class App:
                 yield from self.mando.traducir(e, getattr(self.escena, "mando_juego", False))
                 if e.type == pygame.JOYBUTTONDOWN:
                     self.quieto = 0.0
+            elif e.type in (pygame.MOUSEMOTION, pygame.MOUSEBUTTONDOWN, pygame.MOUSEBUTTONUP):
+                yield self._al_lienzo(e)
             else:
                 if e.type == pygame.KEYDOWN:
                     self.mando.usado = False         # tocaron el teclado: las ayudas vuelven a mostrar teclas
@@ -220,7 +248,7 @@ class App:
                 if isinstance(self.escena, Titulo) or len(fallos) >= 3:
                     raise
                 self._rescatar()
-            pygame.display.flip()
+            self._presentar()
         if self.red:
             self.red.cerrar()
         pygame.quit()
