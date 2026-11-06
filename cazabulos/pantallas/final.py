@@ -106,15 +106,54 @@ def mensaje(res):
     return "Los Bulos ganaron esta vez. Apaga la antena pronto y lánzales a los vecinos morados."
 
 
+def anillos_bfs(grafo, origen, rect):
+    """Posiciones para dibujar el grafo social en anillos: el origen en el centro y cada nivel del BFS en un
+    anillo (elipse) más afuera. Cada vecino queda cerca de quien lo descubrió, así se cruzan pocas líneas y
+    los nombres no se tapan. Los que el BFS no alcanza (otra comunidad) van en el anillo de afuera.
+    Devuelve (posiciones, nivel de cada vértice, radios de cada anillo)."""
+    orden = grafo.bfs(origen)
+    nivel = {v: n for v, n, _ in orden}
+    padre = {v: p for v, _, p in orden}
+    ultimo = (max(nivel.values()) if nivel else 0) + 1
+    for v in grafo.vertices():
+        nivel.setdefault(v, ultimo)
+    maxn = max(1, max(nivel.values()))
+    cx, cy = rect.center
+    # el primer anillo un poco más grande que lo proporcional: ahí suele haber más vecinos juntos
+    fraccion = [(n + 0.4) / (maxn + 0.4) for n in range(maxn + 1)]
+    radios = [(0, 0)] + [((rect.w / 2 - 50) * fraccion[n], (rect.h / 2 - 34) * fraccion[n]) for n in range(1, maxn + 1)]
+    pos, ang = {origen: (cx, cy)}, {origen: 0.0}
+    for n in range(1, maxn + 1):
+        del_nivel = sorted((v for v in nivel if nivel[v] == n),
+                           key=lambda v: (ang.get(padre.get(v), 0.0) % math.tau, v))
+        rx, ry = radios[n]
+        for i, v in enumerate(del_nivel):
+            a = -math.pi / 2 + (i + 0.5) * math.tau / len(del_nivel) + 0.35 * (n - 1)
+            ang[v] = a
+            pos[v] = (cx + math.cos(a) * rx, cy + math.sin(a) * ry)
+    return pos, nivel, radios
+
+
 def dibujar_red(pant, rect, res, t=0.0):
-    """El grafo social al final del turno: quién quedó con Bulo, quién protegido y qué hilos cambiaron."""
+    """El grafo social al final del turno: quién quedó con Bulo, quién protegido y qué hilos cambiaron.
+    Se dibuja en anillos del BFS desde el vecino más conectado (igual que en la ayuda)."""
     from ..ciudad import VECINOS
+    from ..estructuras.grafo import Grafo
     red = res.get("red")
     if not red:
         return
     pygame.draw.rect(pant, (20, 16, 44), rect, border_radius=14)
-    pos = {n: (rect.x + 30 + p[0] / 64 * (rect.w - 60), rect.y + 30 + (p[1] - 6) / 40 * (rect.h - 60))
-           for n, _, _, _, p in VECINOS}
+    g = Grafo()
+    for n, *_ in VECINOS:
+        g.agregar_vertice(n)
+    for a, b, p in red["aristas"]:
+        g.agregar_arista(a, b, p)
+    origen = red.get("mas_conectado") or VECINOS[0][0]
+    pos, _, radios = anillos_bfs(g, origen, rect.inflate(-40, -70).move(0, -14))
+    for rx, ry in radios[1:]:
+        caja = pygame.Rect(0, 0, int(rx * 2), int(ry * 2))
+        caja.center = rect.inflate(-40, -70).move(0, -14).center
+        pygame.draw.ellipse(pant, (44, 38, 80), caja, 1)
     rotos = {tuple(sorted(x)) for x in res.get("rotos", [])}
     nuevos = {tuple(sorted(x)) for x in res.get("nuevos", [])}
     for a, b, p in red["aristas"]:

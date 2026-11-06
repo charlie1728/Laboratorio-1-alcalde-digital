@@ -52,7 +52,7 @@ El aprendizaje sale de las mecánicas, no de preguntas:
   - **Objetivo de los Bulos:** buscan al vecino de mayor **grado**.
   - **Velocidad:** el tiempo para reenviar depende del grado (los más conectados reenvían antes).
   - **Comunidades:** **DFS / componentes**.
-- **Se ve en el juego:** los hilos por donde viaja un Bulo son morados; la verdad se ve crecer en dorado nivel por nivel; las amistades nuevas brillan en verde. Al final de cada turno, la tecla TAB muestra la red del barrio: quién quedó con Bulo, quién protegido, las amistades rotas (rojo) y las nuevas (verde), y cuántas comunidades quedaron (DFS). En la ayuda, el grafo se dibuja en anillos por niveles del BFS.
+- **Se ve en el juego:** los hilos por donde viaja un Bulo son morados; la verdad se ve crecer en dorado nivel por nivel; las amistades nuevas brillan en verde. Al final de cada turno, la tecla TAB muestra la red del barrio en anillos del BFS desde el vecino más conectado: quién quedó con Bulo, quién protegido, las amistades rotas (rojo) y las nuevas (verde), y cuántas comunidades quedaron (DFS). La ayuda dibuja el grafo igual, con cada anillo de un color.
 - **Cambia durante la partida:**
   - Si una pelea no se calma, la amistad se rompe (**eliminar arista**) y por ahí ya no pasa nada, ni Bulos ni verdad.
   - Si se calma, la confianza sube (el peso aumenta).

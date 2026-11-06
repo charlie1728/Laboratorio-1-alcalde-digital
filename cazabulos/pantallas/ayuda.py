@@ -1,6 +1,4 @@
 """AYUDA: objetivo, controles, personajes, cómo ganar, indicadores y las estructuras de datos."""
-import math
-
 import pygame
 
 from .. import personajes, sprites
@@ -13,7 +11,7 @@ from ..personajes import ORDEN, PERSONAJES
 from ..recursos import escalar
 from ..ui import panel, parrafo, tecla, texto
 from .base import Escena, FondoCiudad, es_volver, instrucciones, pie
-from .final import dibujar_arbol
+from .final import anillos_bfs, dibujar_arbol
 from .seleccion import tarjeta_personaje
 
 PAGINAS = ["Objetivo", "Cómo se juega", "Personajes", "Cómo ganar", "Indicadores", "Grafos", "Árboles", "Multijugador"]
@@ -165,13 +163,12 @@ class Ayuda(Escena):
         texto(pant, "Grafo social: quién le pasa el Bulo a quién", (c.x + 30, c.y + 16), 22, (255, 205, 50))
         area = pygame.Rect(c.x + 30, c.y + 50, 560, 400)
         pygame.draw.rect(pant, (20, 16, 44), area, border_radius=12)
-        pos, nivel = self._anillos_bfs(area, "Rosa")
+        pos, nivel, radios = anillos_bfs(self.social, "Rosa", area)
         paso = int(self.t * 1.2) % 5
         colores = [(255, 90, 150), (255, 160, 70), (255, 220, 80), (140, 220, 140), (120, 180, 255)]
-        cx, cy = area.center
-        for n, (rx, ry) in enumerate(self.RADIOS[1:max(nivel.values()) + 1], start=1):
-            caja = pygame.Rect(0, 0, rx * 2, ry * 2)
-            caja.center = (cx, cy)
+        for n, (rx, ry) in enumerate(radios[1:], start=1):
+            caja = pygame.Rect(0, 0, int(rx * 2), int(ry * 2))
+            caja.center = area.center
             pygame.draw.ellipse(pant, colores[n] if n <= paso else (50, 44, 84), caja, 1)
         for a, b, p in self.social.aristas():
             pygame.draw.line(pant, (110, 100, 160), pos[a], pos[b], p)
@@ -202,29 +199,6 @@ class Ayuda(Escena):
         parrafo(pant, "Dijkstra encuentra el camino más corto por las calles. Lo usa la línea que te guía hacia el viral, una "
                       "pelea o el vecino morado más cercano, y lo usan los vecinos para ir de una zona a otra sin atravesar edificios.",
                 (area2.x, area2.bottom + 8), 16, area2.w, (230, 226, 245))
-
-    RADIOS = [(0, 0), (92, 62), (176, 118), (254, 168), (270, 185)]
-
-    def _anillos_bfs(self, area, origen):
-        """Dibujo del grafo social en anillos: el origen en el centro y cada nivel del BFS en un anillo.
-        Cada vecino se pone cerca de quien lo descubrió, así se cruzan pocas líneas y los nombres no se tapan."""
-        orden = self.social.bfs(origen)
-        nivel = {v: n for v, n, _ in orden}
-        padre = {v: p for v, _, p in orden}
-        ultimo = max(nivel.values()) + 1
-        for v in self.social.vertices():
-            nivel.setdefault(v, ultimo)            # los que el BFS no alcanza (otra comunidad), afuera
-        cx, cy = area.center
-        pos, ang = {origen: (cx, cy)}, {origen: 0.0}
-        for n in range(1, max(nivel.values()) + 1):
-            del_nivel = sorted((v for v in nivel if nivel[v] == n),
-                               key=lambda v: (ang.get(padre.get(v), 0.0) % math.tau, v))
-            rx, ry = self.RADIOS[min(n, len(self.RADIOS) - 1)]
-            for i, v in enumerate(del_nivel):
-                a = -math.pi / 2 + (i + 0.5) * math.tau / len(del_nivel) + 0.35 * (n - 1)
-                ang[v] = a
-                pos[v] = (cx + math.cos(a) * rx, cy + math.sin(a) * ry)
-        return pos, nivel
 
     def _p6(self, pant, c):
         texto(pant, "Árbol de mutaciones de los Bulos", (c.x + 30, c.y + 16), 22, (255, 205, 50))
