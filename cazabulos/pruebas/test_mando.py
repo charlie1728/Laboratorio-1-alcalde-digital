@@ -225,6 +225,26 @@ class TestFeria(unittest.TestCase):
         finally:
             pygame.display.set_mode((1280, 720))
 
+    def test_al_acabar_el_tiempo_llega_a_los_resultados(self):
+        """Con el bucle de verdad (fundidos incluidos): antes se quedaba pegado en "¡TIEMPO!" y
+        guardaba el récord en cada cuadro."""
+        from cazabulos.pantallas.final import ResultadoTurno
+        from cazabulos.pantallas.juego import PantallaJuego
+        from cazabulos.partida import Partida
+        pa = Partida([{"clave": "ana", "piel": None, "pelo": None, "nombre": "ANA"}], 1, 2, semilla=3)
+        antes = len(self.app.records.mejores(500))
+        self.app.siguiente = None
+        self.app.escena = PantallaJuego(self.app, pa)
+        velo = pygame.Surface((1280, 720))
+        for _ in range(60 * 12):                       # cuenta + 2 s de juego + "¡TIEMPO!" + fundido
+            self.app._cuadro(1 / 60, velo)
+            if isinstance(self.app.escena, ResultadoTurno):
+                break
+        self.assertIsInstance(self.app.escena, ResultadoTurno)
+        for _ in range(60):                            # unos cuadros más: nada se repite
+            self.app._cuadro(1 / 60, velo)
+        self.assertEqual(len(self.app.records.mejores(500)), antes + 1)
+
     def test_el_control_mueve_al_jugador(self):
         from cazabulos.pantallas.juego import PantallaJuego
         from cazabulos.partida import Partida

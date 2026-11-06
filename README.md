@@ -87,7 +87,7 @@ Otros comandos: `python -m cazabulos.acceso_directo --escritorio` pone el acceso
 
 Para jugar en línea, los computadores deben estar en la misma red. La primera vez, Windows puede preguntar si deja que Python use la red: hay que dar **Permitir** en el computador que crea la sala.
 
-Pruebas (60):
+Pruebas (61):
 
 ```bash
 python -m unittest discover -s cazabulos/pruebas -t .

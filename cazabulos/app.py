@@ -130,9 +130,9 @@ class App:
         guardar_opciones(self.op)
 
     def cambiar(self, escena):
-        """Cambia de pantalla con un fundido corto."""
+        """Cambia de pantalla con un fundido corto. El fundido sigue desde donde iba (no vuelve a cero):
+        así, aunque se pida el cambio dos veces, la pantalla siempre termina de cambiar."""
         self.siguiente = escena
-        self.fundido = 0.0
         self.quieto = 0.0
 
     def _eventos(self):

@@ -116,7 +116,12 @@ class PantallaJuego(Escena):
                 self.estado = "fin"
                 self.t_estado = 0.0
         elif self.estado == "fin" and self.t_estado > 2.0:
+            # una sola vez: el cambio a los resultados tarda un instante (fundido) y mientras tanto esta
+            # pantalla se sigue actualizando; si se llamara cada cuadro, nunca terminaría de cambiar
+            self.estado = "saliendo"
             self._terminar()
+            return
+        elif self.estado == "saliendo":
             return
         self.r.cuenta = self.estado == "cuenta"
         self.r.actualizar(dt)
@@ -164,7 +169,7 @@ class PantallaJuego(Escena):
             texto(pant, s, (ANCHO // 2, 210), tam, color, "center", grosor=6)
             if n > 0:
                 instrucciones(pant, (ANCHO // 2, 440), self.t, self.app.mando.en_uso)
-        elif self.estado == "fin":
+        elif self.estado in ("fin", "saliendo"):
             velo = pygame.Surface((ANCHO, ALTO), pygame.SRCALPHA)
             velo.fill((20, 14, 46, min(170, int(self.t_estado * 300))))
             pant.blit(velo, (0, 0))
