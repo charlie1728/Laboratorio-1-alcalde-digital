@@ -226,7 +226,7 @@ class Render:
     def _calcular_guia(self):
         """Ruta más corta (Dijkstra en el grafo de la ciudad) hacia lo más urgente, si no se ve."""
         m = self.m
-        obj = self._objetivo_urgente()
+        obj = None if self.op.get("demo") else self._objetivo_urgente()
         self.guia = []
         if obj is None or self.visible(*obj, -60):
             return
@@ -253,7 +253,8 @@ class Render:
         self._efectos(pant)
         self._luz_del_dia(pant)
         self._textos(pant)
-        self._flechas(pant)
+        if not self.op.get("demo"):          # el mundo de fondo del menú no necesita guías
+            self._flechas(pant)
         if getattr(self, "flash", 0) > 0:
             s = pygame.Surface((ANCHO, ALTO), pygame.SRCALPHA)
             s.fill((255, 255, 255, int(200 * self.flash / 0.35)))
