@@ -185,6 +185,22 @@ class TestFeria(unittest.TestCase):
             ResultadoTurno(self.app, pa, pa.actual, res)._seguir()
             self.assertIsInstance(self.app.siguiente, esperado)
 
+    def test_salir_pregunta_antes(self):
+        from cazabulos.pantallas.menu import Titulo
+        titulo = Titulo(self.app)
+        self.app.corriendo = True
+        titulo._salir()
+        self.assertTrue(self.app.corriendo)                         # todavía no se cierra
+        aceptar = E(pygame.KEYDOWN, key=pygame.K_SPACE, mod=0, unicode="", scancode=0)
+        titulo.evento(aceptar)                                      # la opción marcada es "No, seguir aquí"
+        self.assertTrue(self.app.corriendo)
+        self.assertIsNone(titulo.confirmar)
+        titulo._salir()
+        titulo.evento(E(pygame.KEYDOWN, key=pygame.K_DOWN, mod=0, unicode="", scancode=0))
+        titulo.evento(aceptar)
+        self.assertFalse(self.app.corriendo)
+        self.app.corriendo = True
+
     def test_el_control_mueve_al_jugador(self):
         from cazabulos.pantallas.juego import PantallaJuego
         from cazabulos.partida import Partida

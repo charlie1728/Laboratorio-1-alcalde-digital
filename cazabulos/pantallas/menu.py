@@ -51,8 +51,17 @@ class Titulo(Escena):
             ("Récords y logros", lambda: app.cambiar(RecordsPantalla(app))),
             ("Salir", self._salir),
         ], centro=(ANCHO // 2, 474), ancho=360, alto=44, sep=8, tam=24)
+        self.confirmar = None
 
     def _salir(self):
+        """En la feria un niño puede tocar "Salir" sin querer: se pregunta antes (por defecto, no)."""
+        self.confirmar = Botonera([("No, seguir aquí", self._no_salir), ("Sí, salir del juego", self._si_salir)],
+                                  centro=(ANCHO // 2, 448), ancho=420, alto=60, sep=14, tam=26)
+
+    def _no_salir(self):
+        self.confirmar = None
+
+    def _si_salir(self):
         self.app.corriendo = False
 
     def _con_historia(self, siguiente):
@@ -64,6 +73,12 @@ class Titulo(Escena):
             self.app.cambiar(Historia(self.app, siguiente))
 
     def evento(self, e):
+        if self.confirmar:
+            if es_volver(e):
+                self.confirmar = None
+            else:
+                self.confirmar.evento(e, self.app)
+            return
         if es_volver(e) and e.key == pygame.K_ESCAPE:
             return
         self.botones.evento(e, self.app)
@@ -113,6 +128,13 @@ class Titulo(Escena):
             texto(pant, p["rol"], (x + 48, y + 176), 15, (230, 226, 245), "midtop", 600)
         self.botones.dibujar(pant, self.t)
         pie(pant, "Flechas y ENTER para elegir  ·  M silencia la música  ·  F11 pantalla completa", self.app)
+        if self.confirmar:
+            velo = pygame.Surface((ANCHO, ALTO), pygame.SRCALPHA)
+            velo.fill((16, 10, 36, 200))
+            pant.blit(velo, (0, 0))
+            panel(pant, (ANCHO // 2 - 290, 276, 580, 262), borde=(255, 205, 50))
+            texto(pant, "¿Salir del juego?", (ANCHO // 2, 304), 40, (255, 205, 50), "midtop", grosor=3)
+            self.confirmar.dibujar(pant, self.t)
 
 
 class Selector:
