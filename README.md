@@ -66,19 +66,31 @@ Más detalle en [docs/ENTREGA_FINAL.md](docs/ENTREGA_FINAL.md).
 
 ## Instalar y ejecutar
 
+En Windows: doble clic en **`jugar.bat`**. La primera vez crea junto a él el acceso directo **Cazabulos**, con el ícono del juego. Desde ahí en adelante se abre con doble clic en **Cazabulos**, sin la ventana negra de la consola.
+
+En cualquier sistema, desde una terminal en esta carpeta:
+
 ```bash
 pip install -r requirements.txt
 python main.py
 ```
 
-En Windows basta con doble clic en `jugar.bat`. La primera vez crea en la carpeta el acceso directo **Cazabulos**, con el ícono del juego, que lo abre sin la ventana negra de la consola (también se puede crear con `python crear_acceso_directo.py --escritorio`). Servidor sin ventana para el modo en línea: `python servidor.py`.
+| En la carpeta | Para qué |
+|---|---|
+| `Cazabulos` (acceso directo) y `jugar.bat` | Abrir el juego |
+| `main.py` | El programa que arranca el juego |
+| `cazabulos/` | Todo el juego: código, dibujos, estructuras de datos, red, pruebas (`pruebas/`) y lo guardado (`datos/`: opciones, récords y logros) |
+| `docs/` | La entrega: cómo cumple el enunciado, el diseño y las capturas |
+| `requirements.txt` | Las librerías que necesita (pygame y numpy) |
+
+Otros comandos: `python -m cazabulos.acceso_directo --escritorio` pone el acceso directo también en el Escritorio, y `python -m cazabulos.red.servidor` abre un servidor sin ventana para el modo en línea.
 
 Para jugar en línea, los computadores deben estar en la misma red. La primera vez, Windows puede preguntar si deja que Python use la red: hay que dar **Permitir** en el computador que crea la sala.
 
 Pruebas (56):
 
 ```bash
-python -m unittest discover -s tests
+python -m unittest discover -s cazabulos/pruebas -t .
 ```
 
 ## Créditos

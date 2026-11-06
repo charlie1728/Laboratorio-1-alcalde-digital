@@ -122,7 +122,7 @@ La tabla de récords: inserción y eliminación balanceadas, recorrido en orden 
   - Del cliente al servidor: `hola`, `elegir`, `empezar`, `estado`, `resultado`, `listo`.
   - Del servidor a los clientes: `sala`, `ronda`, `marcador` (6 veces por segundo), `aviso`, `fin_ronda`, `fin`.
 - **Cómo se juega:** cada cliente simula su propio barrio con la semilla que le da el servidor, así nadie depende de la conexión de otro para jugar. El servidor junta los resultados de todos para la tabla y la elección.
-- **Cómo se abre la sala:** el que crea la sala corre el servidor dentro del juego. También existe `python servidor.py` para un servidor dedicado.
+- **Cómo se abre la sala:** el que crea la sala corre el servidor dentro del juego. También existe `python -m cazabulos.red.servidor` para un servidor dedicado.
 
 ## 5. Inclusividad
 
@@ -178,7 +178,7 @@ La primera versión jugable tenía demasiadas cosas a la vez: noticias que habí
 
 ## 8. Pruebas
 
-`python -m unittest discover -s tests` corre 56 pruebas.
+`python -m unittest discover -s cazabulos/pruebas -t .` corre 56 pruebas.
 
 - **Estructuras:** BFS por niveles y con filtro, componentes, Dijkstra, subárboles, recorridos, AVL y el árbol de decisiones (sus caminos, las cuatro acciones del enunciado y eliminar ramas).
 - **Juego:**

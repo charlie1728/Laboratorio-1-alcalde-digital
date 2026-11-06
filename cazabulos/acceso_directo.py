@@ -1,8 +1,8 @@
 """Crea el acceso directo "Cazabulos" con el ícono del juego (solo Windows).
 
 Abre el juego con pythonw, así no queda una consola negra detrás de la ventana.
-    python crear_acceso_directo.py               -> lo crea en esta carpeta
-    python crear_acceso_directo.py --escritorio  -> también en el Escritorio
+    python -m cazabulos.acceso_directo               -> lo crea junto a main.py
+    python -m cazabulos.acceso_directo --escritorio  -> también en el Escritorio
 jugar.bat lo crea solo la primera vez.
 """
 import shutil
@@ -10,8 +10,8 @@ import subprocess
 import sys
 from pathlib import Path
 
-AQUI = Path(__file__).resolve().parent
-ICONO = AQUI / "cazabulos" / "assets" / "icono.ico"
+AQUI = Path(__file__).resolve().parent.parent          # la carpeta del proyecto (donde está main.py)
+ICONO = Path(__file__).resolve().parent / "assets" / "icono.ico"
 
 
 def _pythonw():

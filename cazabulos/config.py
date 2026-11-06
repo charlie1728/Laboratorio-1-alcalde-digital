@@ -3,7 +3,14 @@ from pathlib import Path
 
 RAIZ = Path(__file__).resolve().parent
 ASSETS = RAIZ / "assets"
-DATOS = RAIZ.parent / "datos"          # récords, opciones y logros guardados
+DATOS = RAIZ / "datos"                 # récords, opciones y logros guardados (no van a git)
+# Antes se guardaban afuera, junto a main.py: si quedó esa carpeta, se mueve aquí.
+_DATOS_VIEJOS = RAIZ.parent / "datos"
+if _DATOS_VIEJOS.is_dir() and not DATOS.exists():
+    try:
+        _DATOS_VIEJOS.rename(DATOS)
+    except OSError:
+        pass
 
 ANCHO, ALTO = 1280, 720
 FPS = 60

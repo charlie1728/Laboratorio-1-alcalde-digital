@@ -217,3 +217,26 @@ class Servidor:
                 c.sock.close()
             except OSError:
                 pass
+
+
+def principal():
+    """Servidor dedicado (sin ventana): python -m cazabulos.red.servidor [--puerto 5070]
+    Los jugadores abren el juego, eligen "En línea" > "Unirme a una sala" y escriben la dirección que
+    muestra este servidor. El primero que se une es el anfitrión y es quien empieza la partida."""
+    import argparse
+    from .protocolo import PUERTO, ips_locales
+    ap = argparse.ArgumentParser(description="Servidor de Cazabulos en línea")
+    ap.add_argument("--puerto", type=int, default=PUERTO)
+    args = ap.parse_args()
+    srv = Servidor(args.puerto)
+    print(f"Sala lista en el puerto {args.puerto}. Los jugadores se unen con: {', '.join(ips_locales())}")
+    print("Ctrl+C para cerrar.")
+    try:
+        while True:
+            time.sleep(1)
+    except KeyboardInterrupt:
+        srv.cerrar()
+
+
+if __name__ == "__main__":
+    principal()

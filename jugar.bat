@@ -15,7 +15,7 @@ if errorlevel 1 (
     exit /b
 )
 rem La primera vez se crea el acceso directo "Cazabulos" con el icono del juego.
-if not exist "Cazabulos.lnk" python crear_acceso_directo.py >nul 2>nul
+if not exist "Cazabulos.lnk" python -m cazabulos.acceso_directo >nul 2>nul
 where pythonw >nul 2>nul
 if errorlevel 1 (
     python main.py %*
