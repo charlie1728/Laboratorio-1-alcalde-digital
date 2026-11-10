@@ -16,17 +16,24 @@ Antes de cada turno, la cuenta regresiva explica el juego en tres dibujos: **atr
 | Tecla | Qué hace |
 |---|---|
 | **Flechas** (o WASD) | Caminar por el barrio |
-| **Espacio** (se puede mantener) | Lanzar tu herramienta. Todo se arregla lanzándole: los Bulos, los vecinos morados, la antena, las peleas y el Bulo viral |
+| **Espacio** (se puede mantener) | Lanzar tu herramienta. Todo se arregla lanzándole: los Bulos, los vecinos morados, la antena, las peleas y el Bulo viral. Cada lanzamiento gasta un **dato verificado** |
 | **X** | El poder de tu personaje, cuando el círculo se llena |
+| **Tab** | Muestra u oculta el **estado del barrio** (los indicadores). Empieza oculto para no tapar el juego |
 | **Esc** | Pausa · **M** silencia la música · **F11** cambia entre ventana grande y pantalla completa |
 
-**Con control USB** (tipo Xbox): cruceta o palanca para caminar, **A** para lanzar o aceptar, **B** o **X** para el poder (en los menús B es volver), **Start** para pausa. Las ayudas en pantalla cambian solas a los botones del control.
+**Con control USB** (tipo Xbox): cruceta o palanca para caminar, **A** para lanzar o aceptar, **B** o **X** para el poder (en los menús B es volver), **Y** para el estado del barrio, **Start** para pausa. Las ayudas en pantalla cambian solas a los botones del control.
 
 - **Bulos:** salen de la antena del Bot y vuelan hacia los vecinos con más amigos. Si llegan, se le suben a la cabeza y el vecino se pone morado.
 - **Vecinos morados:** después de un rato le pasan el Bulo a un amigo por su hilo de la red social. En los últimos segundos aparece una línea punteada hacia el amigo que lo va a recibir: es el momento de curarlo. El Bulo que viaja por el hilo también se puede cortar en el aire.
 - **Bulo con corona:** es la raíz de una cadena. Si lo atrapas, caen todas sus copias de una vez.
 - **Estrellas (noticias verdaderas):** con solo tocarlas se comparten: la verdad le llega al vecino más cercano y a sus amigos, los cura y los protege un rato (brillan dorado).
 - **Antena del Bot:** suelta Bulos sin parar. Golpéala varias veces para apagarla (después pone otra en otro lugar).
+- **Datos verificados (lo que lanzas):** no son infinitos. Tienes 12 (las barritas de tu tarjeta); cada lanzamiento gasta uno. Se recargan sobre todo con las **misiones**, también con las estrellas (+3) y, muy despacio, solos (uno cada 4 segundos). Si te quedas sin datos, la línea guía te lleva a la misión.
+- **Misiones contra la desinformación** (una a la vez; hay que ir al lugar marcado y quedarse en el círculo hasta llenar las barritas):
+  - **Verificar un rumor** de los que pide el enunciado («¿Cierran el colegio?», «¿El alcalde roba?», «¿Cierran los parques?»...): revisas la fuente en ese lugar y llevas la prueba al Kiosco de noticias. Ahí se publica el desmentido, que viaja por la red social (BFS de 2 niveles desde el vecino con más amigos) curando y protegiendo; recargas todos tus datos. Si nadie lo verifica a tiempo, **el rumor se riega**: salen Bulos en ese lugar.
+  - **Reportar la cuenta del Bot** en la Alcaldía: sus antenas se callan 20 segundos.
+  - **Taller en el Colegio:** los 4 vecinos con más amigos aprenden a verificar y quedan protegidos un buen rato.
+  - **Charla de convivencia en la Plaza:** se calman las peleas y nacen amistades nuevas en la red social.
 - **Eventos al azar:** peleas entre vecinos (si no las calmas a tiempo se rompe la amistad), el **Bulo viral** con 10 segundos para detenerlo, rumores sobre los candidatos, noticias verdaderas, campañas de convivencia, grupos de Bulos nuevos y vecinos que reportan por su cuenta.
 
 **El barrio está vivo.** Todo tiene un borde oscuro para que se distinga del fondo (personajes, vecinos, carros, árboles, edificios y objetos). El pasto tiene varios verdes, matitas y florecitas, y sus orillas son redondeadas e irregulares donde toca los caminos y la arena (con bordillo de piedra junto a los andenes). En los prados hay **hierba alta como la de Pokémon**: se mece en ola, se abre y suelta hojitas cuando alguien entra, y tapa los pies de quien camina adentro. Caminos, plazas y asfalto tienen grietas, piedritas y musgo; los edificios, relieve y sombra del alero; y todo proyecta sombras suaves. Los árboles se mecen con el viento (y su sombra también), la fuente de la plaza salpica, la laguna tiene orillas de piedra redondeadas, espuma que corre por el borde y destellos, y en ella nada una pata con sus patitos (con su reflejo) entre nenúfares que hacen ondas, las palomas de la plaza salen volando si pasas cerca, hay mariposas, flores, hojas que caen, banderas que ondean en la alcaldía, sombras de nubes y humito detrás de los carros. De día flota polen; de noche se prenden las ventanas, los faroles (con polvito flotando en su luz) y los faros, las sombras se alargan lejos del farol más cercano y aparecen luciérnagas. Un brillo suave (bloom) hace resplandecer lo más claro; si el computador va lento, se apaga solo para que el juego siga fluido. Nada de esto cambia el juego: con la misma semilla el turno sale igual.
@@ -96,7 +103,7 @@ Otros comandos: `python -m cazabulos.acceso_directo --escritorio` pone el acceso
 
 Para jugar en línea, los computadores deben estar en la misma red. La primera vez, Windows puede preguntar si deja que Python use la red: hay que dar **Permitir** en el computador que crea la sala.
 
-Pruebas (73):
+Pruebas (79):
 
 ```bash
 python -m unittest discover -s cazabulos/pruebas -t .

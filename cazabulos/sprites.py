@@ -266,3 +266,88 @@ def luz(radio, fuerza=1.0):
             pygame.draw.circle(s, (a, a, a, a), (radio, radio), r)
         return s
     return _guardar(("luz", radio, fuerza), hacer)
+
+
+_ICONOS_ENCARGO = {
+    "lupa": [
+        "...kkkk.......",
+        "..kwwwwk......",
+        ".kwccwwwk.....",
+        ".kwcwwwwk.....",
+        ".kwwwwwwk.....",
+        "..kwwwwk......",
+        "...kkkkyk.....",
+        ".......kyyk...",
+        "........kyyk..",
+        ".........kk...",
+    ],
+    "prensa": [
+        "..kkkkkkkkkk..",
+        ".kwwwwwwwwwwk.",
+        ".kwccwwwwwwck.",
+        ".kwccwkkkkwwk.",
+        ".kwwwwwwwwwwk.",
+        ".kwkkkkkkkkwk.",
+        ".kwwwwwwwwwwk.",
+        ".kwkkkkwwkkwk.",
+        ".kwwwwwwwwwwk.",
+        "..kkkkkkkkkk..",
+    ],
+    "buzon": [
+        "....kkkkkk....",
+        "..kkcccccckk..",
+        ".kcccccccccck.",
+        ".kcwwwwwwwwck.",
+        ".kcwkkkkkkwck.",
+        ".kcccccccccck.",
+        ".kcccyyyyccck.",
+        ".kcccccccccck.",
+        "..kkkkkkkkkk..",
+        ".....kkkk.....",
+    ],
+    "megafono": [
+        "........kkkk..",
+        "......kkcccck.",
+        "...kkkcccccck.",
+        ".kkyyccccccck.",
+        ".kyyyccccccck.",
+        ".kkyyccccccck.",
+        "...kkkcccccck.",
+        "....k.kkcccck.",
+        "....k...kkkk..",
+        "..............",
+    ],
+    "taller": [
+        "....kkkkkk....",
+        "...kyyyyyyk...",
+        "..kkkkkkkkkk..",
+        ".kwwwwwwwwwwk.",
+        ".kwccwwwwwwck.",
+        ".kwwwwggggwwk.",
+        ".kwggggggggwk.",
+        ".kwwwwggggwwk.",
+        ".kwwwwwwwwwwk.",
+        "..kkkkkkkkkk..",
+    ],
+}
+
+
+def encargo(icono="prensa"):
+    """Ícono pixel art de 14x10 para los encargos ciudadanos del barrio."""
+    def hacer():
+        filas = _ICONOS_ENCARGO.get(icono, _ICONOS_ENCARGO["prensa"])
+        pal = {
+            "k": (34, 24, 48),
+            "w": (248, 252, 255),
+            "c": (72, 224, 210),
+            "y": (255, 214, 74),
+            "g": (96, 224, 138),
+        }
+        s = pygame.Surface((len(filas[0]), len(filas)), pygame.SRCALPHA)
+        for y, f in enumerate(filas):
+            for x, ch in enumerate(f):
+                if ch in pal:
+                    s.set_at((x, y), pal[ch])
+        return s
+    return _guardar(("encargo", icono), hacer)
+

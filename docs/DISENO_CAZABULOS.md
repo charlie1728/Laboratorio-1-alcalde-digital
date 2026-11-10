@@ -8,7 +8,7 @@ Los **Bulos** (rumores morados) se suben a la cabeza de los vecinos y los vuelve
 
 ## Estado
 
-El juego está completo y jugable (ver README y `docs/ENTREGA_FINAL.md`): mundo, render, HUD, todas las pantallas, ayuda, opciones, récords, elección, podio, modo en línea, control USB y modo feria, con 73 pruebas.
+El juego está completo y jugable (ver README y `docs/ENTREGA_FINAL.md`): mundo, render, HUD, todas las pantallas, ayuda, opciones, récords, elección, podio, modo en línea, control USB y modo feria, con 79 pruebas.
 
 ## Lo que pidió el usuario al probarlo
 
@@ -32,7 +32,7 @@ El juego está completo y jugable (ver README y `docs/ENTREGA_FINAL.md`): mundo,
 
 **Tercera ronda (gráficos):**
 
-9. Personaje un poco más rápido: 92 pixeles por segundo (antes 78).
+9. Personaje un poco más rápido: 92 pixeles por segundo (antes 78); después, 100.
 10. "Que todo tenga bordes": `recursos.borde()` le pone un borde oscuro de 1 pixel a cada imagen (se calcula una vez y se guarda). En el mapa, los edificios y los objetos planos llevan borde y sombra; el pasto tiene textura y un borde donde se encuentra con andenes y caminos.
 11. "Que el mapa tenga animaciones": `cazabulos/ambiente.py` (la vida del barrio, con su propio azar para no cambiar el juego): agua con brillos y ondas, fuente que salpica, pata y patitos, nenúfares, palomas que huyen del jugador, mariposas, hojas, flores que se mecen, banderas, sombras de nubes, polvo al correr, estela de los Bulos, destellos de las estrellas y humo de los carros. En `render.py` los árboles se mecen (la punta más que el medio), los semáforos brillan y de noche se prenden las ventanas, los faroles y los faros; luciérnagas en el parque. Una viñeta suave oscurece las orillas de la pantalla.
 12. Árboles y arbustos verde oscuro de Kenney (tiles 403/406/440/443/514/517) tenían el mismo verde del pasto: se repintan de verde pino (`mapa.tile_cosa`).
@@ -58,6 +58,22 @@ El juego está completo y jugable (ver README y `docs/ENTREGA_FINAL.md`): mundo,
     - Beto: arcos de transmisión y corazones que vuelan a cada vecino con escudo, y una burbuja dorada al llegar.
     - Caro: red con círculos, radios y nudos que se abre y se cierra.
     - Dani: anillos entrecortados de megáfono y estelas en los Bulos aturdidos.
+
+**Quinta ronda (siempre hay algo que hacer):**
+
+18. Un análisis de Gemini agregó "encargos" genéricos. Se rehicieron con el contexto del laboratorio como **misiones contra la desinformación** (`mundo.MISIONES`, `Mundo._encargos`):
+    - verificar un rumor (fuente → Kiosco, desmentido por BFS; si se vence, el rumor se riega);
+    - reportar la cuenta del Bot (antenas calladas 20 s);
+    - taller (protege a los de mayor grado);
+    - charla (aristas nuevas y peleas calmadas).
+    En el árbol de decisiones hay dos ramas nuevas: `falsa → verificar → desmentida` y `falsa → denunciar → denunciada`.
+19. **Datos verificados:** munición de 12 (`MUNICION_MAX`). Se recargan con las misiones (todos o 6), las estrellas (+3) y solos, uno cada 4 s. Con 0 datos, la guía apunta a la misión.
+20. HUD:
+    - "Estado del barrio" oculto por defecto (`Hud.ver_estado`, Tab / Y);
+    - avisos, pista y misión en una columna a la izquierda;
+    - barritas de la misión en la estación (encima de todo) y en su tarjeta;
+    - datos en barritas en la tarjeta del jugador.
+21. Velocidad del jugador 100.
 
 ## Mapa (en tiles)
 

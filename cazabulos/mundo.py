@@ -32,6 +32,50 @@ GOLPES_PELEA = 2        # golpes para calmar una pelea (Caro la calma de uno)
 AVISO_REENVIO = 3.5     # segundos antes de pasar el Bulo en que se ve a qué amigo se lo va a pasar
 VISTA = (200, 115)      # media pantalla alrededor del jugador, en pixeles del mapa (la cámara lo sigue)
 
+# Lugares del barrio donde pasan las misiones (pixeles del mapa). Son vértices del grafo de la ciudad:
+# la línea guía llega a ellos con Dijkstra.
+LUGARES_ENCARGO = {
+    "Colegio": (8.0 * TILE, 12.5 * TILE),
+    "Alcaldía": (25.5 * TILE, 9.5 * TILE),
+    "Plaza": (24.5 * TILE, 14.5 * TILE),
+    "Mercado": (54.5 * TILE, 11.5 * TILE),
+    "Kiosco": (27.5 * TILE, 37.0 * TILE),
+    "Laguna": (18.0 * TILE, 36.0 * TILE),
+    "Terminal": (56.0 * TILE, 34.6 * TILE),
+}
+
+# Misiones contra la desinformación (lo que pide el laboratorio: verificar, reportar, convivir):
+#   verificar: un rumor corre por Civitas. Vas a la FUENTE a revisarlo y llevas la prueba al Kiosco de
+#              noticias para publicar el desmentido, que viaja por la red social (BFS) curando y protegiendo.
+#              Si no llegas a tiempo, el rumor se riega (salen Bulos en ese lugar).
+#   reportar:  reportas en la Alcaldía la cuenta falsa del Bot: sus antenas se callan un rato.
+#   taller:    en el Colegio enseñas a verificar: los vecinos con más amigos (grado en el grafo) quedan
+#              protegidos un buen rato.
+#   charla:    en la Plaza, charla de convivencia: se calman las peleas y nacen amistades nuevas (aristas).
+# Todas recargan los datos verificados (la munición) y suben los indicadores de la ciudad.
+# (tipo, lugar de la fuente, lugar final o None, título, ícono)
+MISIONES = [
+    ("verificar", "Colegio", "Kiosco", "«¿Cierran el colegio?»", "lupa"),
+    ("reportar", "Alcaldía", None, "Reporta la cuenta del Bot", "buzon"),
+    ("verificar", "Laguna", "Kiosco", "«¿Cierran los parques?»", "lupa"),
+    ("taller", "Colegio", None, "Taller: cómo verificar", "taller"),
+    ("verificar", "Alcaldía", "Kiosco", "«¿El alcalde roba?»", "lupa"),
+    ("charla", "Plaza", None, "Charla de convivencia", "megafono"),
+    ("verificar", "Mercado", "Kiosco", "«¿Suben los precios?»", "lupa"),
+    ("verificar", "Terminal", "Kiosco", "«¿No hay buses para votar?»", "lupa"),
+]
+TRABAJO = {"verificar": 1.2, "reportar": 2.0, "taller": 2.4, "charla": 2.4}   # segundos en cada parada
+BARRITAS = {"verificar": 3, "reportar": 4, "taller": 4, "charla": 4}         # cómo se muestra ese trabajo
+COLOR_MISION = {"verificar": (255, 218, 84), "reportar": (255, 120, 120), "taller": (120, 200, 255),
+                "charla": (130, 235, 150)}
+
+# Los datos verificados son lo que lanzas: no son infinitos. Se recargan con las misiones (sobre todo),
+# con las estrellas y, muy despacio, solos.
+MUNICION_MAX = 12
+RECARGA_SOLA = 6.0        # segundos por cada dato que vuelve solo
+BOT_BLOQUEADO = 20.0      # segundos que se callan las antenas tras reportar la cuenta
+
+
 ROLES = {
     "ana": {"poder": "Flash", "pasivo": "Ve todos los Bulos en el mapa y su periódico atraviesa varios",
             "poder_txt": "Congela a todos los Bulos de la pantalla"},
@@ -165,6 +209,57 @@ class Viral:
         self.congelado = 0.0
 
 
+class Encargo:
+    """Una misión contra la desinformación en uno o dos lugares del barrio. En cada lugar hay que quedarse
+    un momento dentro del círculo (se llenan las barritas)."""
+
+    def __init__(self, ident, tipo, origen, destino, titulo, icono, duracion):
+        self.id = ident
+        self.tipo = tipo
+        self.origen = origen
+        self.destino = destino              # None = una sola parada
+        self.titulo = titulo
+        self.icono = icono
+        self.etapa = 0                      # 0 = primera parada, 1 = segunda (si hay)
+        self.progreso = 0.0                 # 0..1 en la parada actual
+        self.trabajo = TRABAJO[tipo]
+        self.barritas = BARRITAS[tipo]
+        self.t = float(duracion)
+        self.duracion = float(duracion)
+        self.golpe = 0.0
+
+    @property
+    def paradas(self):
+        return 2 if self.destino else 1
+
+    @property
+    def lugar_actual(self):
+        return self.destino if (self.etapa == 1 and self.destino) else self.origen
+
+    @property
+    def pos(self):
+        return LUGARES_ENCARGO[self.lugar_actual]
+
+    @property
+    def x(self):
+        return self.pos[0]
+
+    @property
+    def y(self):
+        return self.pos[1]
+
+    @property
+    def color(self):
+        return COLOR_MISION[self.tipo]
+
+    @property
+    def texto_hud(self):
+        """Qué hacer ahora, en pocas palabras."""
+        if self.tipo == "verificar":
+            return f"Revisa la fuente: {self.origen}" if self.etapa == 0 else "Publica el desmentido: Kiosco"
+        return {"reportar": "Ve a la Alcaldía", "taller": "Ve al Colegio", "charla": "Ve a la Plaza"}[self.tipo]
+
+
 class Proyectil:
     def __init__(self, x, y, vx, vy, color, clave="caro", vida=0.5, radio=10, perfora=1):
         self.x, self.y = x, y
@@ -196,7 +291,9 @@ class Jugador:
         self.lanzo = 0.0
         self.poder_t = 0.0
         self.stats = {"bulos": 0, "cadena": 0, "antenas": 0, "compartidas": 0, "peleas": 0, "viral": 0,
-                      "curados": 0, "pulsos": 0, "regados": 0, "combo_max": 0, "poderes": 0}
+                      "curados": 0, "pulsos": 0, "regados": 0, "combo_max": 0, "poderes": 0, "misiones": 0}
+        self.municion = MUNICION_MAX       # datos verificados para lanzar
+        self.t_recarga = RECARGA_SOLA
 
     @property
     def pos(self):
@@ -242,6 +339,9 @@ class Mundo:
         self.peleas = []
         self.viral = None
         self.antenas = []
+        self.encargo = None       # la misión activa (una a la vez)
+        self.bot_bloqueado = 0.0  # segundos que faltan para que las antenas vuelvan a soltar Bulos
+        self.t_sin_datos = 0.0
         self.pasaron = set()      # Bulos que ya se pasaron a un amigo (para el árbol al final)
         self._sig_id = 1
         self.rumores = {c: 0 for c in CANDIDATOS}
@@ -286,6 +386,13 @@ class Mundo:
                 puntos.append((x, y))
         self.puntos_sueltos = puntos
         self.k_suelto = 0
+        # misiones (se preparan al final para no mover el azar anterior): mismo orden para todos los jugadores
+        enc = list(MISIONES)
+        r.shuffle(enc)
+        self.cola_encargos = enc * 3
+        self.k_encargo = 0
+        self.t_encargo = 3.2
+
 
     def _id(self):
         self._sig_id += 1
@@ -389,6 +496,7 @@ class Mundo:
         self._antenas(dt)
         self._viral(dt)
         self._peleas(dt)
+        self._encargos(dt)
         self._guion(dt)
         peatones = [self.jugador.rect()] + [v.rect() for v in self.vecinos.values()]
         self.trafico.actualizar(dt, peatones)
@@ -422,6 +530,12 @@ class Mundo:
             j.paso = 0
         j.enfriar = max(0.0, j.enfriar - dt)
         j.lanzo = max(0.0, j.lanzo - dt)
+        if j.municion < MUNICION_MAX:          # muy despacio, los datos vuelven solos
+            j.t_recarga -= dt
+            if j.t_recarga <= 0:
+                j.t_recarga = RECARGA_SOLA
+                j.municion += 1
+        self.t_sin_datos = max(0.0, self.t_sin_datos - dt)
         j.poder_t = max(0.0, j.poder_t - dt)
         j.t_combo -= dt
         if j.t_combo <= 0:
@@ -432,7 +546,15 @@ class Mundo:
                 self.estrellas.remove(s)
                 self._compartir(s)
         if e.get("accion") and j.enfriar <= 0:
-            self._lanzar()
+            if j.municion > 0:
+                j.municion -= 1
+                self._lanzar()
+            else:
+                j.enfriar = 0.3
+                if self.t_sin_datos <= 0:          # sin datos verificados: hay que ir a una misión
+                    self.t_sin_datos = 2.5
+                    self.aviso("¡SIN DATOS!", (255, 150, 120))
+                    self.sonar("mal")
         if e.get("poder"):
             self._poder()
 
@@ -529,6 +651,7 @@ class Mundo:
         self.emitir("verdad", s.x, s.y, origen.nombre)
         self.sonar("compartir")
         self.cargar(14)
+        j.municion = min(MUNICION_MAX, j.municion + 2)      # la verdad también da datos para lanzar
 
     def _calmar(self, p):
         j = self.jugador
@@ -599,7 +722,7 @@ class Mundo:
                         b.vy += (b.y - j.y) / d * 140
                         b.aturdido = 1.5
             self.ajustar(confianza=4)
-        self.texto(j.x, j.y - 40, f"¡{nombre}!", (255, 250, 210), True)
+        self.aviso(f"¡{nombre}!", (255, 250, 210))
 
     # ------------------------------------------------------------- vecinos
     def _vecinos(self, dt):
@@ -1005,15 +1128,21 @@ class Mundo:
 
     # ------------------------------------------------------------- antenas del Bot
     def _antenas(self, dt):
+        if self.bot_bloqueado > 0:             # reportaste la cuenta: las antenas no sueltan Bulos
+            self.bot_bloqueado = max(0.0, self.bot_bloqueado - dt)
+            for a in self.antenas:
+                a.golpe = max(0.0, a.golpe - dt)
+            return
         if not self.antenas and self.t_antena > 0:
-            self.t_antena -= dt
+            ritmo = 1.6 if (self.t_antena < 1e6 and not self.bulos_libres() and not self.infectados()) else 1.0
+            self.t_antena -= dt * ritmo
             if self.t_antena <= 0:
                 self._poner_antena()
         for a in list(self.antenas):
             a.golpe = max(0.0, a.golpe - dt)
             a.t -= dt
             if a.t <= 0:
-                a.t = max(6.5, 10.0 - self.t * 0.03) * self.ritmo_ronda * (1.4 if self.tranquilo else 1.0)
+                a.t = max(6.0, 9.5 - self.t * 0.03) * self.ritmo_ronda * (1.4 if self.tranquilo else 1.0)
                 if len(self.bulos_libres()) < MAX_BULOS_LIBRES:
                     b = self.nuevo_bulo(a.x, a.y - 34)
                     b.vx, b.vy = 0, -30
@@ -1046,7 +1175,8 @@ class Mundo:
             self.sonar("explosion", a.x, a.y)
             self.cargar(20)
             if not self.antenas:
-                self.t_antena = 14.0
+                self.t_antena = 12.0 if not self.tranquilo else 14.0
+
 
     # ------------------------------------------------------------- viral (decisión con tiempo)
     def _viral(self, dt):
@@ -1167,6 +1297,147 @@ class Mundo:
         va.espera = 0
         self._nuevo_destino(va)
 
+    # ------------------------------------------------------------- misiones contra la desinformación
+    def _encargos(self, dt):
+        """Una misión a la vez: hay que ir al lugar marcado (la guía usa Dijkstra) y quedarse un momento."""
+        if self.t_antena > 1e6 or self.t_kiosco > 1e6:          # pruebas y modos sin eventos
+            return
+        if self.encargo is None:
+            ritmo = 1.5 if (not self.bulos_libres() and not self.infectados()) else 1.0
+            self.t_encargo -= dt * ritmo
+            if self.t_encargo <= 0:
+                self._nuevo_encargo()
+            return
+        e = self.encargo
+        e.golpe = max(0.0, e.golpe - dt)
+        e.t -= dt
+        if _dist(self.jugador.pos, e.pos) < 25:
+            antes = int(e.progreso * e.barritas)
+            e.progreso = min(1.0, e.progreso + dt / e.trabajo)
+            if int(e.progreso * e.barritas) > antes:          # se llenó una barrita
+                e.golpe = 0.2
+                self.sonar("tic", e.x, e.y)
+            if e.progreso >= 1.0:
+                self._avanzar_encargo(e)
+                return
+        if e.t <= 0:
+            self._vencer_encargo(e)
+
+    def _nuevo_encargo(self):
+        j = self.jugador
+        for _ in range(len(self.cola_encargos)):
+            tipo, origen, destino, titulo, icono = self.cola_encargos[self.k_encargo % len(self.cola_encargos)]
+            self.k_encargo += 1
+            if _dist(LUGARES_ENCARGO[origen], j.pos) > 65:
+                break
+        dur = (38.0 if destino else 26.0) * (1.25 if self.tranquilo else 1.0)
+        self.encargo = Encargo(self._id(), tipo, origen, destino, titulo, icono, dur)
+        x, y = self.encargo.pos
+        self.emitir("aparece", x, y)
+        self.sonar("listo", x, y)
+        self.mostrar_pista("encargo", "Misión nueva: sigue la línea y quédate en el círculo")
+
+    def _avanzar_encargo(self, e):
+        x, y = e.pos
+        if e.destino and e.etapa == 0:          # revisaste la fuente: ahora a publicar el desmentido
+            e.etapa = 1
+            e.progreso = 0.0
+            e.t = max(e.t, 24.0 if not self.tranquilo else 30.0)
+            self.emitir("aparece", x, y)
+            self.sonar("recoger", x, y)
+            self.aviso("¡ES FALSO!", (255, 218, 84))
+            return
+        self._completar_encargo(e)
+
+    def _completar_encargo(self, e):
+        """La recompensa de cada misión: datos verificados (munición) y un efecto real en el barrio."""
+        j = self.jugador
+        x, y = e.pos
+        j.stats["misiones"] += 1
+        if e.tipo == "verificar":
+            # el desmentido se publica en Civitas y viaja por la red social desde quien tiene más amigos
+            self._hoja(["falsa", "verificar"], x, y - 20)
+            j.municion = MUNICION_MAX
+            origen = max(self.vecinos.values(), key=lambda v: (self.social.grado(v.nombre), v.nombre))
+            for u, nivel, padre in self.social.bfs(origen.nombre, max_nivel=2):
+                w = self.vecinos[u]
+                if w.bulo is not None and w.bulo in self.bulos:
+                    self._atrapar(w.bulo)
+                w.escudo = max(w.escudo, 12.0 if nivel < 2 else 8.0)
+                w.salto = 0.4
+                self.emitir("ola", u, nivel, (255, 218, 84))
+                if padre is not None:
+                    self.emitir("hilo", padre, u, (255, 220, 80), nivel)
+            self.emitir("verdad", x, y, origen.nombre)
+            self.sumar(40, x, y)
+            self.aviso("¡DESMENTIDO!", (255, 218, 84))
+        elif e.tipo == "reportar":
+            # la cuenta falsa queda reportada: sus antenas se callan un rato
+            self._hoja(["falsa", "denunciar"], x, y - 20)
+            j.municion = min(MUNICION_MAX, j.municion + 8)
+            self.bot_bloqueado = BOT_BLOQUEADO
+            for a in self.antenas:
+                self.emitir("chispas", a.x, a.y - 30, (255, 120, 120))
+            self.sumar(30, x, y)
+            self.aviso("¡CUENTA REPORTADA!", (255, 150, 150))
+        elif e.tipo == "taller":
+            # aprenden a verificar los que más amigos tienen (los que más riegan): quedan protegidos
+            j.municion = min(MUNICION_MAX, j.municion + 8)
+            conectados = sorted(self.vecinos.values(), key=lambda v: (-self.social.grado(v.nombre), v.nombre))[:4]
+            for w in conectados:
+                if w.bulo is not None and w.bulo in self.bulos:
+                    self._atrapar(w.bulo)
+                w.escudo = max(w.escudo, 20.0)
+                w.salto = 0.4
+                self.emitir("ola", w.nombre, 0, (120, 200, 255))
+            self.ajustar(informacion=3, bienestar=4, confianza=2)
+            self.sumar(30, x, y)
+            self.aviso("¡APRENDIERON A VERIFICAR!", (150, 210, 255))
+        else:
+            # charla de convivencia: se calman las peleas y nacen amistades nuevas en la red social
+            j.municion = min(MUNICION_MAX, j.municion + 8)
+            for p in self.peleas:
+                if p.get("activa") and not p.get("fin"):
+                    self._calmar(p)
+            self._nuevas_amistades(2, random.Random(self.semilla * 31 + j.stats["misiones"]))
+            self.ajustar(convivencia=6, conflictos=-5, bienestar=2)
+            self.sumar(30, x, y)
+            self.aviso("¡MÁS CONVIVENCIA!", (150, 240, 160))
+        self.cargar(18)
+        self.emitir("chispas", x, y - 6, e.color)
+        self.sonar("compartir", x, y)
+        self.encargo = None
+        self.t_encargo = 4.5 if not self.tranquilo else 6.5
+
+    def _vencer_encargo(self, e):
+        x, y = e.pos
+        self.emitir("puff", x, y)
+        if e.tipo == "verificar":
+            # nadie lo verificó a tiempo: el rumor se riega desde su fuente
+            fx, fy = LUGARES_ENCARGO[e.origen]
+            if len(self.bulos_libres()) < MAX_BULOS_LIBRES:
+                b = self.nuevo_bulo(fx, fy - 10)
+                b.vx, b.vy = 0, -25
+            self.ajustar(desinformacion=3, confianza=-2)
+            self.aviso("¡EL RUMOR SE REGÓ!", (200, 140, 255))
+            self.sonar("mal")
+        self.encargo = None
+        self.t_encargo = 6.0 if not self.tranquilo else 7.5
+
+    def _nuevas_amistades(self, n, r):
+        """Crea n amistades nuevas en la red social (aristas nuevas en el grafo)."""
+        nombres = sorted(self.vecinos)
+        hechas = 0
+        for _ in range(30):
+            a, b = r.sample(nombres, 2)
+            if not self.social.tiene_arista(a, b):
+                self.social.agregar_arista(a, b, 1)
+                self.nuevos.append((a, b))
+                self.emitir("hilo", a, b, (120, 230, 140))
+                hechas += 1
+                if hechas == n:
+                    break
+
     # ------------------------------------------------------------- eventos al azar
     def _guion(self, dt):
         while self.guion and self.guion[0][0] <= self.t:
@@ -1215,18 +1486,7 @@ class Mundo:
                 if not p.get("fin"):
                     p["fin"] = "paz"
                     self.vecinos[p["a"]].pelea = self.vecinos[p["b"]].pelea = None
-            nombres = sorted(self.vecinos)
-            hechas = 0
-            r = random.Random(int(azar * 1e6))
-            for _ in range(30):
-                a, b = r.sample(nombres, 2)
-                if not self.social.tiene_arista(a, b):
-                    self.social.agregar_arista(a, b, 1)
-                    self.nuevos.append((a, b))
-                    self.emitir("hilo", a, b, (120, 230, 140))
-                    hechas += 1
-                    if hechas == 2:
-                        break
+            self._nuevas_amistades(2, random.Random(int(azar * 1e6)))
             self.ajustar(convivencia=8, conflictos=-6, bienestar=5)
             self.sonar("paz")
         elif tipo == "viral":

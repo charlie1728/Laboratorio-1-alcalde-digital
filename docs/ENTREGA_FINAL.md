@@ -20,7 +20,7 @@ El aprendizaje sale de las mecánicas, no de preguntas:
 | Punto del enunciado | Dónde está en el juego |
 |---|---|
 | 2 a 4 jugadores con roles distintos | Ana (Periodista), Beto (Influencer), Caro (Ciudadana), Dani (Candidato). Cada uno lanza algo distinto y tiene una ventaja y un poder propios (`cazabulos/mundo.py`, `ROLES`). Ninguno es más fuerte: con el mismo jugador automático (20 partidas de 2 minutos por personaje) los cuatro quedan a menos de 10 % de distancia en puntos. |
-| Decidir qué hacer con cada publicación (compartir, verificar, ignorar, reportar) | Son las acciones del juego y las ramas del árbol de decisiones: atrapar un Bulo en el aire es **reportarlo**; curar a quien se lo creyó es **verificar**; tocar una estrella es **compartirla**; dejar pasar una estrella que tuviste en frente es **ignorarla**. |
+| Decidir qué hacer con cada publicación (compartir, verificar, ignorar, reportar) | Son las acciones del juego y las ramas del árbol de decisiones: atrapar un Bulo en el aire es **reportarlo**; curar a quien se lo creyó es **verificar**; tocar una estrella es **compartirla**; dejar pasar una estrella que tuviste en frente es **ignorarla**. Además, las **misiones** son ramas del árbol: *verificar en la fuente y desmentir* (rumores del enunciado como «¿Cierran el colegio?») y *denunciar la cuenta falsa* del Bot. |
 | Periodista detecta noticias falsas | Ana ve en el minimapa todos los Bulos sueltos (los demás no) y su periódico atraviesa varios Bulos de un tiro. Su poder congela a los Bulos de la pantalla. |
 | Influencer con mayor impacto | Cuando Beto cura a alguien, la cura les llega también a los amigos de ese vecino (BFS de un nivel). Las estrellas que comparte llegan dos niveles en la red (las de los demás, uno). |
 | Candidato construye confianza y enfrenta rumores | A quien cura Dani no le vuelven a entrar Bulos por un buen rato, gana más puntos por cada vecino curado y por cada rumor sobre un candidato que atrapa, su Discurso cura a los vecinos cercanos y, si alguien juega con Dani, Dani aparece en la elección. |
@@ -152,7 +152,7 @@ La primera versión jugable tenía demasiadas cosas a la vez: noticias que habí
 - **Más tiempo:** turnos de 2 minutos (90 segundos en "¡Jugar ya!").
 - **Abre en una ventana grande que llena la pantalla, con su propio ícono** y sin consola; F11 la pasa a pantalla completa.
 - **Los paneles no tapan el juego:** en las orillas del mapa la cámara se corre un poco más allá del borde, y si un vecino morado, una estrella, la antena o el viral queda debajo de un panel, el panel se vuelve casi transparente.
-- **El personaje camina más rápido** (92 pixeles por segundo en vez de 78): a veces los Bulos salían lejos y no se alcanzaba a llegar. Caro sigue siendo la más rápida.
+- **El personaje camina más rápido** (100 pixeles por segundo; antes 78 y luego 92): a veces los Bulos salían lejos y no se alcanzaba a llegar. Caro sigue siendo la más rápida.
 - **Gráficos más claros y un barrio vivo:**
   - Todo tiene un borde oscuro de un pixel: personajes, vecinos, carros, árboles, edificios y objetos. Así se distinguen del fondo de un vistazo.
   - Los árboles y arbustos que tenían justo el verde del pasto se veían huecos: se pintaron de verde pino.
@@ -172,6 +172,21 @@ La primera versión jugable tenía demasiadas cosas a la vez: noticias que habí
   - Beto: transmisión en vivo y corazones que llevan una burbuja dorada a cada vecino protegido.
   - Caro: una red que se abre y se cierra.
   - Dani: ondas de megáfono y estelas en los Bulos que empuja.
+
+- **Siempre hay algo que hacer: misiones y datos limitados.** Jugándolo, había ratos de solo esperar a que salieran Bulos. Ahora:
+  - Lo que lanzas son **datos verificados** y no son infinitos (12; se recargan muy despacio solos).
+  - Para recargarlos hay que cumplir **misiones** en lugares del barrio, una a la vez, con su tiempo y sus barritas de progreso.
+  - Cada misión es parte de lo que pide el enunciado y usa las estructuras:
+    - **verificar un rumor** en su fuente y publicar el desmentido en el Kiosco: rama nueva del árbol de decisiones, y el desmentido se propaga con BFS por el grafo social;
+    - **reportar la cuenta del Bot** en la Alcaldía: rama del árbol; las antenas se callan;
+    - **taller en el Colegio:** protege a los vecinos de mayor grado del grafo;
+    - **charla de convivencia en la Plaza:** agrega aristas al grafo social y calma peleas.
+  - La línea guía llega a cada misión con Dijkstra sobre el grafo de la ciudad.
+  - Si un rumor no se verifica a tiempo, se riega: salen Bulos.
+- **Menos cosas tapando la vista:**
+  - el estado del barrio empieza oculto (Tab o Y en el control);
+  - los avisos, la pista y la misión salen en una columna a la izquierda, no en el centro de la pantalla;
+  - el nombre del poder ya no aparece en grande encima del jugador.
 
 ## 7. Respuestas para la sustentación
 
@@ -199,7 +214,7 @@ La primera versión jugable tenía demasiadas cosas a la vez: noticias que habí
 
 ## 8. Pruebas
 
-`python -m unittest discover -s cazabulos/pruebas -t .` corre 73 pruebas.
+`python -m unittest discover -s cazabulos/pruebas -t .` corre 79 pruebas.
 
 - **Estructuras:** BFS por niveles y con filtro, componentes, Dijkstra, subárboles, recorridos, AVL y el árbol de decisiones (sus caminos, las cuatro acciones del enunciado y eliminar ramas).
 - **Juego:**

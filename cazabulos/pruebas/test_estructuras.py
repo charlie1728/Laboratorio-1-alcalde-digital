@@ -109,7 +109,7 @@ class TestArbolDecision(unittest.TestCase):
         self.assertEqual(a.raiz.veces, 3)
         self.assertEqual(a.buscar("falsa").veces, 2)
         self.assertEqual(a.camino_a("verificada"), ["publicacion", "falsa", "creida", "verificada"])
-        self.assertEqual(len(a.hojas()), 5)
+        self.assertEqual(len(a.hojas()), 7)        # con las dos ramas de las misiones
 
     def test_los_cuatro_verbos_del_enunciado(self):
         a = arbol_publicacion()
@@ -124,7 +124,7 @@ class TestArbolDecision(unittest.TestCase):
         a = arbol_publicacion()
         a.eliminar("creida")
         self.assertIsNone(a.buscar("verificada"))
-        self.assertEqual(len(a.hojas()), 3)
+        self.assertEqual(len(a.hojas()), 5)
 
 
 class TestAVL(unittest.TestCase):

@@ -59,6 +59,8 @@ class PantallaJuego(Escena):
                 self.entrada["accion"] = True
             elif e.key in TECLAS_PODER and self.estado == "juego":
                 self.entrada["poder"] = True
+            elif e.key == pygame.K_TAB and self.estado in ("juego", "cuenta"):
+                Hud.ver_estado = not Hud.ver_estado        # mostrar u ocultar el estado del barrio
         elif e.type == pygame.WINDOWFOCUSLOST and self.estado == "juego" and not self.red:
             self._pausar()
 

@@ -402,10 +402,108 @@ class TestPantalla(unittest.TestCase):
         h = Hud(m, r, None, 1, 1, {})
         h.actualizar(1 / 60)
         self.assertGreater(h.alfas["mapa"], 0.9)
-        m.estrellas.append(Estrella(1, (r.cam[0] + 1160) / 3, (r.cam[1] + 250) / 3))
+        Hud.ver_estado = False                      # el estado del barrio oculto ya no tapa esa zona
+        lejos = Estrella(1, (r.cam[0] + 1160) / 3, (r.cam[1] + 250) / 3)
+        m.estrellas.append(lejos)
+        for _ in range(60):
+            h.actualizar(1 / 60)
+        self.assertGreater(h.alfas["mapa"], 0.9)
+        m.estrellas.remove(lejos)
+        m.estrellas.append(Estrella(2, (r.cam[0] + 1160) / 3, (r.cam[1] + 100) / 3))   # debajo del minimapa
         for _ in range(60):
             h.actualizar(1 / 60)
         self.assertLess(h.alfas["mapa"], 0.3)
+
+
+class TestMisiones(unittest.TestCase):
+    """Misiones contra la desinformación: valen de verdad y recargan los datos para lanzar."""
+
+    def _mision(self, m, tipo, origen, destino=None):
+        from cazabulos.mundo import Encargo
+        m.t_antena = 100.0
+        m.t_kiosco = 100.0
+        m.encargo = Encargo(50, tipo, origen, destino, "prueba", "lupa", 30.0)
+        return m.encargo
+
+    def _quedarse(self, m, segundos):
+        for _ in range(int(segundos * 60)):
+            m.jugador.x, m.jugador.y = m.encargo.pos if m.encargo else (m.jugador.x, m.jugador.y)
+            m._encargos(1 / 60)
+
+    def test_verificar_un_rumor_en_su_fuente_y_desmentirlo(self):
+        m = nuevo("caro")
+        m._infectar(m.vecinos["Rosa"], None)
+        m.jugador.municion = 0
+        e = self._mision(m, "verificar", "Colegio", "Kiosco")
+        self._quedarse(m, 0.6)                          # aún no termina de revisar la fuente
+        self.assertEqual(e.etapa, 0)
+        self._quedarse(m, 0.8)
+        self.assertEqual(e.etapa, 1)                    # ya sabe que es falso: ahora al Kiosco
+        self.assertEqual(e.lugar_actual, "Kiosco")
+        desinfo = m.ind["desinformacion"]
+        self._quedarse(m, 1.4)
+        self.assertIsNone(m.encargo)
+        self.assertEqual(m.jugador.stats["misiones"], 1)
+        from cazabulos.mundo import MUNICION_MAX
+        self.assertEqual(m.jugador.municion, MUNICION_MAX)          # datos recargados
+        self.assertLess(m.ind["desinformacion"], desinfo)
+        self.assertEqual(m.decisiones.buscar("desmentida").veces, 1)  # queda en el árbol de decisiones
+        self.assertGreater(sum(1 for v in m.vecinos.values() if v.escudo > 0), 3)   # el desmentido viajó por el grafo
+
+    def test_si_nadie_verifica_el_rumor_se_riega(self):
+        m = nuevo("caro")
+        e = self._mision(m, "verificar", "Mercado", "Kiosco")
+        m.jugador.x, m.jugador.y = 0, 0
+        antes = len(m.bulos_libres())
+        e.t = 0.01
+        m._encargos(1 / 60)
+        self.assertIsNone(m.encargo)
+        self.assertEqual(len(m.bulos_libres()), antes + 1)
+
+    def test_reportar_la_cuenta_calla_las_antenas(self):
+        m = nuevo("caro")
+        m._poner_antena()
+        self._mision(m, "reportar", "Alcaldía")
+        self._quedarse(m, 2.2)
+        self.assertIsNone(m.encargo)
+        self.assertGreater(m.bot_bloqueado, 0)
+        self.assertEqual(m.decisiones.buscar("denunciada").veces, 1)
+        a = m.antenas[0]
+        a.t = 0.0
+        libres = len(m.bulos_libres())
+        m._antenas(1 / 60)
+        self.assertEqual(len(m.bulos_libres()), libres)              # callada: no suelta Bulos
+
+    def test_el_taller_protege_a_los_mas_conectados(self):
+        m = nuevo("caro")
+        self._mision(m, "taller", "Colegio")
+        self._quedarse(m, 2.6)
+        mas = sorted(m.vecinos, key=lambda n: -m.social.grado(n))[:4]
+        self.assertTrue(all(m.vecinos[n].escudo > 15 for n in mas))
+
+    def test_la_charla_crea_amistades_nuevas(self):
+        m = nuevo("caro")
+        aristas = len(list(m.social.aristas()))
+        self._mision(m, "charla", "Plaza")
+        self._quedarse(m, 2.6)
+        self.assertGreater(len(list(m.social.aristas())), aristas)
+
+    def test_los_datos_para_lanzar_no_son_infinitos(self):
+        from cazabulos.mundo import MUNICION_MAX, RECARGA_SOLA
+        m = nuevo("ana")
+        j = m.jugador
+        self.assertEqual(j.municion, MUNICION_MAX)
+        for _ in range(MUNICION_MAX + 5):
+            j.enfriar = 0
+            m._jugador(1 / 60, {"accion": True})
+        self.assertEqual(j.municion, 0)
+        n = len(m.proyectiles)
+        j.enfriar = 0
+        m._jugador(1 / 60, {"accion": True})
+        self.assertEqual(len(m.proyectiles), n)                      # sin datos no se lanza
+        for _ in range(int(RECARGA_SOLA * 60) + 5):                  # muy despacio vuelven solos
+            m._jugador(1 / 60, {})
+        self.assertEqual(j.municion, 1)
 
 
 if __name__ == "__main__":

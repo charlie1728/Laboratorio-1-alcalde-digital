@@ -14,49 +14,113 @@ import random
 import pygame
 
 from .config import ESC, TILE
-from .recursos import borde, escalar
+from .recursos import escalar
 
+BORDE_HIERBA = (20, 68, 44)
 OSCURO = (30, 98, 62)
-MEDIO = (54, 142, 84)
-CLARO = (104, 192, 104)
-PUNTA = (156, 222, 122)
-HOJITAS = ((104, 192, 104), (156, 222, 122), (200, 220, 110), (80, 168, 92))
+MEDIO = (54, 146, 84)
+CLARO = (98, 190, 102)
+PUNTA = (158, 228, 120)
+BRILLO_VIENTO = (188, 242, 144)
+FLORES_MATA = ((255, 230, 96), (255, 182, 212), (245, 250, 255))
+HOJITAS = ((98, 190, 102), (158, 228, 120), (204, 232, 118), (74, 166, 90))
 
 _cuadros = {}
 
 
+def _borde_verde(s):
+    """Contorno verde bosque oscuro alrededor de la mata (1 px por lado, pasa de 16x16 a 18x18)
+    para que la hierba alta se integre con el prado como en Pokémon sin verse como rejas negras."""
+    w, h = s.get_size()
+    out = pygame.Surface((w + 2, h + 2), pygame.SRCALPHA)
+    mascara = pygame.mask.from_surface(s, 40)
+    sil = mascara.to_surface(setcolor=(*BORDE_HIERBA, 235), unsetcolor=(0, 0, 0, 0))
+    for dx, dy in ((-1, 0), (1, 0), (0, -1), (0, 1)):
+        out.blit(sil, (1 + dx, 1 + dy))
+    out.blit(s, (1, 1))
+    return out
+
+
 def _mata(variante, inclinacion, abierta):
-    """Dibuja una mata de 16x16: cuatro manojos de hojas de distinta altura. inclinacion -1/0/1 es hacia
-    dónde las empuja el viento; abierta = alguien está adentro (se abren hacia los lados y se agachan)."""
-    rng = random.Random(variante * 97 + 13)
+    """Dibuja una mata frondosa de 16x16 al estilo Pokémon: capa trasera de hojas oscuras, base unida
+    y hojas delanteras en abanico con puntas iluminadas. inclinacion -1/0/1 es hacia dónde las empuja
+    el viento; abierta = alguien está adentro (se abren hacia los lados y se agachan)."""
+    rng = random.Random(variante * 131 + 19)
     s = pygame.Surface((TILE, TILE), pygame.SRCALPHA)
-    for mx in (2, 6, 10, 13):
-        mx += rng.randint(-1, 1)
-        for k in range(3):
-            bx = mx + k - 1
-            alto = rng.randint(8, 12)
+    # 1) Base tupida abajo para unir los manojos y dar volumen
+    if not abierta:
+        for x in range(2, TILE - 2):
+            alto_base = 3 + ((x + variante) % 2)
+            for y in range(TILE - alto_base, TILE):
+                s.set_at((x, y), OSCURO if y >= TILE - 2 else MEDIO)
+    else:
+        for x in (1, 2, 3, 4, 11, 12, 13, 14):
+            s.set_at((x, TILE - 1), OSCURO)
+            s.set_at((x, TILE - 2), MEDIO)
+
+    # 2) Hojas traseras (más oscuras, llenan los huecos entre manojos)
+    for mx in (3, 6, 9, 12):
+        ox = mx + rng.randint(-1, 1)
+        alto = rng.randint(9, 12)
+        if abierta:
+            alto = int(alto * 0.55)
+            empuje = -2.2 if ox < 8 else 2.2
+        else:
+            empuje = inclinacion * 0.9
+        for j in range(alto):
+            f = (j / max(1, alto - 1)) ** 1.6
+            x = int(round(ox + empuje * f))
+            y = TILE - 1 - j
+            if 0 <= x < TILE and 0 <= y < TILE:
+                col = OSCURO if j < alto - 3 else MEDIO
+                s.set_at((x, y), col)
+                if 0 <= x + 1 < TILE and j < alto - 2:
+                    s.set_at((x + 1, y), OSCURO if j < 4 else MEDIO)
+
+    # 3) Manojos principales en forma de abanico ("V") con puntas brillantes
+    puntas_luz =BRILLO_VIENTO if inclinacion > 0 and not abierta else PUNTA
+    for mx in (2, 5, 8, 11, 14):
+        cx = mx + (rng.randint(-1, 0) if mx > 8 else rng.randint(0, 1))
+        for rama in (-1, 0, 1):
+            alto = rng.randint(10, 14) - abs(rama)
             if abierta:
-                alto = int(alto * 0.6)
-                lado = -2 if mx < 8 else 2
+                alto = int(alto * 0.62)
+                curva = (-2.6 if cx < 8 else 2.6) + rama * 0.7
             else:
-                lado = inclinacion * (1 if k != 1 else 0.6)
+                curva = rama * 1.15 + inclinacion * (1.35 if rama == 0 else 1.05)
             for j in range(alto):
-                f = (j / max(1, alto - 1)) ** 2
-                x = bx + round(lado * f * 1.5)
+                f = (j / max(1, alto - 1)) ** 1.45
+                x = int(round(cx + rama * 0.5 + curva * f))
                 y = TILE - 1 - j
-                if 0 <= x < TILE:
-                    color = OSCURO if j < 3 else MEDIO if j < alto - 3 else CLARO
-                    if j == alto - 1:
-                        color = PUNTA
-                    s.set_at((x, y), color)
+                if 0 <= x < TILE and 0 <= y < TILE:
+                    if j < 3:
+                        col = OSCURO
+                    elif j < alto - 4:
+                        col = MEDIO
+                    elif j < alto - 1:
+                        col = CLARO
+                    else:
+                        col = puntas_luz
+                    s.set_at((x, y), col)
+
+    # 4) En algunas matas, un capullo de flor silvestre entre las hojas
+    if variante == 3 and not abierta:
+        fx = 5 + inclinacion
+        fy = 5
+        ColorFlor = FLORES_MATA[(variante + max(0, inclinacion)) % len(FLORES_MATA)]
+        for dx, dy in ((0, 0), (1, 0), (0, 1)):
+            if 0 <= fx + dx < TILE and 0 <= fy + dy < TILE:
+                s.set_at((fx + dx, fy + dy), ColorFlor)
+        if 0 <= fx + 9 < TILE:
+            s.set_at((fx + 7, fy + 2), FLORES_MATA[0])
     return s
 
 
 def cuadro(variante, inclinacion, abierta=False):
-    """La mata ya con borde y escalada (crece 1 pixel por lado: dibujarla en x-1, y-1)."""
+    """La mata ya con su contorno verde oscuro y escalada (crece 1 pixel por lado: dibujarla en x-1, y-1)."""
     clave = (variante, inclinacion, abierta)
     if clave not in _cuadros:
-        _cuadros[clave] = escalar(borde(_mata(variante, inclinacion, abierta)))
+        _cuadros[clave] = escalar(_borde_verde(_mata(variante, inclinacion, abierta)))
     return _cuadros[clave]
 
 
@@ -88,17 +152,20 @@ class HierbaAlta:
         res = {}
         for ty in range(1, H - 1):
             for tx in range(1, W - 1):
-                if any(m.suelo[ty + dy][tx + dx] != "g" for dx in (-1, 0, 1) for dy in (-1, 0, 1)):
+                if m.suelo[ty][tx] != "g":
+                    continue
+                if any(m.suelo[ty + dy][tx + dx] != "g" for dx, dy in ((-1, 0), (1, 0), (0, -1), (0, 1))):
                     continue
                 if m.solido[ty][tx] or m.capa[ty][tx] is not None:
                     continue
                 if not m.libre(pygame.Rect(tx * TILE + 1, ty * TILE + 1, TILE - 2, TILE - 2)):
                     continue
-                if any(abs(x - tx * TILE) < 14 and -4 < yb - ty * TILE < 30 for _, x, yb, _ in m.props):
+                if any(abs(x - tx * TILE) < 13 and -4 < yb - ty * TILE < 28 for _, x, yb, _ in m.props):
                     continue                     # no tapar troncos ni postes
-                umbral = 0.56 if parque.collidepoint(tx, ty) else 0.7
+                umbral = 0.48 if parque.collidepoint(tx, ty) else 0.62
                 if mancha(tx, ty) > umbral:
-                    res[(tx, ty)] = {"var": self.rng.randrange(3), "agitada": 0.0, "dentro": False}
+                    var = 3 if self.rng.random() < 0.2 else self.rng.randrange(3)
+                    res[(tx, ty)] = {"var": var, "agitada": 0.0, "dentro": False}
         return res
 
     # ------------------------------------------------------------- tiempo

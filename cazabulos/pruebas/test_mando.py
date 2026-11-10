@@ -33,6 +33,8 @@ class TestMando(unittest.TestCase):
         self.assertEqual(teclas(self.m.traducir(b, en_juego=False)), [(pygame.KEYDOWN, pygame.K_ESCAPE)])
         self.assertEqual(teclas(self.m.traducir(start, en_juego=True)), [(pygame.KEYDOWN, pygame.K_ESCAPE)])
         self.assertEqual(teclas(self.m.traducir(start, en_juego=False)), [(pygame.KEYDOWN, pygame.K_RETURN)])
+        y = E(pygame.JOYBUTTONDOWN, button=3, instance_id=0, joy=0)
+        self.assertEqual(teclas(self.m.traducir(y, en_juego=True)), [(pygame.KEYDOWN, pygame.K_TAB)])   # estado del barrio
 
     def test_a_sostenido_sirve_para_lanzar(self):
         self.m.traducir(E(pygame.JOYBUTTONDOWN, button=0, instance_id=0, joy=0))

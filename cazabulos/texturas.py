@@ -22,8 +22,8 @@ CODIGOS = {"g": 0, "a": 1, "p": 2, "b": 3, "s": 4, "r": 5, "e": 6, "w": 7}
 G, A, P, B, S, R, E, AGUA = range(8)
 BAYER = np.array([[0, 8, 2, 10], [12, 4, 14, 6], [3, 11, 1, 9], [15, 7, 13, 5]], np.float32) / 16 - 0.47
 
-PASTO = np.array([(44, 122, 80), (54, 140, 90), (64, 156, 98), (76, 168, 104), (92, 180, 108)], np.float32)
-FLORCITAS = np.array([(250, 250, 240), (255, 222, 90), (255, 170, 200), (200, 170, 255)], np.float32)
+PASTO = np.array([(38, 114, 72), (50, 136, 86), (64, 156, 98), (82, 174, 106), (106, 194, 114)], np.float32)
+FLORCITAS = np.array([(252, 252, 242), (255, 224, 88), (255, 168, 204), (198, 168, 255)], np.float32)
 AGUA_COL = np.array([(136, 222, 232), (106, 204, 226), (84, 180, 216), (66, 156, 204)], np.float32)
 PIEDRAS = np.array([(116, 114, 124), (148, 146, 156), (176, 174, 184), (204, 202, 210)], np.float32)
 
@@ -144,36 +144,41 @@ def piedritas(img, permitido, rng, densidad):
 
 # ----------------------------------------------------------------- pasto
 def textura_pasto(h, w, rng):
-    """Pasto pixel art: manchas grandes de varios verdes con tramado, hojitas, tréboles y florecitas."""
-    v = 0.5 * ruido(h, w, 22, rng) + 0.32 * ruido(h, w, 7, rng) + 0.18 * ruido(h, w, 3, rng)
+    """Pasto pixel art: manchas grandes de varios verdes con tramado, matitas tipo Pokémon, tréboles y florecitas."""
+    v = 0.5 * ruido(h, w, 20, rng) + 0.32 * ruido(h, w, 7, rng) + 0.18 * ruido(h, w, 3, rng)
     v = (v - v.min()) / (v.max() - v.min() + 1e-6)
-    idx = np.digitize(v + tramado(h, w) * 0.16, [0.13, 0.36, 0.66, 0.87])
+    idx = np.digitize(v + tramado(h, w) * 0.17, [0.14, 0.36, 0.64, 0.85])
     img = PASTO[idx]
-    # matitas en forma de "v": dos puntas claras, el centro claro y la base oscura
-    n = int(h * w * 0.006)
-    ys, xs = rng.integers(0, h - 2, n), rng.integers(0, w - 2, n)
+    # matitas en forma de "v" y "w": puntas claras y base con sombra para dar relieve 2D
+    n = int(h * w * 0.011)
+    ys, xs = rng.integers(1, h - 3, n), rng.integers(1, w - 3, n)
     claro = PASTO[np.minimum(idx[ys, xs] + 1, 4)]
+    sombra = PASTO[np.maximum(idx[ys, xs] - 1, 0)]
     img[ys, xs] = claro
     img[ys, xs + 2] = claro
     img[ys + 1, xs + 1] = claro
     for dx in range(3):
-        img[ys + 2, xs + dx] = PASTO[np.maximum(idx[ys + 2, xs + dx] - 1, 0)]
-    # hojitas: una rayita de 2 pixeles (punta clara, base oscura)
-    n = int(h * w * 0.04)
+        img[ys + 2, xs + dx] = sombra
+    # hojitas dobles: rayita de 2 pixeles (punta clara, base oscura)
+    n = int(h * w * 0.048)
     ys, xs = rng.integers(0, h - 1, n), rng.integers(0, w, n)
     img[ys, xs] = PASTO[np.minimum(idx[ys, xs] + 1, 4)]
     img[ys + 1, xs] = PASTO[np.maximum(idx[ys + 1, xs] - 1, 0)]
-    # tréboles: tres pixeles oscuros con uno claro
-    n = int(h * w * 0.003)
+    # tréboles: grupitos de hojas redondeadas con centro luminoso
+    n = int(h * w * 0.0045)
     ys, xs = rng.integers(1, h - 2, n), rng.integers(1, w - 2, n)
-    for dy, dx in ((0, 0), (0, 1), (1, 0)):
+    for dy, dx in ((0, 0), (0, 1), (1, 0), (1, 1)):
         img[ys + dy, xs + dx] = PASTO[1]
-    img[ys, xs] = PASTO[3]
-    # florecitas sueltas (un pixel de color con su tallito)
-    n = int(h * w * 0.0012)
-    ys, xs = rng.integers(0, h - 1, n), rng.integers(0, w, n)
-    img[ys, xs] = FLORCITAS[rng.integers(0, len(FLORCITAS), n)]
+    img[ys, xs] = PASTO[4]
+    img[ys + 1, xs + 1] = PASTO[3]
+    # florecitas silvestres (pétalos + centro + tallito)
+    n = int(h * w * 0.0018)
+    ys, xs = rng.integers(1, h - 2, n), rng.integers(1, w - 2, n)
+    col_flor = FLORCITAS[rng.integers(0, len(FLORCITAS), n)]
+    img[ys, xs] = col_flor
+    img[ys, xs + 1] = col_flor
     img[ys + 1, xs] = PASTO[0]
+    img[ys + 1, xs + 1] = PASTO[3]
     return img
 
 

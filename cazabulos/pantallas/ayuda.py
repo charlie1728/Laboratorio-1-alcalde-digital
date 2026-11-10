@@ -94,19 +94,20 @@ class Ayuda(Escena):
         # lo mismo que se ve en la cuenta regresiva: el juego en tres dibujos
         instrucciones(pant, (c.centerx, c.y + 118), self.t, teclas=False)
         filas = [("FLECHAS", "Caminar por el barrio (también W A S D)."),
-                 ("ESPACIO", "Lanzar tu herramienta (puedes dejarla presionada). Todo se arregla lanzándole: Bulos, morados, la antena y las peleas."),
+                 ("ESPACIO", "Lanzar tu herramienta (puedes dejarla presionada). Cada lanzamiento gasta un dato verificado. Todo se arregla lanzándole: Bulos, morados, la antena y las peleas."),
                  ("X", "Usar el poder de tu personaje cuando el círculo se llena."),
-                 ("ESC", "Pausa.  ·  M: silenciar la música.  ·  F11: pantalla completa.")]
+                 ("ESC", "Pausa.  ·  TAB: ver el estado del barrio.  ·  M: música.  ·  F11: pantalla completa.")]
         y = c.y + 232
         for t_, d in filas:
             tecla(pant, t_, (c.x + 40, y), 18)
             y = max(y + 44, parrafo(pant, d, (c.x + 200, y + 2), 20, c.w - 260, (240, 240, 250)) + 14)
-        r = panel(pant, (c.x + 40, c.y + 424, c.w - 80, 104), (60, 40, 110), 230, borde=(255, 205, 50))
-        texto(pant, "Las estrellas", (r.x + 20, r.y + 12), 22, (255, 230, 150))
-        parrafo(pant, "Una estrella es una noticia VERDADERA. Con solo tocarla la compartes: la verdad le llega al vecino más "
-                      "cercano y a sus amigos por la red social, los cura y los protege un rato (brillan dorado).",
-                (r.x + 20, r.y + 44), 19, r.w - 40, (240, 240, 250))
-        texto(pant, "¿Con control USB?  Cruceta: caminar  ·  A: lanzar  ·  B o X: poder  ·  Start: pausa",
+        r = panel(pant, (c.x + 40, c.y + 420, c.w - 80, 112), (60, 40, 110), 230, borde=(255, 205, 50))
+        texto(pant, "Datos verificados y misiones", (r.x + 20, r.y + 12), 22, (255, 230, 150))
+        parrafo(pant, "Lo que lanzas son datos verificados (las barritas de tu tarjeta) y se gastan. Los recargas con las "
+                      "MISIONES: revisa un rumor en su fuente y publica el desmentido en el Kiosco, reporta la cuenta del Bot, "
+                      "da un taller o una charla. Las estrellas también dan datos.",
+                (r.x + 20, r.y + 44), 18, r.w - 40, (240, 240, 250))
+        texto(pant, "¿Con control USB?  Cruceta: caminar  ·  A: lanzar  ·  B o X: poder  ·  Y: estado  ·  Start: pausa",
               (c.centerx, r.bottom + 16), 19, (200, 230, 255), "midtop", 600)
 
     def _p2(self, pant, c):

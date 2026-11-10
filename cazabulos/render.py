@@ -190,7 +190,10 @@ class Render:
             tipo = fx[0]
             if tipo == "texto":
                 _, x, y, s, color, grande = fx
-                self.textos.append([x, y, s, color, grande, 0.0])
+                if grande:
+                    self.avisos = [a for a in self.avisos if a[0] != s][-1:] + [[s, color, 0.0]]
+                else:
+                    self.textos.append([x, y, s, color, grande, 0.0])
             elif tipo == "pop":
                 self._estallido(fx[1], fx[2], fx[3], 14)
             elif tipo == "cadena":
@@ -354,6 +357,8 @@ class Render:
     def _objetivo_urgente(self):
         m = self.m
         j = m.jugador
+        if getattr(m, "encargo", None) and getattr(j, "municion", 99) <= 3:     # pocos datos: a recargar
+            return m.encargo.pos
         if m.viral:
             return (m.viral.x, m.viral.y)
         for p in m.peleas:
@@ -368,6 +373,8 @@ class Render:
         if m.antenas:
             a = min(m.antenas, key=lambda a: math.dist((a.x, a.y), j.pos))
             return (a.x, a.y + 4)
+        if getattr(m, "encargo", None):
+            return m.encargo.pos
         return None
 
     def _calcular_guia(self):
@@ -382,6 +389,7 @@ class Render:
             self.guia = [j.pos] + ruta(m.ciudad, m.mapa, j.pos, obj)
         except Exception:
             self.guia = []
+        self.guia_mision = bool(getattr(m, "encargo", None) and obj == m.encargo.pos)
 
     # ------------------------------------------------------------- dibujo
     def dibujar(self, pant):
@@ -409,6 +417,7 @@ class Render:
             pant.blit(self.suelo, borde.topleft)
         self.amb.dibujar_suelo(pant, self)
         self._sombras_arboles(pant)
+        self._encargo_suelo(pant)
         self.capa.fill((0, 0, 0, 0))
         self._guia(self.capa)
         self._hilos(self.capa)
@@ -422,6 +431,7 @@ class Render:
         self.amb.dibujar_aire(pant, self)
         self._luz_del_dia(pant)
         self._noche(pant)
+        self._encargo_marcador(pant)
         if self.bloom:
             ronda = self.m.ronda
             bloom(pant, 214 if ronda >= 3 else 200 if ronda == 2 else 206, 140 if ronda >= 3 else 150)
@@ -444,17 +454,23 @@ class Render:
         if len(self.guia) < 2:
             return
         dist_total = 0.0
+        col_luz = self.m.encargo.color if (getattr(self, "guia_mision", False) and self.m.encargo) else (255, 224, 96)
         for (x0, y0), (x1, y1) in zip(self.guia, self.guia[1:]):
             largo = math.dist((x0, y0), (x1, y1))
             n = int(largo / 9)
             for k in range(n):
                 f = k / max(1, n)
                 d = dist_total + largo * f
-                if d > 260:
+                if d > 270:
                     return
                 fase = (d / 9 - self.t * 6) % 3
-                alfa = int(200 * (1 - d / 260)) if fase < 1.2 else 60
-                self._px(capa, x0 + (x1 - x0) * f, y0 + (y1 - y0) * f, (255, 255, 255, max(0, alfa)), 1)
+                alfa = int(235 * (1 - d / 270)) if fase < 1.25 else int(85 * (1 - d / 270))
+                if alfa <= 10:
+                    continue
+                px, py = x0 + (x1 - x0) * f, y0 + (y1 - y0) * f
+                sx, sy = self.a_pantalla(px, py)
+                pygame.draw.circle(capa, (24, 18, 44, min(220, alfa)), (int(sx), int(sy)), ESC + 2)
+                pygame.draw.circle(capa, (*col_luz, max(0, alfa)), (int(sx), int(sy)), ESC)
             dist_total += largo
 
     def _curva(self, va, vb):
@@ -515,7 +531,10 @@ class Render:
             else:
                 if not (vis_a and vis_b):
                     continue
-                color, alfa, grosor = (255, 255, 255), 22 + 8 * peso, 2
+                alerta = va.bulo is not None or vb.bulo is not None
+                color = (220, 195, 255) if alerta else (255, 255, 255)
+                alfa = (22 + 7 * peso) if alerta else (10 + 4 * peso)
+                grosor = 2 if alerta else 1
             self._linea_hilo(capa, self._curva(va, vb), color, alfa, grosor)
         # el aviso: a quién le va a pasar el Bulo este vecino morado
         for v in m.vecinos.values():
@@ -721,12 +740,18 @@ class Render:
         pant.blit(escalar(borde(img)), self.a_pantalla(s.x - 9, s.y - 11 + bob))
 
     def _d_antena(self, pant, a):
-        luz = int(self.t * 3) % 2 == 0
+        callada = getattr(self.m, "bot_bloqueado", 0) > 0
+        luz = int(self.t * 3) % 2 == 0 and not callada
         img = sprites.antena(luz, a.golpe > 0)
         self._sombra(pant, a.x, a.y, 14)
         pant.blit(escalar(borde(img)), self.a_pantalla(a.x - 9, a.y - 41))
         sx, sy = self.a_pantalla(a.x, a.y - 40)
-        for k in range(3):
+        if callada:                            # cuenta reportada: señal de prohibido y sin ondas
+            cx, cy = int(sx), int(sy) - 18
+            pygame.draw.circle(pant, (24, 18, 44), (cx, cy), 15)
+            pygame.draw.circle(pant, (255, 90, 90), (cx, cy), 12, 4)
+            pygame.draw.line(pant, (255, 90, 90), (cx - 8, cy + 8), (cx + 8, cy - 8), 4)
+        for k in range(0 if callada else 3):
             r = ((self.t * 30 + k * 12) % 36) + 6
             alfa = int(255 * (1 - r / 42))
             s = pygame.Surface((int(r * 2 * ESC), int(r * 2 * ESC)), pygame.SRCALPHA)
@@ -804,8 +829,57 @@ class Render:
         bob = -1 if (j.mov and cuadro in (1, 3)) else 0
         pant.blit(escalar(borde(img)), self.a_pantalla(j.x - 9 + ox, j.y - 24 + bob))
         self.amb.hierba.encima(pant, self, j.x, j.y)
+        enc = getattr(self.m, "encargo", None)
+        if enc and enc.destino and enc.etapa == 1:
+            ic = escalar(borde(sprites.encargo("prensa")), 2)
+            by = math.sin(self.t * 6) * 3
+            pant.blit(ic, ic.get_rect(center=(int(sx + 24), int(sy - 52 + by))))
         if (self.m.t < 4 or self.op.get("contraste")) and not self.op.get("demo") and not self.cuenta:
             texto(pant, "TÚ", (sx, sy - 27 * ESC), 18, color, "midbottom")
+
+    def _encargo_suelo(self, pant):
+        """El círculo de la misión en el piso, su ícono y las barritas que se llenan al quedarse adentro."""
+        e = getattr(self.m, "encargo", None)
+        if not e or not self.visible(e.x, e.y, 90):
+            return
+        sx, sy = self.a_pantalla(e.x, e.y)
+        sx, sy = int(sx), int(sy)
+        col = e.color
+        pulso = math.sin(self.t * 5) * 4
+        r_ext = int(22 * ESC + pulso)
+        halo = pygame.Surface((r_ext * 2 + 8, int(r_ext * 1.3) + 8), pygame.SRCALPHA)
+        rw, rh = halo.get_width() - 4, halo.get_height() - 4
+        pygame.draw.ellipse(halo, (*col, 42), (2, 2, rw, rh))
+        pygame.draw.ellipse(halo, (24, 18, 44, 180), (2, 2, rw, rh), 5)
+        pygame.draw.ellipse(halo, (*col, 220), (4, 4, rw - 4, rh - 4), 3)
+        pant.blit(halo, (sx - halo.get_width() // 2, sy - halo.get_height() // 2))
+
+    def _encargo_marcador(self, pant):
+        """El ícono y las barritas de la misión, encima de todo (también encima de quien está parado ahí)."""
+        e = getattr(self.m, "encargo", None)
+        if not e or not self.visible(e.x, e.y, 90):
+            return
+        sx, sy = self.a_pantalla(e.x, e.y)
+        sx, sy = int(sx), int(sy)
+        col = e.color
+        bob = math.sin(self.t * 4.5) * 4 - (4 if e.golpe > 0 else 0)
+        ic = escalar(borde(sprites.encargo(e.icono)), 3)
+        pant.blit(ic, ic.get_rect(center=(sx, int(sy - 92 + bob))))
+        # barritas del trabajo en esta parada (como las vidas de la antena)
+        n = e.barritas
+        llenas = int(e.progreso * n + 1e-6)
+        ancho = 16
+        x0 = sx - (n * (ancho + 4) - 4) // 2
+        y0 = int(sy - 126 + bob)
+        for k in range(n):
+            caja = pygame.Rect(x0 + k * (ancho + 4), y0, ancho, 9)
+            pygame.draw.rect(pant, (24, 18, 44), caja.inflate(4, 4), border_radius=4)
+            pygame.draw.rect(pant, col if k < llenas else (70, 62, 96), caja, border_radius=3)
+        if e.paradas == 2:                     # puntitos: en qué parada vas (1 de 2 o 2 de 2)
+            for k in range(2):
+                c = (255, 255, 255) if k <= e.etapa else (90, 84, 120)
+                pygame.draw.circle(pant, (24, 18, 44), (sx - 7 + k * 14, y0 - 10), 5)
+                pygame.draw.circle(pant, c, (sx - 7 + k * 14, y0 - 10), 3)
 
     def _pulsos(self, pant):
         m = self.m
@@ -995,16 +1069,22 @@ class Render:
             pant.blit(s, (0, 0))
         elif ronda >= 3:
             s = self.oscuro
-            s.fill((14, 18, 52, 128))
+            s.fill((14, 18, 52, 118))
             # (x, y, radio, fuerza): los faroles y el jugador aclaran la noche sin borrarla
-            luces = [(x, y, 70, 0.62) for x, y in self.m.mapa.luces]
+            luces = [(x, y, 70, 0.58) for x, y in self.m.mapa.luces]
             j = self.m.jugador
-            luces.append((j.x, j.y - 10, 100, 0.7))
-            luces += [(e.x, e.y, 40, 1.0) for e in self.m.estrellas]
-            luces += [(a.x, a.y - 30, 50, 1.0) for a in self.m.antenas]
-            luces += [(x, y + 6, 26, 0.75) for (x, y), on in zip(self.m.mapa.ventanas_luz, self.ventanas) if on]
+            luces.append((j.x, j.y - 10, 96, 0.56))
+            luces += [(e.x, e.y, 40, 0.95) for e in self.m.estrellas]
+            luces += [(a.x, a.y - 30, 50, 0.95) for a in self.m.antenas]
+            luces += [(b.x, b.y, 26, 0.52) for b in self.m.bulos.values() if b.estado == "libre"]
+            luces += [(v.x, v.y - 10, 32, 0.58) for v in self.m.infectados()]
+            if self.m.viral:
+                luces.append((self.m.viral.x, self.m.viral.y - 10, 56, 0.85))
+            if getattr(self.m, "encargo", None):
+                luces.append((self.m.encargo.x, self.m.encargo.y, 46, 0.82))
+            luces += [(x, y + 6, 26, 0.72) for (x, y), on in zip(self.m.mapa.ventanas_luz, self.ventanas) if on]
             for c in self.m.trafico.carros:          # los faros alumbran adelante del carro
-                luces.append((*self._faros(c)[1], 30, 0.8))
+                luces.append((*self._faros(c)[1], 30, 0.75))
             for x, y, r, fuerza in luces:
                 if not self.visible(x, y, r * ESC):
                     continue
@@ -1023,10 +1103,10 @@ class Render:
             if on and self.visible(x, y, 40):
                 sx, sy = self.a_pantalla(x - 8, y - 8)
                 pant.blit(vidrio, (int(sx), int(sy)))
-                g = resplandor(30, (110, 80, 20))
+                g = resplandor(30, (96, 70, 18))
                 pant.blit(g, (int(sx) + 24 - 30, int(sy) + 24 - 30), special_flags=pygame.BLEND_RGB_ADD)
-        bombillo = resplandor(18, (200, 164, 78))
-        charco = resplandor(80, (46, 34, 9))           # la luz cálida que cae al piso
+        bombillo = resplandor(18, (186, 152, 72))
+        charco = resplandor(76, (28, 20, 7))           # la luz cálida que cae al piso sin encandilar
         for x, y in self.m.mapa.luces:
             if not self.visible(x, y - 30, 120):
                 continue
@@ -1080,9 +1160,13 @@ class Render:
         if m.estrellas:
             e = min(m.estrellas, key=lambda s: math.dist((s.x, s.y), m.jugador.pos))
             objetivos.append(((e.x, e.y), (255, 214, 70), sprites.estrella()))
+        if getattr(m, "encargo", None):
+            enc = m.encargo
+            objetivos.append((enc.pos, enc.color, borde(sprites.encargo(enc.icono))))
         cx, cy = ANCHO / 2, ALTO / 2
         # zona segura: las flechas nunca tapan la tarjeta, el minimapa, los indicadores ni el botón de poder
         x0, x1, y0, y1 = 70, 1040, 185, 595
+        puestas = []
         for (x, y), color, icono in objetivos:
             if self.visible(x, y, -30):
                 continue
@@ -1092,6 +1176,13 @@ class Render:
             k = min((x1 - cx) / ca if ca > 1e-3 else (x0 - cx) / ca if ca < -1e-3 else 1e9,
                     (y1 - cy) / sa if sa > 1e-3 else (y0 - cy) / sa if sa < -1e-3 else 1e9)
             px_, py_ = cx + ca * k, cy + sa * k
+            for qx, qy in puestas:                  # no encima de otra flecha: se corre por el borde
+                if math.hypot(px_ - qx, py_ - qy) < 50:
+                    if abs(px_ - x0) < 2 or abs(px_ - x1) < 2:
+                        py_ = min(y1, max(y0, py_ + (52 if py_ >= qy else -52)))
+                    else:
+                        px_ = min(x1, max(x0, px_ + (52 if px_ >= qx else -52)))
+            puestas.append((px_, py_))
             pulso = 4 * math.sin(self.t * 8)
             pts = [(px_ + math.cos(ang) * (22 + pulso), py_ + math.sin(ang) * (22 + pulso)),
                    (px_ + math.cos(ang + 2.4) * 16, py_ + math.sin(ang + 2.4) * 16),

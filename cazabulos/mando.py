@@ -16,7 +16,7 @@ EVENTOS = (pygame.JOYDEVICEADDED, pygame.JOYDEVICEREMOVED, pygame.JOYBUTTONDOWN,
            pygame.JOYHATMOTION, pygame.JOYAXISMOTION)
 
 # Botones con la distribución estándar (XInput): 0=A 1=B 2=X 3=Y 6=Back 7=Start
-EN_JUEGO = {0: pygame.K_SPACE, 1: pygame.K_x, 2: pygame.K_x, 3: pygame.K_x, 6: pygame.K_ESCAPE, 7: pygame.K_ESCAPE}
+EN_JUEGO = {0: pygame.K_SPACE, 1: pygame.K_x, 2: pygame.K_x, 3: pygame.K_TAB, 6: pygame.K_ESCAPE, 7: pygame.K_ESCAPE}
 EN_MENU = {0: pygame.K_SPACE, 1: pygame.K_ESCAPE, 2: pygame.K_c, 3: pygame.K_TAB, 6: pygame.K_ESCAPE, 7: pygame.K_RETURN}
 
 

@@ -63,7 +63,7 @@ def dibujar_arbol(pant, filas, rect, t=0.0):
     for c, n in nodos.items():
         x, y = pos[c]
         usado = n["veces"] > 0
-        bueno = c in ("reportada", "verificada", "compartida")
+        bueno = c in ("reportada", "verificada", "compartida", "desmentida", "denunciada")
         malo = c in ("regada", "perdida")
         color = (120, 220, 140) if (bueno and usado) else (255, 110, 110) if (malo and usado) else (255, 205, 50) if usado else (70, 62, 110)
         r = 15 if n["hoja"] else 12
@@ -73,11 +73,13 @@ def dibujar_arbol(pant, filas, rect, t=0.0):
             texto(pant, str(n["veces"]), (x, y), 15, TINTA, "center", borde=None)
         etiqueta = CORTOS.get(c, n["texto"])
         lineas = [etiqueta] if len(etiqueta) < 12 or " " not in etiqueta else _partir(etiqueta)
+        # hojas vecinas: una sí y otra no, la etiqueta un poco más abajo para que no se pisen
+        baja = 13 if n["hoja"] and hojas.index(c) % 2 == 1 else 0
         for k, ln in enumerate(lineas):
-            texto(pant, ln, (x, y + r + 3 + k * 15), 13, (240, 240, 250) if usado else (150, 144, 180), "midtop", 600)
+            texto(pant, ln, (x, y + r + 3 + baja + k * 15), 13, (240, 240, 250) if usado else (150, 144, 180), "midtop", 600)
 
 
-CORTOS = {"publicacion": "Publicación", "falsa": "Falsa", "verdadera": "Verdadera", "reportada": "Reportas",
+CORTOS = {"desmentida": "Desmientes", "denunciada": "Denuncias", "publicacion": "Publicación", "falsa": "Falsa", "verdadera": "Verdadera", "reportada": "Reportas",
           "creida": "Se la creen", "verificada": "Verificas", "regada": "Se riega", "compartida": "Compartes",
           "perdida": "Ignoras"}
 
@@ -247,14 +249,15 @@ class ResultadoTurno(Escena):
         r = panel(pant, (420, 96, 400, 420), borde=p["color"])
         s = res["stats"]
         filas = [("Bulos atrapados", s["bulos"]), ("Vecinos curados", s["curados"]), ("Antenas apagadas", s["antenas"]),
-                 ("Estrellas compartidas", s["compartidas"]), ("Reenvíos cortados", s["pulsos"]),
-                 ("Bulos que se regaron", s["regados"]), ("Peleas calmadas", s["peleas"]),
-                 ("Viral detenido", "sí" if s["viral"] else "no"), ("Cadena más larga", s["cadena"])]
+                 ("Estrellas compartidas", s["compartidas"]), ("Misiones cumplidas", s.get("misiones", 0)),
+                 ("Reenvíos cortados", s["pulsos"]), ("Bulos que se regaron", s["regados"]),
+                 ("Peleas calmadas", s["peleas"]), ("Viral detenido", "sí" if s["viral"] else "no"),
+                 ("Cadena más larga", s["cadena"])]
         for k, (nombre, v) in enumerate(filas):
-            y = r.y + 18 + k * 30
-            texto(pant, nombre, (r.x + 20, y), 18, (230, 226, 245), peso=600)
+            y = r.y + 14 + k * 28
+            texto(pant, nombre, (r.x + 20, y), 17, (230, 226, 245), peso=600)
             mala = nombre.startswith("Bulos que se regaron") and v
-            texto(pant, str(v), (r.right - 20, y), 20, (255, 120, 120) if mala else (255, 255, 255), "topright")
+            texto(pant, str(v), (r.right - 20, y), 19, (255, 120, 120) if mala else (255, 255, 255), "topright")
         y = r.y + 300
         pygame.draw.line(pant, (90, 80, 140), (r.x + 16, y), (r.right - 16, y), 2)
         cuenta = min(1.0, self.t / 1.5)

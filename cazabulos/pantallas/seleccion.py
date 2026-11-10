@@ -163,7 +163,9 @@ class Seleccion(Escena):
         self.fondo.dibujar(pant, 1 / 60)
         k = len(self.elegidos)
         titulo_pantalla(pant, f"Jugador {k + 1}, elige tu personaje" if self.n > 1 else "Elige tu personaje", 24, tam=44)
-        texto(pant, "Todos tienen la misma fuerza: cada uno ayuda distinto", (ANCHO // 2, 82), 20, (230, 226, 245), "midtop", 600)
+        sub_r = pygame.Rect(ANCHO // 2 - 310, 76, 620, 32)
+        panel(pant, sub_r, (20, 14, 46), 195, radio=10)
+        texto(pant, "Todos tienen la misma fuerza: cada uno ayuda distinto", (ANCHO // 2, 81), 20, (240, 236, 255), "midtop", 600)
         self._rects = []
         w, h = 290, 500
         x0 = ANCHO // 2 - (4 * w + 3 * 16) // 2
@@ -236,8 +238,8 @@ class Relevo(Escena):
         for k, (t_, d) in enumerate(filas):
             rr = tecla(pant, t_, (r.x + 20, r.y + 20 + k * 50), 16)
             texto(pant, d, (rr.right + 12, r.y + 24 + k * 50), 20, (240, 240, 250), peso=600)
-        parrafo(pant, "Atrapa los Bulos, cura a los vecinos morados y recoge las estrellas. ¡Gana quien salve a más vecinos!",
-                (r.x + 20, r.y + 172), 18, r.w - 40, (220, 214, 240))
+        parrafo(pant, "Atrapa los Bulos, cura a los morados y cumple misiones: verifica los rumores y recarga tus datos. ¡Gana quien salve a más vecinos!",
+                (r.x + 20, r.y + 168), 17, r.w - 40, (220, 214, 240))
         # orden de turnos de esta ronda
         orden = pa.orden()
         y = 580
