@@ -60,8 +60,15 @@ def bulo(cuadro=0, corona=False, congelado=False, mirada=(0, 0), enojado=True, c
 
 
 def bulo_gigante(t):
-    base = bulo(int(t * 4) % 2, corona=True, color=(200, 60, 200))
-    return pygame.transform.scale(base, (32, 36))
+    cuadro = int(t * 4) % 2
+    return _guardar(("gigante", cuadro),
+                    lambda: pygame.transform.scale(bulo(cuadro, corona=True, color=(200, 60, 200)), (32, 36)))
+
+
+def bulo_chico(cuadro, congelado):
+    """El Bulo que viaja por un hilo (más pequeño)."""
+    return _guardar(("chico", cuadro, congelado),
+                    lambda: pygame.transform.scale(bulo(cuadro, False, congelado, (1, 0)), (10, 11)))
 
 
 def sombra(ancho=10):

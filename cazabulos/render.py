@@ -6,9 +6,10 @@ import random
 import pygame
 
 from . import personajes, sprites
+from .ambiente import Ambiente, bolita, resplandor
 from .ciudad import ruta
 from .config import ALTO, ANCHO, ESC, TILE
-from .recursos import escalar
+from .recursos import CONTORNO, borde, escalar
 from .sonido import SUBTITULOS
 from .ui import render, texto
 
@@ -34,6 +35,61 @@ def suelo_escalado(mapa):
             pygame.draw.rect(_suelo_escalado, (255, 240, 220), fondo, 2, border_radius=6)
             _suelo_escalado.blit(img, r)
     return _suelo_escalado
+
+
+_arboles = {}
+
+
+def partes_arbol(img):
+    """El árbol (ya con borde y escalado) partido en franjas: la punta se mece más que la mitad de la copa
+    y el tronco no se mueve. Devuelve [(franja, y en pantalla, cuánto se mece)]."""
+    hecho = _arboles.get(id(img))
+    if hecho is None or hecho[1] is not img:
+        grande = escalar(borde(img))
+        w, h = grande.get_size()
+        cortes = [(0, 12 * ESC, 1.0), (12 * ESC, 22 * ESC, 0.55), (22 * ESC, h, 0.0)]
+        partes = [(grande.subsurface((0, y0, w, y1 - y0)), y0, f) for y0, y1, f in cortes]
+        hecho = (partes, img)
+        _arboles[id(img)] = hecho
+    return hecho[0]
+
+
+_vineta = []
+
+
+def vineta():
+    """Bordes de la pantalla un poquito más oscuros (como en una película). Son 4 franjas con degradado
+    en vez de una imagen entera: cuesta menos dibujarlas y en las esquinas se suman solas."""
+    if not _vineta:
+        for lado, largo, grueso in (("arr", ANCHO, 110), ("aba", ANCHO, 110), ("izq", ALTO, 150), ("der", ALTO, 150)):
+            horizontal = lado in ("arr", "aba")
+            s = pygame.Surface((largo, grueso) if horizontal else (grueso, largo), pygame.SRCALPHA)
+            for k in range(grueso):
+                a = int(62 * (1 - k / grueso) ** 2.2)
+                if horizontal:
+                    s.fill((8, 6, 24, a), (0, k if lado == "arr" else grueso - 1 - k, largo, 1))
+                else:
+                    s.fill((8, 6, 24, a), (k if lado == "izq" else grueso - 1 - k, 0, 1, largo))
+            pos = {"arr": (0, 0), "aba": (0, ALTO - grueso), "izq": (0, 0), "der": (ANCHO - grueso, 0)}[lado]
+            _vineta.append((s, pos))
+    return _vineta
+
+
+_ventana_luz = []
+
+
+def ventana_encendida():
+    """La ventana de las casas con los vidrios prendidos (amarillo cálido) para la noche."""
+    if not _ventana_luz:
+        from .recursos import C
+        img = C(617).copy()
+        for y in range(img.get_height()):
+            for x in range(img.get_width()):
+                r, g, b, a = img.get_at((x, y))
+                if a > 0 and r + g + b > 420:          # los vidrios son los pixeles claros
+                    img.set_at((x, y), (255, 226, 120, 255) if y < 9 else (255, 196, 90, 255))
+        _ventana_luz.append(escalar(img))
+    return _ventana_luz[0]
 
 
 class Render:
@@ -65,6 +121,10 @@ class Render:
         self.sx = self.sy = 0
         self.flash = 0.0
         self.cuenta = False        # durante la cuenta regresiva no se muestra el "TÚ" (lo tapan las tarjetas)
+        self.amb = Ambiente(mundo.mapa, mundo.ronda)      # agua, fuente, palomas, mariposas, hojas, nubes...
+        # de noche no todas las ventanas están prendidas (y de vez en cuando alguien apaga o prende la luz)
+        self.ventanas = [self.rng.random() < 0.7 for _ in mundo.mapa.ventanas_luz]
+        self.t_ventanas = 3.0
 
     # ------------------------------------------------------------- coordenadas
     def _limitar(self):
@@ -177,6 +237,13 @@ class Render:
         self.cam[0] += (objetivo[0] - self.cam[0]) * k
         self.cam[1] += (objetivo[1] - self.cam[1]) * k
         self._limitar()
+        vista = pygame.Rect(self.cam[0] / ESC - 24, self.cam[1] / ESC - 24, ANCHO / ESC + 48, ALTO / ESC + 56)
+        self.amb.actualizar(dt, self.m, vista)
+        self.t_ventanas -= dt
+        if self.t_ventanas <= 0 and self.ventanas:
+            self.t_ventanas = self.rng.uniform(2.0, 5.0)
+            k = self.rng.randrange(len(self.ventanas))
+            self.ventanas[k] = not self.ventanas[k]
         self.temblor = max(0.0, self.temblor - dt * 18)
         self.flash = max(0.0, getattr(self, "flash", 0.0) - dt)
         for p in self.part:
@@ -257,15 +324,22 @@ class Render:
             borde = pygame.Rect(-cx + self.sx, -cy + self.sy, mw, mh)
             pygame.draw.rect(pant, (14, 16, 26), borde.inflate(12, 12), 6, border_radius=6)
             pant.blit(self.suelo, borde.topleft)
+        self.amb.dibujar_suelo(pant, self)
         self.capa.fill((0, 0, 0, 0))
         self._guia(self.capa)
         self._hilos(self.capa)
         pant.blit(self.capa, (0, 0))
         self._sprites(pant)
+        self.amb.dibujar_nubes(pant, self)
         self._pulsos(pant)
         self._proyectiles(pant)
         self._efectos(pant)
+        self.amb.dibujar_aire(pant, self)
         self._luz_del_dia(pant)
+        self._noche(pant)
+        if not self.op.get("demo"):          # el menú ya tiene su propio velo
+            for img, pos in vineta():
+                pant.blit(img, pos)
         self._textos(pant)
         if not self.op.get("demo"):          # el mundo de fondo del menú no necesita guías
             self._flechas(pant)
@@ -383,12 +457,14 @@ class Render:
         m = self.m
         dib = []
         vista = pygame.Rect(self.cam[0] / ESC - 40, self.cam[1] / ESC - 40, ANCHO / ESC + 80, ALTO / ESC + 100)
-        for img, x, yb in m.mapa.props:
+        for img, x, yb, tipo in m.mapa.props:
             if vista.collidepoint(x + 8, yb - 8) or vista.collidepoint(x + 8, yb - img.get_height()):
-                dib.append((yb, 0, img, x, yb - img.get_height()))
+                dib.append((yb, 0, "prop", img, x, yb, tipo))
         for c in m.trafico.carros:
             x, y = c.topleft()
-            dib.append((y + c.img.get_height() - 2, 0, c.img, x, y))
+            img = c.img
+            if vista.colliderect((x, y, img.get_width(), img.get_height())):
+                dib.append((y + img.get_height() - 2, 0, img, x, y))
         for sx_, sy_ in m.mapa.semaforos:
             dib.append(((sy_ + 1) * TILE, 1, "semaforo", sx_ * TILE + 8, (sy_ + 1) * TILE - 2))
         for v in m.vecinos.values():
@@ -411,14 +487,15 @@ class Render:
         for d in dib:
             if isinstance(d[2], pygame.Surface):
                 img, x, y = d[2], d[3], d[4]
-                pant.blit(escalar(img), self.a_pantalla(x, y))
+                pant.blit(escalar(borde(img)), self.a_pantalla(x - 1, y - 1))
             else:
                 getattr(self, "_d_" + d[2])(pant, *d[3:])
 
     def _borde(self, pant, img, x, y):
-        """Modo alto contraste: un borde blanco grueso alrededor de lo importante."""
-        sil = escalar(sprites.silueta(img, (255, 255, 255)))
-        sx, sy = self.a_pantalla(x, y)
+        """Modo alto contraste: un borde blanco grueso alrededor de lo importante (por fuera del borde
+        oscuro que ya tiene todo)."""
+        sil = escalar(sprites.silueta(borde(img), (255, 255, 255)))
+        sx, sy = self.a_pantalla(x - 1, y - 1)
         for dx, dy in ((-3, 0), (3, 0), (0, -3), (0, 3)):
             pant.blit(sil, (sx + dx, sy + dy))
 
@@ -426,14 +503,34 @@ class Render:
         sx, sy = self.a_pantalla(x - ancho / 2, y - 2)
         pant.blit(escalar(sprites.sombra(ancho)), (sx, sy))
 
+    def _d_prop(self, pant, img, x, yb, tipo):
+        """Árboles, postes, el paradero y lo alto: todo con borde oscuro. Los árboles se mecen con el
+        viento (la punta más que el medio; el tronco queda quieto)."""
+        y = yb - img.get_height()
+        sx, sy = self.a_pantalla(x - 1, y - 1)
+        if tipo != "arbol":
+            pant.blit(escalar(borde(img)), (sx, sy))
+            return
+        viento = math.sin(self.t * 1.5 + x * 0.045) * 0.75 + math.sin(self.t * 3.3 + x * 0.13) * 0.25
+        for parte, oy, fuerza in partes_arbol(img):
+            pant.blit(parte, (sx + round(viento * fuerza * 3), sy + oy))
+
     def _d_semaforo(self, pant, x, yb):
         sx, sy = self.a_pantalla(x, yb)
+        pygame.draw.rect(pant, CONTORNO, (sx - 6, sy - 66, 12, 69), border_radius=2)
         pygame.draw.rect(pant, (60, 60, 72), (sx - 3, sy - 66, 6, 66))
+        pygame.draw.rect(pant, (90, 92, 106), (sx - 3, sy - 66, 2, 66))
+        pygame.draw.rect(pant, CONTORNO, (sx - 15, sy - 99, 30, 42), border_radius=7)
         pygame.draw.rect(pant, (34, 34, 44), (sx - 12, sy - 96, 24, 36), border_radius=5)
         verde = self.m.trafico.verde
         for k, (col, on) in enumerate((((240, 60, 60), verde != "h"), ((80, 230, 110), verde == "h"))):
             c = col if on else tuple(v // 4 for v in col)
-            pygame.draw.circle(pant, c, (int(sx), int(sy - 87 + k * 17)), 6)
+            cy_ = int(sy - 87 + k * 17)
+            if on:     # la luz que está prendida brilla alrededor
+                pant.blit(bolita(14, col, 70), (int(sx) - 14, cy_ - 14))
+            pygame.draw.circle(pant, c, (int(sx), cy_), 6)
+            if on:
+                pygame.draw.circle(pant, (255, 255, 255), (int(sx) - 2, cy_ - 2), 2)
 
     def _d_vecino(self, pant, v):
         cuadro = int(v.paso) % 4 if v.mov else 0
@@ -449,9 +546,11 @@ class Render:
             alfa = 255 if v.escudo > 3 or int(self.t * 8) % 2 else 90
             pygame.draw.ellipse(pant, (255, 214, 70, alfa), (sx - r * ESC, sy - 3 * ESC, 2 * r * ESC, 6 * ESC), 3)
         x, y = v.x - 8 + temblor, v.y - 16 - salto
+        con_borde = borde(img)
         if v.escudo > 0:
-            pant.blit(escalar(sprites.silueta(img, (255, 226, 110))), self.a_pantalla(x - 0.34, y))
-            pant.blit(escalar(sprites.silueta(img, (255, 226, 110))), self.a_pantalla(x + 0.34, y))
+            sil = escalar(sprites.silueta(con_borde, (255, 226, 110)))
+            for dx, dy in ((-0.67, 0), (0.67, 0), (0, -0.67)):
+                pant.blit(sil, self.a_pantalla(x - 1 + dx, y - 1 + dy))
         if v.bulo is not None:
             # un aura morada que palpita: "a este hay que curarlo"
             sx, sy = self.a_pantalla(v.x, v.y - 10)
@@ -460,13 +559,13 @@ class Render:
             pygame.draw.circle(aura, (170, 90, 255, 55), (r, r), r)
             pygame.draw.circle(aura, (200, 140, 255, 150), (r, r), r, 3)
             pant.blit(aura, (sx - r, sy - r))
-        pant.blit(escalar(img), self.a_pantalla(x, y))
+        pant.blit(escalar(con_borde), self.a_pantalla(x - 1, y - 1))
         if v.bulo is not None and v.bulo in self.m.bulos:
             b = self.m.bulos[v.bulo]
             corona = self.m.arbol.es_raiz(b.id) and self.m.arbol.tiene_hijos(b.id)
             bob = math.sin(self.t * 4 + b.id) * 1.2
             ib = sprites.bulo(int(self.t * 3 + b.id) % 2, corona, False, (0, 1))
-            pant.blit(escalar(ib), self.a_pantalla(v.x - 8, v.y - 31 - salto + bob))
+            pant.blit(escalar(borde(ib)), self.a_pantalla(v.x - 9, v.y - 32 - salto + bob))
         if v.pelea and v.pelea.get("activa") and v.pelea["a"] == v.nombre:
             otro = self.m.vecinos[v.pelea["b"]]
             mx, my = (v.x + otro.x) / 2, min(v.y, otro.y) - 34
@@ -499,13 +598,13 @@ class Render:
             return
         if self.op.get("contraste"):
             self._borde(pant, img, s.x - 8, s.y - 10 + bob)
-        pant.blit(escalar(img), self.a_pantalla(s.x - 8, s.y - 10 + bob))
+        pant.blit(escalar(borde(img)), self.a_pantalla(s.x - 9, s.y - 11 + bob))
 
     def _d_antena(self, pant, a):
         luz = int(self.t * 3) % 2 == 0
         img = sprites.antena(luz, a.golpe > 0)
         self._sombra(pant, a.x, a.y, 14)
-        pant.blit(escalar(img), self.a_pantalla(a.x - 8, a.y - 40))
+        pant.blit(escalar(borde(img)), self.a_pantalla(a.x - 9, a.y - 41))
         sx, sy = self.a_pantalla(a.x, a.y - 40)
         for k in range(3):
             r = ((self.t * 30 + k * 12) % 36) + 6
@@ -527,7 +626,7 @@ class Render:
         img = sprites.bulo(int(b.t * 5) % 2, corona, b.congelado > 0, mir)
         if self.op.get("contraste"):
             self._borde(pant, img, b.x - 8, b.y - 9 + bob)
-        pant.blit(escalar(img), self.a_pantalla(b.x - 8, b.y - 9 + bob))
+        pant.blit(escalar(borde(img)), self.a_pantalla(b.x - 9, b.y - 10 + bob))
         if b.candidato:
             from .partida import CANDIDATOS as INFO
             color = INFO.get(b.candidato, ("", "", (255, 255, 255)))[2]
@@ -537,10 +636,10 @@ class Render:
         img = sprites.bulo_gigante(self.t)
         golpe = v.golpe > 0
         self._sombra(pant, v.x, v.y + 14, 20)
-        x, y = self.a_pantalla(v.x - 16, v.y - 22 + math.sin(self.t * 3) * 2)
-        grande = escalar(img)
+        x, y = self.a_pantalla(v.x - 17, v.y - 23 + math.sin(self.t * 3) * 2)
+        grande = escalar(borde(img))
         if golpe:
-            grande = escalar(sprites.silueta(img, (255, 255, 255)))
+            grande = escalar(sprites.silueta(borde(img), (255, 255, 255)))
         pant.blit(grande, (x, y))
         cx, cy = self.a_pantalla(v.x, v.y - 30)
         r = 26 + math.sin(self.t * 10) * 3
@@ -557,9 +656,9 @@ class Render:
     def _d_fantasma(self, pant, f):
         cs = personajes.cuadros(f["clave"])
         img = cs[f.get("dir", "abajo")][int(f.get("paso", 0)) % 4]
-        g = escalar(img).copy()
+        g = escalar(borde(img)).copy()
         g.set_alpha(110)
-        pant.blit(g, self.a_pantalla(f["x"] - 8, f["y"] - 23))
+        pant.blit(g, self.a_pantalla(f["x"] - 9, f["y"] - 24))
         sx, sy = self.a_pantalla(f["x"], f["y"] - 26)
         texto(pant, f["nombre"], (sx, sy), 14, (220, 220, 255), "midbottom", 600, alfa=170)
 
@@ -575,7 +674,7 @@ class Render:
         img = cs[j.dir][cuadro]
         ox = j.vec[0] * 1.5 if j.lanzo > 0 else 0
         bob = -1 if (j.mov and cuadro in (1, 3)) else 0
-        pant.blit(escalar(img), self.a_pantalla(j.x - 8 + ox, j.y - 23 + bob))
+        pant.blit(escalar(borde(img)), self.a_pantalla(j.x - 9 + ox, j.y - 24 + bob))
         if (self.m.t < 4 or self.op.get("contraste")) and not self.op.get("demo") and not self.cuenta:
             texto(pant, "TÚ", (sx, sy - 27 * ESC), 18, color, "midbottom")
 
@@ -591,9 +690,8 @@ class Render:
                 (x0, y0), (x1, y1) = a.cabeza, b.cabeza
                 tx, ty = x0 + (x1 - x0) * f2, y0 + (y1 - y0) * f2 - math.sin(f2 * math.pi) * 14
                 self._px(pant, tx, ty, (180, 110, 255))
-            img = sprites.bulo(int(self.t * 8) % 2, False, p.congelado > 0, (1, 0))
-            pequeno = pygame.transform.scale(img, (10, 11))
-            pant.blit(escalar(pequeno), self.a_pantalla(x - 5, y - 6))
+            pequeno = sprites.bulo_chico(int(self.t * 8) % 2, p.congelado > 0)
+            pant.blit(escalar(borde(pequeno)), self.a_pantalla(x - 6, y - 7))
 
     def _proyectiles(self, pant):
         for pr in self.m.proyectiles:
@@ -663,6 +761,9 @@ class Render:
             luces.append((j.x, j.y - 10, 110))
             luces += [(e.x, e.y, 40) for e in self.m.estrellas]
             luces += [(a.x, a.y - 30, 50) for a in self.m.antenas]
+            luces += [(x, y + 6, 26) for (x, y), on in zip(self.m.mapa.ventanas_luz, self.ventanas) if on]
+            for c in self.m.trafico.carros:          # los faros alumbran adelante del carro
+                luces.append((*self._faros(c)[1], 30))
             for x, y, r in luces:
                 if not self.visible(x, y, r * ESC):
                     continue
@@ -670,6 +771,49 @@ class Render:
                 img = sprites.luz(r * ESC // 2)
                 s.blit(img, (sx - img.get_width() // 2, sy - img.get_height() // 2), special_flags=pygame.BLEND_RGBA_SUB)
             pant.blit(s, (0, 0))
+
+    def _noche(self, pant):
+        """Ya oscuro: las ventanas prendidas, los bombillos de los postes y las luciérnagas brillan
+        (la luz se suma a lo de abajo, así se ve que alumbra)."""
+        if self.m.ronda < 3:
+            return
+        vidrio = ventana_encendida()
+        for (x, y), on in zip(self.m.mapa.ventanas_luz, self.ventanas):
+            if on and self.visible(x, y, 40):
+                sx, sy = self.a_pantalla(x - 8, y - 8)
+                pant.blit(vidrio, (int(sx), int(sy)))
+                g = resplandor(30, (110, 80, 20))
+                pant.blit(g, (int(sx) + 24 - 30, int(sy) + 24 - 30), special_flags=pygame.BLEND_RGB_ADD)
+        bombillo = resplandor(20, (230, 190, 90))
+        charco = resplandor(80, (56, 42, 12))          # la luz cálida que cae al piso
+        for x, y in self.m.mapa.luces:
+            if not self.visible(x, y - 30, 120):
+                continue
+            sx, sy = self.a_pantalla(x, y)
+            pant.blit(charco, (int(sx) - 80, int(sy) - 80), special_flags=pygame.BLEND_RGB_ADD)
+            for dx in (-6, 5):                         # los dos bombillos en las puntas de la T del poste
+                bx, by = self.a_pantalla(x + dx, y - 29)
+                pant.blit(bombillo, (int(bx) - 20 + 1, int(by) - 20), special_flags=pygame.BLEND_RGB_ADD)
+        faro = resplandor(16, (200, 180, 100))
+        charco_faro = resplandor(46, (64, 56, 28))
+        for c in self.m.trafico.carros:               # los faros prendidos y la luz que echan al piso
+            (fx, fy), (px, py) = self._faros(c)
+            if self.visible(fx, fy, 60):
+                sx, sy = self.a_pantalla(px, py)
+                pant.blit(charco_faro, (int(sx) - 46, int(sy) - 46), special_flags=pygame.BLEND_RGB_ADD)
+                sx, sy = self.a_pantalla(fx, fy)
+                pant.blit(faro, (int(sx) - 16, int(sy) - 16), special_flags=pygame.BLEND_RGB_ADD)
+        self.amb.dibujar_noche(pant, self)
+
+    @staticmethod
+    def _faros(c):
+        """Dónde están los faros de un carro y dónde cae su luz (adelante, según para dónde va)."""
+        x, y = c.topleft()
+        w, h = c.img.get_size()
+        return {"der": ((x + w - 2, y + h * 0.62), (x + w + 10, y + h / 2)),
+                "izq": ((x + 2, y + h * 0.62), (x - 10, y + h / 2)),
+                "abajo": ((x + w / 2, y + h - 3), (x + w / 2, y + h + 10)),
+                "arriba": ((x + w / 2, y + 4), (x + w / 2, y - 10))}[c.carril.dir]
 
     def _textos(self, pant):
         for x, y, s, color, grande, t in self.textos:

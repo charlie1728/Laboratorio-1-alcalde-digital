@@ -143,15 +143,15 @@ def instrucciones(pant, centro, t=0.0, mando=False, teclas=True):
     """Todo el juego en tres dibujos (se ve en la cuenta regresiva, antes de empezar a jugar):
     atrapa los Bulos, cura a los morados y recoge las estrellas."""
     from .. import sprites
-    from ..recursos import escalar
+    from ..recursos import borde, escalar
     from ..ui import panel, tecla
     cx, cy = centro
     w, h, sep = 270, 190, 26
     x0 = cx - (3 * w + 2 * sep) // 2
-    bulo = escalar(sprites.bulo(int(t * 4) % 2, False, False, (0, 1)), 5)
-    vecino = escalar(sprites.morado(sprites.vecino(1, 0, "abajo", 0)), 5)
-    cabeza = escalar(sprites.bulo(int(t * 3) % 2, False, False, (0, 1)), 3)
-    estrella = escalar(sprites.estrella(brillo=int(t * 2) % 2), 5)
+    bulo = escalar(borde(sprites.bulo(int(t * 4) % 2, False, False, (0, 1))), 5)
+    vecino = escalar(borde(sprites.morado(sprites.vecino(1, 0, "abajo", 0))), 5)
+    cabeza = escalar(borde(sprites.bulo(int(t * 3) % 2, False, False, (0, 1))), 3)
+    estrella = escalar(borde(sprites.estrella(brillo=int(t * 2) % 2)), 5)
     tarjetas = [("¡Atrápalos!", (190, 130, 255)), ("¡Cura a los morados!", (220, 160, 255)),
                 ("Recoge las estrellas", (255, 214, 70))]
     for k, (txt, color) in enumerate(tarjetas):

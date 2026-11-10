@@ -7,7 +7,7 @@ from .. import personajes
 from ..config import ALTO, ANCHO
 from ..partida import Partida
 from ..personajes import ORDEN, PERSONAJES
-from ..recursos import escalar
+from ..recursos import borde, escalar
 from ..red.protocolo import PUERTO, ips_locales
 from ..ui import barra, panel, parrafo, texto
 from .base import Botonera, Escena, FondoCiudad, es_aceptar, es_volver, titulo_pantalla
@@ -271,7 +271,7 @@ class EsperaRed(Escena):
             for k, (nombre, clave, pts) in enumerate(filas):
                 y = 180 + k * 90
                 r = panel(pant, (ANCHO // 2 - 340, y, 680, 74), borde=PERSONAJES[clave]["color"])
-                img = escalar(personajes.retrato(clave), 4)
+                img = escalar(borde(personajes.retrato(clave)), 4)
                 pant.blit(img, img.get_rect(midleft=(r.x + 20, r.centery)))
                 texto(pant, nombre, (r.x + 110, r.centery), 28, PERSONAJES[clave]["color"], "midleft")
                 texto(pant, str(pts), (r.right - 24, r.centery), 30, (255, 255, 255), "midright")
@@ -287,7 +287,7 @@ class EsperaRed(Escena):
                 y = 150 + k * 110
                 r = panel(pant, (140, y, ANCHO - 280, 92), borde=p["color"] if k == 0 else None)
                 texto(pant, f"{k + 1}°", (r.x + 24, r.centery), 38, (255, 205, 50) if k == 0 else (255, 255, 255), "midleft")
-                img = escalar(personajes.retrato(j["clave"], j["piel"], j["pelo"]), 4)
+                img = escalar(borde(personajes.retrato(j["clave"], j["piel"], j["pelo"])), 4)
                 pant.blit(img, img.get_rect(midleft=(r.x + 90, r.centery)))
                 texto(pant, j["nombre"], (r.x + 180, r.y + 16), 28, p["color"])
                 texto(pant, f"{pa.salvados(i)} vecinos salvados", (r.x + 180, r.y + 52), 18, (220, 214, 240), peso=600)

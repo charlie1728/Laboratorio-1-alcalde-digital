@@ -29,6 +29,8 @@ Antes de cada turno, la cuenta regresiva explica el juego en tres dibujos: **atr
 - **Antena del Bot:** suelta Bulos sin parar. Golpéala varias veces para apagarla (después pone otra en otro lugar).
 - **Eventos al azar:** peleas entre vecinos (si no las calmas a tiempo se rompe la amistad), el **Bulo viral** con 10 segundos para detenerlo, rumores sobre los candidatos, noticias verdaderas, campañas de convivencia, grupos de Bulos nuevos y vecinos que reportan por su cuenta.
 
+**El barrio está vivo.** Todo tiene un borde oscuro para que se distinga del fondo (personajes, vecinos, carros, árboles, edificios y objetos). Los árboles se mecen con el viento, la fuente de la plaza salpica, en la laguna nada una pata con sus patitos entre nenúfares, las palomas de la plaza salen volando si pasas cerca, hay mariposas, flores, hojas que caen, banderas que ondean en la alcaldía, sombras de nubes y humito detrás de los carros. De noche se prenden las ventanas, los faroles y los faros, y aparecen luciérnagas en el parque. Nada de esto cambia el juego: con la misma semilla el turno sale igual.
+
 ## Personajes (fuerza pareja, cada uno ayuda distinto)
 
 ![Elegir personaje](docs/img/cazabulos/seleccion.png)
@@ -40,7 +42,7 @@ Antes de cada turno, la cuenta regresiva explica el juego en tres dibujos: **atr
 | **Caro** (verde) | Ciudadana | su red | Corre más rápido, su red es más ancha y calma una pelea de un golpe | **Red gigante:** atrapa de un golpe todos los Bulos cercanos |
 | **Dani** (azul) | Candidato | volantes | A quien cura no le vuelven a entrar Bulos por un buen rato. Compite en la elección | **Discurso:** cura a los vecinos cercanos y empuja a los Bulos |
 
-La piel y el color de pelo se pueden cambiar al elegir. Con jugadores automáticos (20 partidas por personaje) los cuatro sacan puntajes parecidos.
+La piel y el color de pelo se pueden cambiar al elegir. Con jugadores automáticos (20 partidas de 2 minutos por personaje) los cuatro sacan puntajes parecidos: jugando como un niño (reacciona tarde y a veces se distrae) quedan a menos de 5 % entre sí; jugando perfecto, Ana saca hasta 17 % más que Beto.
 
 ## Modos
 
@@ -87,7 +89,7 @@ Otros comandos: `python -m cazabulos.acceso_directo --escritorio` pone el acceso
 
 Para jugar en línea, los computadores deben estar en la misma red. La primera vez, Windows puede preguntar si deja que Python use la red: hay que dar **Permitir** en el computador que crea la sala.
 
-Pruebas (61):
+Pruebas (68):
 
 ```bash
 python -m unittest discover -s cazabulos/pruebas -t .
@@ -96,6 +98,6 @@ python -m unittest discover -s cazabulos/pruebas -t .
 ## Créditos
 
 - Gráficos del barrio y de los vecinos: [Kenney](https://kenney.nl) (*RPG Urban Pack* y *Roguelike Modern City*, licencia CC0). Las licencias están en `cazabulos/assets/kenney/`.
-- Protagonistas, Bulos, estrellas, antena e ícono: pixel art propio del equipo, hecho en código (`cazabulos/personajes.py`, `cazabulos/sprites.py`).
+- Protagonistas, Bulos, estrellas, antena, palomas, patos, mariposas, banderas e ícono: pixel art propio del equipo, hecho en código (`cazabulos/personajes.py`, `cazabulos/sprites.py`, `cazabulos/ambiente.py`).
 - Fuentes: Fredoka y Nunito (licencia SIL OFL).
 - Sonidos y música: sintetizados en el juego con numpy (`cazabulos/sonido.py`).

@@ -8,7 +8,7 @@ from ..config import ALTO, ANCHO
 from ..mundo import ROLES
 from ..partida import MOMENTOS, Partida
 from ..personajes import ORDEN, PELOS, PERSONAJES, PIELES
-from ..recursos import escalar
+from ..recursos import borde, escalar
 from ..ui import panel, parrafo, render, tecla, texto
 from .base import Escena, FondoCiudad, es_aceptar, es_volver, titulo_pantalla
 from .menu import SI_NO, Formulario, Selector, Titulo
@@ -244,7 +244,7 @@ class Relevo(Escena):
         texto(pant, "Turnos:", (x, y + 8), 18, (220, 214, 240), peso=600)
         for k, i in enumerate(orden):
             jj = pa.jugadores[i]
-            img = escalar(personajes.retrato(jj["clave"], jj["piel"], jj["pelo"]), 3)
+            img = escalar(borde(personajes.retrato(jj["clave"], jj["piel"], jj["pelo"])), 3)
             xx = x + 90 + k * 70
             if i == pa.actual:
                 pygame.draw.rect(pant, PERSONAJES[jj["clave"]]["color"], (xx - 4, y - 4, 56, 50), border_radius=10)

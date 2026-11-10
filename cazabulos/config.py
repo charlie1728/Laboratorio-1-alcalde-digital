@@ -37,5 +37,5 @@ CIELO = (120, 200, 255)
 
 # Ronda
 DURACION_RONDA = 120        # segundos por turno (se puede cambiar en el menú)
-VELOCIDAD_JUGADOR = 78      # pixeles nativos por segundo
+VELOCIDAD_JUGADOR = 92      # pixeles nativos por segundo (antes 78: el usuario pidió un poco más rápido)
 VELOCIDAD_BULO = 34

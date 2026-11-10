@@ -46,6 +46,8 @@ def escalar(img, factor=ESC):
     """Escala con vecino más cercano (el pixel art no se emborrona)."""
     clave = (id(img), factor)
     if clave not in _escaladas:
+        if len(_escaladas) > 3000:      # red de seguridad: si alguien pide imágenes nuevas cada cuadro
+            _escaladas.clear()
         _escaladas[clave] = (pygame.transform.scale(img, (img.get_width() * factor, img.get_height() * factor)), img)
     return _escaladas[clave][0]
 
@@ -98,3 +100,26 @@ def contorno(img, color, grosor=1):
                 out.blit(sil, (grosor + dx, grosor + dy))
     out.blit(img, (grosor, grosor))
     return out
+
+
+CONTORNO = (34, 26, 44)          # el borde oscuro de todo lo que hay en el barrio
+_bordes = {}
+
+
+def borde(img, color=CONTORNO):
+    """La imagen con un borde oscuro de 1 pixel alrededor (crece 1 pixel por lado: dibujar en x-1, y-1).
+    Se guarda en caché: cada imagen se procesa una sola vez."""
+    clave = (id(img), color)
+    hecho = _bordes.get(clave)
+    if hecho is None or hecho[1] is not img:
+        if len(_bordes) > 3000:
+            _bordes.clear()
+        w, h = img.get_size()
+        out = pygame.Surface((w + 2, h + 2), pygame.SRCALPHA)
+        sil = pygame.mask.from_surface(img, 40).to_surface(setcolor=(*color, 255), unsetcolor=(0, 0, 0, 0))
+        for dx, dy in ((0, 1), (2, 1), (1, 0), (1, 2)):
+            out.blit(sil, (dx, dy))
+        out.blit(img, (1, 1))
+        hecho = (out, img)
+        _bordes[clave] = hecho
+    return hecho[0]

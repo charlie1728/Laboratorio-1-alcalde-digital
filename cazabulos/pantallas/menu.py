@@ -7,7 +7,7 @@ import pygame
 from .. import personajes, sprites
 from ..config import ALTO, ANCHO, TINTA
 from ..personajes import ORDEN, PERSONAJES
-from ..recursos import escalar
+from ..recursos import borde, escalar
 from ..ui import panel, parrafo, render, texto
 from .base import Botonera, Escena, FondoCiudad, es_aceptar, es_volver, pie, titulo_pantalla
 
@@ -110,19 +110,19 @@ class Titulo(Escena):
         texto(pant, "Alcalde Digital · Ciudad Nova", (ANCHO // 2, 168), 26, (255, 255, 255), "midtop")
         # Bulos que flotan junto al logo
         for k, (bx, by) in enumerate(((ANCHO // 2 - 360, 90), (ANCHO // 2 + 330, 70))):
-            img = escalar(sprites.bulo(int(self.t * 4 + k) % 2, k == 1, False, (1 if k == 0 else -1, 0)), 5)
+            img = escalar(borde(sprites.bulo(int(self.t * 4 + k) % 2, k == 1, False, (1 if k == 0 else -1, 0))), 5)
             pant.blit(img, (bx - 40, by + math.sin(self.t * 2 + k) * 10))
-        img = escalar(sprites.estrella(brillo=int(self.t * 2) % 2), 4)
+        img = escalar(borde(sprites.estrella(brillo=int(self.t * 2) % 2)), 4)
         pant.blit(img, (ANCHO // 2 + 250, 150 + math.sin(self.t * 2.5) * 6))
         # los cuatro protagonistas
         for k, clave in enumerate(ORDEN):
             cs = personajes.cuadros(clave)
             cuadro = int(self.t * 6 + k) % 4
-            img = escalar(cs["abajo"][cuadro], 6)
+            img = escalar(borde(cs["abajo"][cuadro]), 6)
             x = 120 + k * 75 if k < 2 else ANCHO - 120 - (3 - k) * 75 - 96
             y = ALTO - 230 + (math.sin(self.t * 3 + k) * 4 if cuadro in (1, 3) else 0)
             pygame.draw.ellipse(pant, (0, 0, 0, 120), (x + 10, y + 136, 76, 16))
-            pant.blit(img, (x, y))
+            pant.blit(img, (x - 6, y - 6))          # el borde suma un pixel (x6) por lado
             p = PERSONAJES[clave]
             texto(pant, p["nombre"], (x + 48, y + 150), 22, p["color"], "midtop")
             texto(pant, p["rol"], (x + 48, y + 176), 15, (230, 226, 245), "midtop", 600)
@@ -299,7 +299,7 @@ class RecordsPantalla(Escena):
             color = [(255, 205, 50), (220, 220, 235), (230, 160, 100)][k] if k < 3 else (255, 255, 255)
             texto(pant, f"{k + 1}.", (r.x + 24, y), 24, color)
             clave = rec.get("personaje", "caro")
-            img = escalar(personajes.retrato(clave), 2)
+            img = escalar(borde(personajes.retrato(clave)), 2)
             pant.blit(img, (r.x + 70, y - 2))
             texto(pant, rec["nombre"], (r.x + 116, y), 24, PERSONAJES.get(clave, PERSONAJES["caro"])["color"])
             texto(pant, f"{rec['salvados']} a salvo", (r.x + 300, y + 4), 18, (200, 230, 210), peso=600)
@@ -316,7 +316,7 @@ class RecordsPantalla(Escena):
             if ok:
                 pygame.draw.circle(pant, (255, 205, 50), (x + 18, y + 22), 17, 3)
             if ok:
-                img = escalar(sprites.estrella(), 2)
+                img = escalar(borde(sprites.estrella()), 2)
                 pant.blit(img, img.get_rect(center=(x + 18, y + 22)))
             texto(pant, nombre, (x + 44, y + 2), 18, (255, 255, 255) if ok else (170, 164, 200))
             parrafo(pant, desc, (x + 44, y + 26), 13, 200, (220, 214, 240) if ok else (140, 134, 170))

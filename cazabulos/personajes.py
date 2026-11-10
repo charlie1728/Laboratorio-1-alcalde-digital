@@ -322,7 +322,14 @@ def cuadros(clave, piel=None, pelo=None):
     return res
 
 
+_retratos = {}
+
+
 def retrato(clave, piel=None, pelo=None):
-    """La cabeza de frente (para el HUD y las tarjetas)."""
-    img = cuadros(clave, piel, pelo)["abajo"][0]
-    return img.subsurface((0, 0, 16, 14)).copy()
+    """La cabeza de frente (para el HUD y las tarjetas). Siempre la misma imagen para el mismo personaje:
+    así la caché de imágenes escaladas no crece en cada cuadro."""
+    llave = (clave, piel, pelo)
+    if llave not in _retratos:
+        img = cuadros(clave, piel, pelo)["abajo"][0]
+        _retratos[llave] = img.subsurface((0, 0, 16, 14)).copy()
+    return _retratos[llave]

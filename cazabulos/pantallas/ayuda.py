@@ -8,7 +8,7 @@ from ..estructuras.arbol_decision import arbol_publicacion
 from ..hud import INDICADORES
 from ..mapa import NODOS
 from ..personajes import ORDEN, PERSONAJES
-from ..recursos import escalar
+from ..recursos import borde, escalar
 from ..ui import panel, parrafo, tecla, texto
 from .base import Escena, FondoCiudad, es_volver, instrucciones, pie
 from .final import anillos_bfs, dibujar_arbol
@@ -75,10 +75,10 @@ class Ayuda(Escena):
         parrafo(pant, "Ciudad Nova va a elegir alcalde y por la red social Civitas corren los BULOS: rumores falsos que se "
                       "suben a la cabeza de los vecinos y los vuelven morados. Atrápalos y cura a los morados antes de que se "
                       "los pasen a sus amigos.", (c.x + 40, c.y + 84), 22, 700, (240, 240, 250))
-        items = [(escalar(sprites.bulo(0, False, False, (1, 0)), 3), "Bulo", "Una publicación falsa. Atrápala antes de que llegue a un vecino."),
-                 (escalar(sprites.morado(sprites.vecino(1, 0, "abajo", 0)), 3), "Vecino morado", "Se creyó un Bulo. Lánzale tu herramienta para curarlo."),
-                 (escalar(sprites.bulo(0, True, False, (1, 0)), 3), "Bulo con corona", "Es la raíz de una cadena: si lo atrapas caen todas sus copias."),
-                 (escalar(sprites.estrella(), 3), "Estrella", "Una noticia verdadera. Tócala: protege y cura al vecino y a sus amigos."),
+        items = [(escalar(borde(sprites.bulo(0, False, False, (1, 0))), 3), "Bulo", "Una publicación falsa. Atrápala antes de que llegue a un vecino."),
+                 (escalar(borde(sprites.morado(sprites.vecino(1, 0, "abajo", 0))), 3), "Vecino morado", "Se creyó un Bulo. Lánzale tu herramienta para curarlo."),
+                 (escalar(borde(sprites.bulo(0, True, False, (1, 0))), 3), "Bulo con corona", "Es la raíz de una cadena: si lo atrapas caen todas sus copias."),
+                 (escalar(borde(sprites.estrella()), 3), "Estrella", "Una noticia verdadera. Tócala: protege y cura al vecino y a sus amigos."),
                  (pygame.transform.scale(sprites.antena(), (24, 60)), "Antena del Bot", "Suelta Bulos sin parar. Golpéala varias veces para apagarla.")]
         for k, (img, nombre, desc) in enumerate(items):
             y = c.y + 210 + k * 70
@@ -134,7 +134,7 @@ class Ayuda(Escena):
         r = panel(pant, (c.x + 620, c.y + 170, c.w - 660, 190), (40, 30, 84), 235, borde=(255, 205, 50))
         texto(pant, "Estrellas de reputación", (r.x + 20, r.y + 12), 22, (255, 230, 150))
         filas = [(3, f"{tres} o más vecinos a salvo"), (2, f"{dos} o más vecinos a salvo"), (1, f"menos de {dos}")]
-        llena, vacia = escalar(sprites.estrella(), 2), escalar(sprites.desaturar(sprites.estrella()), 2)
+        llena, vacia = escalar(borde(sprites.estrella()), 2), escalar(borde(sprites.desaturar(sprites.estrella())), 2)
         for k, (n, txt) in enumerate(filas):
             y = r.y + 54 + k * 42
             for e in range(3):
@@ -211,7 +211,7 @@ class Ayuda(Escena):
             if p:
                 pygame.draw.line(pant, (176, 110, 255), pos[p], pos[n], 4)
         for n, p, nv, x in arbol:
-            img = escalar(sprites.bulo(int(self.t * 3) % 2, n == "A", False, (0, 1)), 4)
+            img = escalar(borde(sprites.bulo(int(self.t * 3) % 2, n == "A", False, (0, 1))), 4)
             if not (cae and n in ("B", "D", "E")):
                 pant.blit(img, img.get_rect(center=pos[n]))
             else:
@@ -234,7 +234,7 @@ class Ayuda(Escena):
         mitad = c.w // 2
         # mismo computador: los turnos pasan de uno a otro
         texto(pant, "Mismo computador (2 a 4)", (c.x + mitad // 2, c.y + 90), 24, (255, 230, 150), "midtop")
-        caras = [escalar(personajes.retrato(k), 4) for k in ORDEN]
+        caras = [escalar(borde(personajes.retrato(k)), 4) for k in ORDEN]
         x0 = c.x + mitad // 2 - (4 * 70 + 3 * 34) // 2
         activo = int(self.t * 1.2) % 4
         for k, img in enumerate(caras):
@@ -267,7 +267,7 @@ class Ayuda(Escena):
         for k, r in enumerate(clientes):
             pygame.draw.rect(pant, (46, 38, 90), r, border_radius=12)
             pygame.draw.rect(pant, (200, 196, 230), r, 2, border_radius=12)
-            img = escalar(personajes.retrato(ORDEN[k]), 3)
+            img = escalar(borde(personajes.retrato(ORDEN[k])), 3)
             pant.blit(img, img.get_rect(center=r.center))
         parrafo(pant, "Uno crea la sala y los demás escriben la dirección que aparece. Todos juegan a la vez, ven a los rivales "
                       "como fantasmas y el marcador en vivo.", (sx, c.y + 360), 19, mitad - 80, (240, 240, 250),

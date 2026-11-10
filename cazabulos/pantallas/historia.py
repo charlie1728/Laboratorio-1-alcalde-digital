@@ -7,7 +7,7 @@ from .. import personajes, sprites
 from ..config import ALTO, ANCHO
 from ..partida import CANDIDATOS
 from ..personajes import ORDEN, PERSONAJES
-from ..recursos import escalar
+from ..recursos import borde, escalar
 from ..ui import panel, texto
 from .base import Escena, FondoCiudad, con_mando, es_aceptar
 
@@ -94,14 +94,14 @@ class Historia(Escena):
             a = self.t * 0.8 + i * math.tau / 7
             x = cx + math.cos(a) * (260 + 30 * math.sin(self.t * 2 + i))
             y = cy - 40 + math.sin(a) * 120
-            b = escalar(sprites.bulo(int(self.t * 4 + i) % 2, i == 0, False, (1 if math.cos(a) < 0 else -1, 0)), 4)
+            b = escalar(borde(sprites.bulo(int(self.t * 4 + i) % 2, i == 0, False, (1 if math.cos(a) < 0 else -1, 0))), 4)
             pant.blit(b, b.get_rect(center=(x, y)))
         for i, (tipo, var) in enumerate(((1, 0), (4, 1), (2, 2), (0, 1))):
             x = 180 + i * 300 if i < 2 else 180 + i * 300
             v = sprites.morado(sprites.vecino(tipo, var, "abajo", 0))
-            img = escalar(v, 5)
+            img = escalar(borde(v), 5)
             pant.blit(img, img.get_rect(midbottom=(x, 640)))
-            b = escalar(sprites.bulo(int(self.t * 3 + i) % 2), 3)
+            b = escalar(borde(sprites.bulo(int(self.t * 3 + i) % 2)), 3)
             pant.blit(b, b.get_rect(midbottom=(x, 640 - 80 + math.sin(self.t * 4 + i) * 3)))
 
     def _e2(self, pant):

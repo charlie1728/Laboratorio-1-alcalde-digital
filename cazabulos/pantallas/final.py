@@ -8,7 +8,7 @@ from .. import personajes, sprites
 from ..config import ALTO, ANCHO, TINTA
 from ..partida import CANDIDATOS, MOMENTOS, calcular_eleccion
 from ..personajes import PERSONAJES
-from ..recursos import escalar
+from ..recursos import borde, escalar
 from ..ui import barra, panel, parrafo, texto
 from .base import Escena, FondoCiudad, con_mando, es_aceptar, titulo_pantalla
 
@@ -240,7 +240,7 @@ class ResultadoTurno(Escena):
                 self.app.son.tocar("recoger")
             on = aparece and k < res["reputacion"]
             esc = 6 if on else 5
-            img_s = escalar(sprites.estrella() if on else sprites.desaturar(sprites.estrella()), esc)
+            img_s = escalar(borde(sprites.estrella() if on else sprites.desaturar(sprites.estrella())), esc)
             pant.blit(img_s, img_s.get_rect(center=(140 + k * 75, 150 + (0 if k == 1 else 16))))
         parrafo(pant, mensaje(res), (215, 520), 19, 360, (255, 255, 255), ancla="midtop")
         # números
@@ -326,7 +326,7 @@ class TablaRonda(Escena):
             y = 150 + k * 120
             r = panel(pant, (120, y, ANCHO - 240, 100), borde=p["color"] if k == 0 else None)
             texto(pant, f"{k + 1}°", (r.x + 24, r.centery), 40, (255, 205, 50) if k == 0 else (255, 255, 255), "midleft")
-            img = escalar(personajes.retrato(j["clave"], j["piel"], j["pelo"]), 5)
+            img = escalar(borde(personajes.retrato(j["clave"], j["piel"], j["pelo"])), 5)
             pant.blit(img, img.get_rect(midleft=(r.x + 90, r.centery)))
             texto(pant, j["nombre"], (r.x + 190, r.y + 16), 30, p["color"])
             texto(pant, f"{pa.salvados(i)} vecinos salvados en total", (r.x + 190, r.y + 56), 18, (220, 214, 240), peso=600)
@@ -339,11 +339,11 @@ class TablaRonda(Escena):
 
 def _figura_candidato(c):
     if c == "Emilio":
-        return escalar(sprites.bulo(0, True, False, (0, 1)), 6)
+        return escalar(borde(sprites.bulo(0, True, False, (0, 1))), 6)
     if c == "Dani":
-        return escalar(personajes.cuadros("dani")["abajo"][0], 4)
+        return escalar(borde(personajes.cuadros("dani")["abajo"][0]), 4)
     tipo = {"Lucia": 1, "Marcos": 3, "Elena": 0}[c]
-    return escalar(sprites.vecino(tipo, {"Lucia": 1, "Marcos": 2, "Elena": 2}[c], "abajo", 0), 6)
+    return escalar(borde(sprites.vecino(tipo, {"Lucia": 1, "Marcos": 2, "Elena": 2}[c], "abajo", 0)), 6)
 
 
 class Eleccion(Escena):
@@ -476,7 +476,7 @@ class Podio(Escena):
             pant.blit(img, img.get_rect(midbottom=(x, base.y + 4 - salto)))
             texto(pant, j["nombre"], (x, base.y - 24 * esc - 14 - salto), 26, p["color"], "midbottom")
             if puesto == 0:
-                corona = escalar(sprites.estrella(brillo=1), 4)
+                corona = escalar(borde(sprites.estrella(brillo=1)), 4)
                 pant.blit(corona, corona.get_rect(midbottom=(x, base.y - 24 * esc - 44 - salto)))
         nombre, lema, color = CANDIDATOS[self.ganador]
         texto(pant, f"Alcalde de Ciudad Nova: {nombre}", (ANCHO // 2, 100), 26, color, "midtop")

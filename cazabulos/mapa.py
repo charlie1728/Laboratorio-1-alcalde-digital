@@ -9,7 +9,7 @@ import random
 import pygame
 
 from .config import TILE
-from .recursos import C, U
+from .recursos import CONTORNO, C, U
 
 W, H = 64, 46
 
@@ -46,6 +46,44 @@ ANTENAS = [(12, 10), (36, 11), (61, 8), (37, 31), (3, 35), (61, 31), (8, 27), (2
 TECHO = {"rojo": 0, "gris": 8, "claro": 16, "beige": 24}
 FACHADA = {"rojo": (148, 185, 407), "gris": (152, 189, 411), "beige": (156, 193, 415), "vitrina": (160, 197, 419)}
 
+# Los árboles y arbustos verde oscuro de Kenney usan justo el verde del pasto: encima del pasto se veían
+# huecos (solo el borde). Se pintan de verde pino para que se distingan.
+PINO = {(64, 156, 98): (36, 122, 98), (48, 126, 77): (26, 94, 76), (75, 168, 109): (62, 154, 124),
+        (61, 144, 91): (32, 112, 90)}
+VERDE_PASTO = (403, 406, 440, 443, 514, 517)
+_tiles_pino = {}
+_arboles = {}
+
+
+def repintar(img, cambios):
+    img = img.copy()
+    for y in range(img.get_height()):
+        for x in range(img.get_width()):
+            c = img.get_at((x, y))
+            nuevo = cambios.get(tuple(c[:3]))
+            if nuevo and c[3]:
+                img.set_at((x, y), (*nuevo, c[3]))
+    return img
+
+
+def tile_cosa(i):
+    """Tile de un objeto del barrio (árbol, arbusto...), en verde pino si era del color del pasto."""
+    if i not in VERDE_PASTO:
+        return C(i)
+    if i not in _tiles_pino:
+        _tiles_pino[i] = repintar(C(i), PINO)
+    return _tiles_pino[i]
+
+
+def imagen_arbol(tipo):
+    """Árbol de 2 tiles. Todos los árboles del mismo tipo comparten la imagen."""
+    if tipo not in _arboles:
+        img = pygame.Surface((TILE, TILE * 2), pygame.SRCALPHA)
+        img.blit(tile_cosa(401 + tipo), (0, 0))
+        img.blit(tile_cosa(438 + tipo), (0, TILE))
+        _arboles[tipo] = img
+    return _arboles[tipo]
+
 
 class Mapa:
     def __init__(self):
@@ -61,7 +99,11 @@ class Mapa:
         self.semaforos = []
         self.luces = []                                    # puntos que brillan de noche
         self.lineas = []                                   # líneas blancas pintadas (x0, y0, x1, y1) en px
+        self.ventanas_luz = []                             # ventanas que se encienden de noche (px)
         self._construir()
+        # para las animaciones del barrio (en pixeles nativos)
+        self.agua = [pygame.Rect(7 * TILE, 32 * TILE, 8 * TILE, 5 * TILE)]      # la laguna, sin el borde
+        self.fuente = (28 * TILE, 11 * TILE + 8)                                 # punta de la estatua (chorro)
         self.superficie = self._dibujar_suelo()
 
     # ------------------------------------------------------------- utilidades de construcción
@@ -84,10 +126,7 @@ class Mapa:
 
     def arbol(self, x, y, tipo=0):
         """Árbol de 2 tiles; (x, y) es el tile del tronco."""
-        img = pygame.Surface((TILE, TILE * 2), pygame.SRCALPHA)
-        img.blit(C(401 + tipo), (0, 0))
-        img.blit(C(438 + tipo), (0, TILE))
-        self.props.append((img, x * TILE, (y + 1) * TILE))
+        self.props.append((imagen_arbol(tipo % 6), x * TILE, (y + 1) * TILE, "arbol"))
         self.rects.append(pygame.Rect(x * TILE + 4, y * TILE + 9, 8, 6))
 
     def poste(self, x, y):
@@ -95,7 +134,7 @@ class Mapa:
         img = pygame.Surface((TILE, TILE * 3), pygame.SRCALPHA)
         for k, i in enumerate((597, 634, 671)):
             img.blit(C(i), (0, k * TILE))
-        self.props.append((img, x * TILE, (y + 1) * TILE))
+        self.props.append((img, x * TILE, (y + 1) * TILE, "poste"))
         self.rects.append(pygame.Rect(x * TILE + 6, y * TILE + 11, 4, 3))
         self.luces.append((x * TILE + 8, y * TILE + 2))
 
@@ -108,7 +147,7 @@ class Mapa:
         for dy, fila in enumerate(((447, 448), (474, 475))):
             for dx, i in enumerate(fila):
                 img.blit(U(i), (dx * TILE, dy * TILE))
-        self.props.append((img, x * TILE, (y + 2) * TILE))
+        self.props.append((img, x * TILE, (y + 2) * TILE, "bus"))
         self.rects.append(pygame.Rect(x * TILE + 3, y * TILE + 4, 2 * TILE - 6, 2 * TILE - 6))
 
     def objeto(self, x, y, tile, solido=True, alto=1):
@@ -118,7 +157,7 @@ class Mapa:
             img = pygame.Surface((TILE, TILE * alto), pygame.SRCALPHA)
             for k in range(alto):
                 img.blit(C(tile + 37 * k), (0, k * TILE))
-            self.props.append((img, x * TILE, (y + 1) * TILE))
+            self.props.append((img, x * TILE, (y + 1) * TILE, "objeto"))
         if solido:
             self.rects.append(pygame.Rect(x * TILE + 2, y * TILE + 6, TILE - 4, TILE - 7))
 
@@ -262,7 +301,7 @@ class Mapa:
         if c in ("r", "e"):
             return 714
         if c == "w":
-            return None
+            return 888
         return 888
 
     def _dibujar_suelo(self):
@@ -270,11 +309,11 @@ class Mapa:
         s = pygame.Surface((W * TILE, H * TILE), pygame.SRCALPHA)
         for y in range(H):
             for x in range(W):
-                t = self._tile_suelo(x, y, rng)
-                if t is not None:
-                    s.blit(C(t), (x * TILE, y * TILE))
-        # laguna con borde de piedra (9 partes)
+                s.blit(C(self._tile_suelo(x, y, rng)), (x * TILE, y * TILE))
+        self._pasto(s, rng)
+        # laguna con borde de piedra (9 partes) y un borde oscuro alrededor
         self._nueve(s, 6, 31, 15, 37, ((174, 175, 176), (211, 212, 213), (248, 249, 250)))
+        pygame.draw.rect(s, CONTORNO, pygame.Rect(6 * TILE - 1, 31 * TILE - 1, 10 * TILE + 2, 7 * TILE - 1), 1)
         # marcas de la calle (pintadas en pixel)
         blanco, amarillo = (236, 236, 236), (255, 204, 60)
         for x in range(0, W * TILE, 12):
@@ -310,15 +349,60 @@ class Mapa:
                             s.fill((180, 184, 196), (px, py, 2, TILE))
                         else:
                             s.fill((180, 184, 196), (px + TILE - 2, py, 2, TILE))
-        # edificios
+        # sombras en el piso: edificios (hacia abajo a la derecha) y lo que sobresale (árboles, postes, buses)
+        sombras = pygame.Surface((W * TILE, H * TILE), pygame.SRCALPHA)
+        for x, y, w, h, *_ in self.edificios:
+            sombras.fill((0, 0, 0, 70), ((x + w) * TILE, y * TILE + 4, 4, h * TILE))
+            sombras.fill((0, 0, 0, 55), (x * TILE + 4, (y + h) * TILE, w * TILE, 3))
+        for img, px, yb, tipo in self.props:
+            ancho = {"arbol": 12, "poste": 8, "bus": 30, "objeto": 12}[tipo]
+            alto = 6 if tipo == "bus" else 4
+            pygame.draw.ellipse(sombras, (0, 0, 0, 75), (px + (img.get_width() - ancho) // 2 + 2, yb - alto + 1,
+                                                         ancho, alto))
+        s.blit(sombras, (0, 0))
+        # edificios y objetos planos (bancas, canecas, materas, puestos, la fuente) en capas aparte para
+        # ponerles a todos un borde oscuro y una sombrita
+        edif = pygame.Surface((W * TILE, H * TILE), pygame.SRCALPHA)
         for x, y, w, h, color, fachada, puerta, ventanas in self.edificios:
-            self._edificio(s, x, y, w, h, color, fachada, puerta, ventanas)
-        # objetos planos
+            self._edificio(edif, x, y, w, h, color, fachada, puerta, ventanas)
+        self._con_borde(s, edif, sombra=False)
+        planos = pygame.Surface((W * TILE, H * TILE), pygame.SRCALPHA)
         for y in range(H):
             for x in range(W):
                 if self.capa[y][x] is not None:
-                    s.blit(C(self.capa[y][x]), (x * TILE, y * TILE))
+                    planos.blit(tile_cosa(self.capa[y][x]), (x * TILE, y * TILE))
+        self._con_borde(s, planos, sombra=True)
         return s
+
+    @staticmethod
+    def _con_borde(destino, capa, sombra):
+        """Pega una capa con un borde oscuro de 1 pixel alrededor de cada forma (y, si se pide, una
+        sombrita corrida hacia abajo)."""
+        mascara = pygame.mask.from_surface(capa, 40)
+        if sombra:
+            destino.blit(mascara.to_surface(setcolor=(0, 0, 0, 70), unsetcolor=(0, 0, 0, 0)), (1, 2))
+        sil = mascara.to_surface(setcolor=(*CONTORNO, 255), unsetcolor=(0, 0, 0, 0))
+        for dx, dy in ((-1, 0), (1, 0), (0, -1), (0, 1)):
+            destino.blit(sil, (dx, dy))
+        destino.blit(capa, (0, 0))
+
+    def _pasto(self, s, rng):
+        """Textura del pasto (hojitas más claras y más oscuras) y un borde donde el pasto se encuentra
+        con un andén, la plaza, la arena o un camino: así cada zona se ve recortada."""
+        oscuro, claro, borde = (52, 134, 84), (92, 182, 116), (40, 108, 66)
+        for y in range(H):
+            for x in range(W):
+                if self.suelo[y][x] != "g":
+                    continue
+                px, py = x * TILE, y * TILE
+                for _ in range(3):
+                    hx, hy = rng.randrange(1, TILE - 1), rng.randrange(1, TILE - 2)
+                    s.fill(oscuro if rng.random() < 0.6 else claro, (px + hx, py + hy, 1, 2))
+                for dx, dy, r in ((0, -1, (px, py, TILE, 1)), (0, 1, (px, py + TILE - 1, TILE, 1)),
+                                  (-1, 0, (px, py, 1, TILE)), (1, 0, (px + TILE - 1, py, 1, TILE))):
+                    nx, ny = x + dx, y + dy
+                    if 0 <= nx < W and 0 <= ny < H and self.suelo[ny][nx] in ("a", "p", "b", "s", "e"):
+                        s.fill(borde, r)
 
     def _nueve(self, s, x0, y0, x1, y1, ids):
         for y in range(y0, y1 + 1):
@@ -329,10 +413,6 @@ class Mapa:
                     # centro del agua liso con ondas (el tile original repite unas piedras)
                     agua = C(ids[0][1]).get_at((8, 12))
                     s.fill(agua, (x * TILE, y * TILE, TILE, TILE))
-                    if (x * 7 + y * 3) % 4 == 0:
-                        claro = tuple(min(255, v + 40) for v in agua[:3])
-                        s.fill(claro, (x * TILE + 3, y * TILE + 5, 5, 1))
-                        s.fill(claro, (x * TILE + 9, y * TILE + 11, 4, 1))
                     continue
                 s.blit(C(ids[fy][fx]), (x * TILE, y * TILE))
 
@@ -353,6 +433,7 @@ class Mapa:
             s.blit(C(abajo + col), ((x + fx) * TILE, (yf + 2) * TILE))
             if ventanas and fachada != "vitrina" and 0 < fx < w - 1 and fx != puerta and fx % 2 == 1:
                 s.blit(C(617), ((x + fx) * TILE, (yf + 1) * TILE))
+                self.ventanas_luz.append(((x + fx) * TILE + 8, (yf + 1) * TILE + 8))
         if puerta is not None:
             s.blit(C(800), ((x + puerta) * TILE, (yf + 1) * TILE))
             s.blit(C(837), ((x + puerta) * TILE, (yf + 2) * TILE))

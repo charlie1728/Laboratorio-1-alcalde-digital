@@ -38,7 +38,7 @@ El aprendizaje sale de las mecánicas, no de preguntas:
 | Interfaz gráfica | Todo en pygame: ciudad, personaje, publicaciones (Bulos y estrellas), opciones, estado, puntuación, indicadores y resultados. |
 | Inclusividad | Ver la sección 5. |
 | Sistema de ayuda | Pantalla AYUDA de 8 páginas: objetivo, cómo se juega, personajes, cómo ganar, indicadores, grafos, árboles y multijugador. Durante la partida orientan: la cuenta regresiva con tres dibujos, flechas con dibujos hacia lo que no se ve, la línea de Dijkstra hacia lo más urgente y una pista corta la primera vez que alguien se vuelve morado. |
-| Elementos motivadores | Música y efectos, animaciones, partículas, temblor de cámara, confeti, podio, logros, récords, combos, estrellas de reputación y mensajes. |
+| Elementos motivadores | Música y efectos, animaciones, partículas, temblor de cámara, confeti, podio, logros, récords, combos, estrellas de reputación y mensajes. Un barrio vivo: árboles que se mecen, fuente, laguna con patos, palomas que salen volando, mariposas, banderas, nubes y una noche con ventanas, faroles y luciérnagas. |
 
 ## 3. Las estructuras de datos
 
@@ -152,6 +152,11 @@ La primera versión jugable tenía demasiadas cosas a la vez: noticias que habí
 - **Más tiempo:** turnos de 2 minutos (90 segundos en "¡Jugar ya!").
 - **Abre en una ventana grande que llena la pantalla, con su propio ícono** y sin consola; F11 la pasa a pantalla completa.
 - **Los paneles no tapan el juego:** en las orillas del mapa la cámara se corre un poco más allá del borde, y si un vecino morado, una estrella, la antena o el viral queda debajo de un panel, el panel se vuelve casi transparente.
+- **El personaje camina más rápido** (92 pixeles por segundo en vez de 78): a veces los Bulos salían lejos y no se alcanzaba a llegar. Caro sigue siendo la más rápida.
+- **Gráficos más claros y un barrio vivo:**
+  - Todo tiene un borde oscuro de un pixel: personajes, vecinos, carros, árboles, edificios y objetos. Así se distinguen del fondo de un vistazo.
+  - Los árboles y arbustos que tenían justo el verde del pasto se veían huecos: se pintaron de verde pino.
+  - El barrio se mueve solo (agua, fuente, palomas, patos, mariposas, banderas, nubes, noche con luces). Nada de eso cambia el juego: usa su propio azar y una prueba comprueba que, con la misma semilla, el turno sale igual dibujando o sin dibujar.
 
 ## 7. Respuestas para la sustentación
 
@@ -179,7 +184,7 @@ La primera versión jugable tenía demasiadas cosas a la vez: noticias que habí
 
 ## 8. Pruebas
 
-`python -m unittest discover -s cazabulos/pruebas -t .` corre 61 pruebas.
+`python -m unittest discover -s cazabulos/pruebas -t .` corre 68 pruebas.
 
 - **Estructuras:** BFS por niveles y con filtro, componentes, Dijkstra, subárboles, recorridos, AVL y el árbol de decisiones (sus caminos, las cuatro acciones del enunciado y eliminar ramas).
 - **Juego:**
@@ -191,6 +196,7 @@ La primera versión jugable tenía demasiadas cosas a la vez: noticias que habí
   - El periódico de Ana atraviesa, las peleas se calman lanzando, peleas que rompen hilos y viral por BFS.
   - Estrellas de reputación y mensaje final que va con ellas. Jugando solo se pasa directo a la elección.
 - **Mapa:** colisiones con edificios, grafo de la ciudad caminable y carros siempre en su carril sin chocar.
+- **Gráficos:** todo con borde, árboles y arbustos que se distinguen del pasto, palomas que salen volando y se posan en un lugar libre, fuente y laguna que se mueven, luciérnagas solo de noche, dibujar no cambia el turno y las imágenes no se acumulan en memoria cuadro tras cuadro.
 - **Partida y red:** turnos y rondas, elección y servidor con dos clientes.
 - **Control USB y feria:**
   - Botones que cambian según la pantalla y palanca con margen para que no tiemble.
