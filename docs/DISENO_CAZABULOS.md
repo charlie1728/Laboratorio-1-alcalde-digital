@@ -8,7 +8,7 @@ Los **Bulos** (rumores morados) se suben a la cabeza de los vecinos y los vuelve
 
 ## Estado
 
-El juego está completo y jugable (ver README y `docs/ENTREGA_FINAL.md`): mundo, render, HUD, todas las pantallas, ayuda, opciones, récords, elección, podio, modo en línea, control USB y modo feria, con 68 pruebas.
+El juego está completo y jugable (ver README y `docs/ENTREGA_FINAL.md`): mundo, render, HUD, todas las pantallas, ayuda, opciones, récords, elección, podio, modo en línea, control USB y modo feria, con 73 pruebas.
 
 ## Lo que pidió el usuario al probarlo
 
@@ -36,6 +36,28 @@ El juego está completo y jugable (ver README y `docs/ENTREGA_FINAL.md`): mundo,
 10. "Que todo tenga bordes": `recursos.borde()` le pone un borde oscuro de 1 pixel a cada imagen (se calcula una vez y se guarda). En el mapa, los edificios y los objetos planos llevan borde y sombra; el pasto tiene textura y un borde donde se encuentra con andenes y caminos.
 11. "Que el mapa tenga animaciones": `cazabulos/ambiente.py` (la vida del barrio, con su propio azar para no cambiar el juego): agua con brillos y ondas, fuente que salpica, pata y patitos, nenúfares, palomas que huyen del jugador, mariposas, hojas, flores que se mecen, banderas, sombras de nubes, polvo al correr, estela de los Bulos, destellos de las estrellas y humo de los carros. En `render.py` los árboles se mecen (la punta más que el medio), los semáforos brillan y de noche se prenden las ventanas, los faroles y los faros; luciérnagas en el parque. Una viñeta suave oscurece las orillas de la pantalla.
 12. Árboles y arbustos verde oscuro de Kenney (tiles 403/406/440/443/514/517) tenían el mismo verde del pasto: se repintan de verde pino (`mapa.tile_cosa`).
+
+**Cuarta ronda (aspecto profesional):**
+
+13. `cazabulos/texturas.py` (numpy, una sola vez al cargar el mapa, menos de 1 segundo):
+    - pasto con paleta de 5 verdes, tramado y matitas;
+    - bordes del pasto redondeados con desenfoque + ruido + umbral (solo hacia caminos y arena; hacia andenes y plaza va un bordillo);
+    - texturas de caminos, losas, asfalto y arena;
+    - laguna con forma orgánica, piedras, profundidad y espuma;
+    - sombras suaves y oclusión de edificios y objetos;
+    - relieve de los edificios.
+    Sin numpy el mapa se dibuja como antes.
+14. `cazabulos/hierba.py`: hierba alta por tiles (mancha de ruido), cuadros de viento, abierta cuando alguien está adentro, hojitas al entrar y la parte de adelante encima de los pies.
+15. `render.py`:
+    - sombras de los árboles en vivo (se mueven con la copa);
+    - sombras suaves de la gente (de noche, alargadas lejos del farol más cercano);
+    - bloom (achicar, umbral, difuminar y sumar; unos 3 ms) que se apaga solo si más de la mitad de los cuadros pasan de 12 ms durante un rato.
+16. El usuario aprobó el aspecto del día ("esto sí me encanta") y pidió bajar las luces de noche: los faroles ahora aclaran la noche sin borrarla (`sprites.luz(radio, fuerza)`).
+17. "El poder de Beto se ve igual al de Ana": `Render._nuevo_poder` y `Render._poderes` dibujan cada uno distinto.
+    - Ana: onda de escarcha con picos y copos en los Bulos congelados.
+    - Beto: arcos de transmisión y corazones que vuelan a cada vecino con escudo, y una burbuja dorada al llegar.
+    - Caro: red con círculos, radios y nudos que se abre y se cierra.
+    - Dani: anillos entrecortados de megáfono y estelas en los Bulos aturdidos.
 
 ## Mapa (en tiles)
 

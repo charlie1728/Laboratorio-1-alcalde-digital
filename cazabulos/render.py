@@ -2,11 +2,12 @@
 hilos del grafo social, efectos, noche y flechas hacia lo importante."""
 import math
 import random
+import time
 
 import pygame
 
 from . import personajes, sprites
-from .ambiente import Ambiente, bolita, resplandor
+from .ambiente import Ambiente, bolita, resplandor, sombra_larga, sombra_suave
 from .ciudad import ruta
 from .config import ALTO, ANCHO, ESC, TILE
 from .recursos import CONTORNO, borde, escalar
@@ -92,6 +93,39 @@ def ventana_encendida():
     return _ventana_luz[0]
 
 
+def bloom(pant, umbral, fuerza):
+    """Brillo suave alrededor de lo más claro (post-proceso): se achica la imagen, se queda solo con lo
+    que pasa del umbral, se difumina y se suma encima. Cuesta unos 3 ms."""
+    chico = pygame.transform.smoothscale(pant, (ANCHO // 4, ALTO // 4))
+    chico.fill((umbral, umbral, umbral), special_flags=pygame.BLEND_RGB_SUB)
+    ancho = pygame.transform.smoothscale(chico, (ANCHO // 16, ALTO // 16))
+    ancho = pygame.transform.smoothscale(ancho, (ANCHO // 4, ALTO // 4))
+    ancho.blit(chico, (0, 0), special_flags=pygame.BLEND_RGB_ADD)
+    if fuerza < 255:
+        ancho.fill((fuerza, fuerza, fuerza), special_flags=pygame.BLEND_RGB_MULT)
+    pant.blit(pygame.transform.smoothscale(ancho, (ANCHO, ALTO)), (0, 0), special_flags=pygame.BLEND_RGB_ADD)
+
+
+_copo = []
+
+
+def copo():
+    """Copito de nieve (el Bulo que congeló Ana)."""
+    if not _copo:
+        filas = ["...w...", ".w.w.w.", "..www..", "wwwcwww", "..www..", ".w.w.w.", "...w..."]
+        img = pygame.Surface((7, 7), pygame.SRCALPHA)
+        for y, fila in enumerate(filas):
+            for x, ch in enumerate(fila):
+                if ch != ".":
+                    img.set_at((x, y), (236, 250, 255) if ch == "w" else (150, 214, 255))
+        _copo.append(escalar(borde(img)))
+    return _copo[0]
+
+
+# cuánto dura el dibujo de cada poder (segundos)
+DURA_PODER = {"ana": 0.8, "beto": 1.3, "caro": 0.75, "dani": 0.9}
+
+
 class Render:
     def __init__(self, mundo, sonido=None, opciones=None):
         self.m = mundo
@@ -110,6 +144,11 @@ class Render:
         self.anillos = []
         self.subs = []
         self.avisos = []           # una o dos palabras grandes arriba ("¡VIRAL!", "¡PELEA!")
+        # cada poder se ve distinto: escarcha (Ana), transmisión y corazones (Beto), red (Caro), megáfono (Dani)
+        self.poderes = []          # {"clave", "x", "y", "t", "dur"}
+        self.viajes = []           # [x0, y0, vecino, t, dur]: corazón de Beto que vuela hasta un vecino
+        self.burbujas = []         # [vecino, t]: burbuja dorada que se infla al llegar el corazón
+        self.empujados = []        # [id del Bulo, t]: estela de los Bulos que empuja Dani
         self.brillos = {}
         self.temblor = 0.0
         self.capa = pygame.Surface((ANCHO, ALTO), pygame.SRCALPHA)
@@ -125,6 +164,9 @@ class Render:
         # de noche no todas las ventanas están prendidas (y de vez en cuando alguien apaga o prende la luz)
         self.ventanas = [self.rng.random() < 0.7 for _ in mundo.mapa.ventanas_luz]
         self.t_ventanas = 3.0
+        # el brillo (bloom) se apaga solo si el computador no alcanza a dibujar rápido
+        self.bloom = not self.op.get("demo")
+        self.lentos = 0.0                  # cuántos cuadros lentos seguidos (con memoria corta)
 
     # ------------------------------------------------------------- coordenadas
     def _limitar(self):
@@ -206,17 +248,33 @@ class Render:
                 if v:
                     self.rayos.append([fx[1], fx[2] - 6, v.x, v.y - 14, 0.0])
             elif tipo == "poder":
-                from .personajes import PERSONAJES
-                color = PERSONAJES[fx[1]]["color"]
-                radio = {"ana": 240, "beto": 230, "caro": 120, "dani": 110}[fx[1]]
-                self.anillos.append([fx[2], fx[3] - 8, 0.0, 0.7, color, radio])
-                self.anillos.append([fx[2], fx[3] - 8, -0.1, 0.7, (255, 255, 255), radio * 0.7])
-                if fx[1] == "ana":
-                    self.flash = 0.35
-                self.temblor = max(self.temblor, 4)
+                self._nuevo_poder(fx[1], fx[2], fx[3])
             elif tipo == "puff":
                 self._estallido(fx[1], fx[2], (230, 230, 240), 5, vel=20, grav=0)
         m.fx.clear()
+
+    def _nuevo_poder(self, clave, x, y):
+        """Arranca el dibujo del poder. Se mira a quién le hizo efecto (el mundo ya lo aplicó)."""
+        m = self.m
+        self.poderes.append({"clave": clave, "x": x, "y": y - 8, "t": 0.0, "dur": DURA_PODER[clave]})
+        if clave == "ana":                       # flash de cámara y los Bulos se vuelven hielo
+            self.flash = 0.25
+            for b in m.bulos.values():
+                if b.estado == "libre" and b.congelado > 5.5:
+                    retraso = math.dist((b.x, b.y), (x, y)) / 240 * 0.45      # cuando la escarcha llega
+                    self._estallido(b.x, b.y - 2, (190, 236, 255), 10, vel=60, grav=40, retraso=retraso)
+        elif clave == "beto":                    # un corazón vuela hasta cada vecino que protegió
+            for nombre, v in m.vecinos.items():
+                d = math.dist((v.x, v.y), (x, y))
+                if v.escudo > 9.5 and d < 230:
+                    self.viajes.append([x, y - 22, nombre, 0.0, 0.35 + d / 230 * 0.45])
+        elif clave == "caro":
+            self.temblor = max(self.temblor, 5)
+        elif clave == "dani":
+            self.temblor = max(self.temblor, 3)
+            for b in m.bulos.values():
+                if b.estado == "libre" and b.aturdido > 1.4:
+                    self.empujados.append([b.id, 0.0])
 
     def _estallido(self, x, y, color, n, vel=80, grav=120, retraso=0.0, tam=1):
         for _ in range(n):
@@ -238,7 +296,7 @@ class Render:
         self.cam[1] += (objetivo[1] - self.cam[1]) * k
         self._limitar()
         vista = pygame.Rect(self.cam[0] / ESC - 24, self.cam[1] / ESC - 24, ANCHO / ESC + 48, ALTO / ESC + 56)
-        self.amb.actualizar(dt, self.m, vista)
+        self.amb.actualizar(dt, self.m, vista, [(f["nombre"], f["x"], f["y"]) for f in self.fantasmas])
         self.t_ventanas -= dt
         if self.t_ventanas <= 0 and self.ventanas:
             self.t_ventanas = self.rng.uniform(2.0, 5.0)
@@ -268,6 +326,22 @@ class Render:
         for o in self.olas:
             o[1] += dt
         self.olas = [o for o in self.olas if o[1] < 0.8]
+        for e in self.poderes:
+            e["t"] += dt
+        self.poderes = [e for e in self.poderes if e["t"] < e["dur"]]
+        for v in self.viajes:
+            v[3] += dt
+            if v[3] >= v[4]:                     # llegó: se infla la burbuja dorada
+                self.burbujas.append([v[2], 0.0])
+                w = self.m.vecinos.get(v[2])
+                if w:
+                    self._estallido(w.x, w.y - 10, (255, 226, 120), 8, vel=50, grav=30)
+        self.viajes = [v for v in self.viajes if v[3] < v[4]]
+        for lista in (self.burbujas, self.empujados):
+            for e in lista:
+                e[1] += dt
+        self.burbujas = [b for b in self.burbujas if b[1] < 0.8]
+        self.empujados = [e for e in self.empujados if e[1] < 0.5]
         for k_, v in list(self.brillos.items()):
             v["t"] += dt
             if v["t"] >= v["fin"]:
@@ -311,7 +385,16 @@ class Render:
 
     # ------------------------------------------------------------- dibujo
     def dibujar(self, pant):
-        self.m
+        t0 = time.perf_counter()
+        self._dibujar(pant)
+        lento = (time.perf_counter() - t0) * 1000 > 12
+        self.lentos = self.lentos * 0.98 + (1.0 if lento else 0.0)
+        # computador lento de verdad (más de la mitad de los cuadros, un buen rato): lo primero es que
+        # el juego se mueva fluido. Un tirón suelto (o los primeros cuadros) no cuenta.
+        if self.bloom and self.lentos > 30 and self.t > 3:
+            self.bloom = False
+
+    def _dibujar(self, pant):
         self.sx = int(self.rng.uniform(-self.temblor, self.temblor)) if self.temblor > 0.5 else 0
         self.sy = int(self.rng.uniform(-self.temblor, self.temblor)) if self.temblor > 0.5 else 0
         cx, cy = int(self.cam[0]), int(self.cam[1])
@@ -325,6 +408,7 @@ class Render:
             pygame.draw.rect(pant, (14, 16, 26), borde.inflate(12, 12), 6, border_radius=6)
             pant.blit(self.suelo, borde.topleft)
         self.amb.dibujar_suelo(pant, self)
+        self._sombras_arboles(pant)
         self.capa.fill((0, 0, 0, 0))
         self._guia(self.capa)
         self._hilos(self.capa)
@@ -334,9 +418,13 @@ class Render:
         self._pulsos(pant)
         self._proyectiles(pant)
         self._efectos(pant)
+        self._poderes(pant)
         self.amb.dibujar_aire(pant, self)
         self._luz_del_dia(pant)
         self._noche(pant)
+        if self.bloom:
+            ronda = self.m.ronda
+            bloom(pant, 214 if ronda >= 3 else 200 if ronda == 2 else 206, 140 if ronda >= 3 else 150)
         if not self.op.get("demo"):          # el menú ya tiene su propio velo
             for img, pos in vineta():
                 pant.blit(img, pos)
@@ -345,7 +433,7 @@ class Render:
             self._flechas(pant)
         if getattr(self, "flash", 0) > 0:
             s = pygame.Surface((ANCHO, ALTO), pygame.SRCALPHA)
-            s.fill((255, 255, 255, int(200 * self.flash / 0.35)))
+            s.fill((255, 255, 255, int(160 * min(1.0, self.flash / 0.25))))
             pant.blit(s, (0, 0))
 
     def _px(self, surf, x, y, color, tam=1):
@@ -500,8 +588,39 @@ class Render:
             pant.blit(sil, (sx + dx, sy + dy))
 
     def _sombra(self, pant, x, y, ancho=10):
-        sx, sy = self.a_pantalla(x - ancho / 2, y - 2)
-        pant.blit(escalar(sprites.sombra(ancho)), (sx, sy))
+        """Sombra suave en los pies. De día cae un poco hacia la derecha (el sol viene de arriba a la
+        izquierda); de noche, cerca de un farol, se alarga hacia el lado contrario a la luz."""
+        sx, sy = self.a_pantalla(x, y)
+        if self.m.ronda >= 3:
+            cerca, dist = None, 80.0
+            for lx, ly in self.m.mapa.luces:
+                d = math.hypot(x - lx, y - ly)
+                if d < dist:
+                    cerca, dist = (lx, ly), d
+            if cerca is not None and dist > 3:
+                ang = round(math.degrees(math.atan2(-(y - cerca[1]), x - cerca[0])) / 22.5) * 22.5
+                largo = int(ancho * ESC * (1.2 + 1.6 * (1 - dist / 80)))
+                img, (dx, dy) = sombra_larga(largo, int(ancho * ESC * 0.5), ang, 95)
+                pant.blit(img, (int(sx + dx) - img.get_width() // 2, int(sy + dy) - img.get_height() // 2))
+                return
+        img = sombra_suave(int(ancho * ESC * 1.25), int(ancho * ESC * 0.45), 95)
+        pant.blit(img, (int(sx) + ESC - img.get_width() // 2, int(sy) - img.get_height() // 2))
+
+    def _viento(self, x):
+        return math.sin(self.t * 1.5 + x * 0.045) * 0.75 + math.sin(self.t * 3.3 + x * 0.13) * 0.25
+
+    def _sombras_arboles(self, pant):
+        """La sombra de la copa de cada árbol, suave y corrida hacia abajo a la derecha; se mueve un poco
+        con el viento, como la copa."""
+        if self.m.ronda >= 3:
+            return                             # de noche no hay sol
+        som = sombra_suave(20 * ESC, 9 * ESC, 80)
+        for img, x, yb, tipo in self.m.mapa.props:
+            if tipo != "arbol" or not self.visible(x + 8, yb, 90):
+                continue
+            sx, sy = self.a_pantalla(x + 13, yb + 1)
+            sx += round(self._viento(x) * 4)
+            pant.blit(som, (int(sx) - som.get_width() // 2, int(sy) - som.get_height() // 2))
 
     def _d_prop(self, pant, img, x, yb, tipo):
         """Árboles, postes, el paradero y lo alto: todo con borde oscuro. Los árboles se mecen con el
@@ -511,7 +630,7 @@ class Render:
         if tipo != "arbol":
             pant.blit(escalar(borde(img)), (sx, sy))
             return
-        viento = math.sin(self.t * 1.5 + x * 0.045) * 0.75 + math.sin(self.t * 3.3 + x * 0.13) * 0.25
+        viento = self._viento(x)
         for parte, oy, fuerza in partes_arbol(img):
             pant.blit(parte, (sx + round(viento * fuerza * 3), sy + oy))
 
@@ -560,6 +679,7 @@ class Render:
             pygame.draw.circle(aura, (200, 140, 255, 150), (r, r), r, 3)
             pant.blit(aura, (sx - r, sy - r))
         pant.blit(escalar(con_borde), self.a_pantalla(x - 1, y - 1))
+        self.amb.hierba.encima(pant, self, v.x, v.y)
         if v.bulo is not None and v.bulo in self.m.bulos:
             b = self.m.bulos[v.bulo]
             corona = self.m.arbol.es_raiz(b.id) and self.m.arbol.tiene_hijos(b.id)
@@ -627,6 +747,13 @@ class Render:
         if self.op.get("contraste"):
             self._borde(pant, img, b.x - 8, b.y - 9 + bob)
         pant.blit(escalar(borde(img)), self.a_pantalla(b.x - 9, b.y - 10 + bob))
+        if b.congelado > 0 and (b.congelado > 1.5 or int(self.t * 8) % 2):
+            c = copo()                                  # congelado: lleva su copito (aparece creciendo)
+            crece = min(1.0, (6.0 - b.congelado) / 0.2) if b.congelado <= 6.0 else 1.0
+            if crece < 1:
+                c = pygame.transform.scale(c, (max(1, int(c.get_width() * (0.3 + 0.7 * crece))),) * 2)
+            sx, sy = self.a_pantalla(b.x, b.y - 13 + bob)
+            pant.blit(c, c.get_rect(center=(int(sx), int(sy))))
         if b.candidato:
             from .partida import CANDIDATOS as INFO
             color = INFO.get(b.candidato, ("", "", (255, 255, 255)))[2]
@@ -659,6 +786,7 @@ class Render:
         g = escalar(borde(img)).copy()
         g.set_alpha(110)
         pant.blit(g, self.a_pantalla(f["x"] - 9, f["y"] - 24))
+        self.amb.hierba.encima(pant, self, f["x"], f["y"])
         sx, sy = self.a_pantalla(f["x"], f["y"] - 26)
         texto(pant, f["nombre"], (sx, sy), 14, (220, 220, 255), "midbottom", 600, alfa=170)
 
@@ -667,7 +795,7 @@ class Render:
         color = PERSONAJES[j.clave]["color"]
         sx, sy = self.a_pantalla(j.x, j.y)
         r = 9 + math.sin(self.t * 6) * 1
-        pygame.draw.ellipse(pant, (0, 0, 0, 90), (sx - 6 * ESC, sy - 2 * ESC, 12 * ESC, 4 * ESC))
+        self._sombra(pant, j.x, j.y, 12)
         pygame.draw.ellipse(pant, color, (sx - r * ESC, sy - 3.3 * ESC, 2 * r * ESC, 6.6 * ESC), 4)
         cs = personajes.cuadros(j.clave, j.piel, j.pelo)
         cuadro = int(j.paso) % 4 if j.mov else 0
@@ -675,6 +803,7 @@ class Render:
         ox = j.vec[0] * 1.5 if j.lanzo > 0 else 0
         bob = -1 if (j.mov and cuadro in (1, 3)) else 0
         pant.blit(escalar(borde(img)), self.a_pantalla(j.x - 9 + ox, j.y - 24 + bob))
+        self.amb.hierba.encima(pant, self, j.x, j.y)
         if (self.m.t < 4 or self.op.get("contraste")) and not self.op.get("demo") and not self.cuenta:
             texto(pant, "TÚ", (sx, sy - 27 * ESC), 18, color, "midbottom")
 
@@ -747,6 +876,117 @@ class Render:
                 b = self.a_pantalla(x1, y1)
                 pygame.draw.line(pant, (220, 180, 255), a, b, 4)
 
+    def _poderes(self, pant):
+        """Cada poder con su propio dibujo (sin capas transparentes grandes: son líneas que se adelgazan)."""
+        for p in self.poderes:
+            t, dur = p["t"], p["dur"]
+            f = t / dur
+            cx, cy = self.a_pantalla(p["x"], p["y"])
+            cx, cy = int(cx), int(cy)
+            clave = p["clave"]
+            if clave == "ana":
+                # onda de escarcha con picos de hielo
+                r = int(240 * ESC * min(1.0, t / 0.45) ** 0.6)
+                ancho = max(1, int(10 * (1 - f)))
+                if r > ancho:
+                    pygame.draw.circle(pant, (170, 228, 255), (cx, cy), r, ancho)
+                    pygame.draw.circle(pant, (255, 255, 255), (cx, cy), max(1, r - ancho - 2), max(1, ancho // 3))
+                    largo = 16 * (1 - f) + 4
+                    for k in range(18):
+                        a = math.radians(k * 20 + t * 40)
+                        base1 = (cx + math.cos(a - 0.05) * r, cy + math.sin(a - 0.05) * r)
+                        base2 = (cx + math.cos(a + 0.05) * r, cy + math.sin(a + 0.05) * r)
+                        punta = (cx + math.cos(a) * (r + largo), cy + math.sin(a) * (r + largo))
+                        pygame.draw.polygon(pant, (214, 244, 255), (base1, punta, base2))
+            elif clave == "beto":
+                # ondas de transmisión en vivo saliendo de su cabeza
+                for k in range(4):
+                    tk = t - k * 0.18
+                    if not 0 < tk < 0.6:
+                        continue
+                    r = int(14 + tk / 0.6 * 120)
+                    ancho = max(2, int(8 * (1 - tk / 0.6)))
+                    caja = pygame.Rect(0, 0, 2 * r, 2 * r)
+                    caja.center = (cx, cy - 12 * ESC)
+                    pygame.draw.arc(pant, (255, 110, 176), caja, math.radians(30), math.radians(150), ancho)
+                    pygame.draw.arc(pant, (255, 220, 236), caja.inflate(-2 * ancho, -2 * ancho), math.radians(40),
+                                    math.radians(140), max(1, ancho // 3))
+                if int(t * 6) % 2 == 0:              # el puntito rojo de "en vivo"
+                    pygame.draw.circle(pant, (40, 20, 40), (cx + 9 * ESC, cy - 21 * ESC), 8)
+                    pygame.draw.circle(pant, (255, 60, 80), (cx + 9 * ESC, cy - 21 * ESC), 6)
+            elif clave == "caro":
+                # la red gigante: se abre y después se cierra hacia ella, arrastrando los Bulos
+                if t < 0.25:
+                    esc = 0.3 + 0.7 * (t / 0.25) ** 0.5
+                else:
+                    esc = 1 - 0.85 * ((t - 0.25) / (dur - 0.25)) ** 1.5
+                r = int(120 * ESC * esc)
+                if r > 6:
+                    verde, blanco = (110, 230, 140), (236, 255, 240)
+                    for k in range(12):
+                        a = math.radians(k * 30 + 15 * f)
+                        pygame.draw.line(pant, verde, (cx, cy), (cx + math.cos(a) * r, cy + math.sin(a) * r), 3)
+                    for frac in (0.36, 0.68):
+                        pygame.draw.circle(pant, verde, (cx, cy), int(r * frac), 2)
+                    pygame.draw.circle(pant, verde, (cx, cy), r, 5)
+                    pygame.draw.circle(pant, blanco, (cx, cy), r - 3, 1)
+                    for k in range(12):                  # nudos de la red
+                        a = math.radians(k * 30 + 15 * f)
+                        for frac in (0.36, 0.68, 1.0):
+                            pant.fill(blanco, (int(cx + math.cos(a) * r * frac) - 2, int(cy + math.sin(a) * r * frac) - 2, 5, 5))
+            elif clave == "dani":
+                # ondas de megáfono: anillos entrecortados que salen uno tras otro
+                for k in range(3):
+                    tk = t - k * 0.14
+                    if not 0 < tk < 0.6:
+                        continue
+                    r = int(20 + tk / 0.6 * 130 * ESC)
+                    ancho = max(2, int(9 * (1 - tk / 0.6)))
+                    caja = pygame.Rect(0, 0, 2 * r, 2 * r)
+                    caja.center = (cx, cy)
+                    for seg in range(16):
+                        a0 = math.radians(seg * 22.5 + k * 11)
+                        pygame.draw.arc(pant, (90, 150, 255), caja, a0, a0 + math.radians(14), ancho)
+                    pygame.draw.circle(pant, (220, 234, 255), (cx, cy), max(1, r - ancho - 3), 1)
+        for x0, y0, nombre, t, dur in self.viajes:      # corazones de Beto volando a cada vecino
+            v = self.m.vecinos.get(nombre)
+            if not v:
+                continue
+            f = t / dur
+            x = x0 + (v.x - x0) * f
+            y = y0 + (v.y - 14 - y0) * f - math.sin(f * math.pi) * 26
+            img = escalar(borde(sprites.corazon()))
+            sx, sy = self.a_pantalla(x, y)
+            pant.blit(img, img.get_rect(center=(int(sx), int(sy))))
+        for nombre, t in self.burbujas:                 # burbuja dorada alrededor del vecino protegido
+            v = self.m.vecinos.get(nombre)
+            if not v:
+                continue
+            r = int(14 * ESC * min(1.0, t / 0.18) ** 0.5)
+            alfa = int(200 * min(1.0, (0.8 - t) / 0.4))
+            if r < 3 or alfa <= 0:
+                continue
+            burbuja = pygame.Surface((2 * r + 4, 2 * r + 4), pygame.SRCALPHA)
+            pygame.draw.circle(burbuja, (255, 226, 120, alfa // 4), (r + 2, r + 2), r)
+            pygame.draw.circle(burbuja, (255, 236, 150, alfa), (r + 2, r + 2), r, 3)
+            pygame.draw.circle(burbuja, (255, 255, 255, alfa), (r + 2 - r // 2, r + 2 - r // 2), max(2, r // 6))
+            sx, sy = self.a_pantalla(v.x, v.y - 9)
+            pant.blit(burbuja, (int(sx) - r - 2, int(sy) - r - 2))
+        for bid, t in self.empujados:                   # estela de los Bulos que empuja Dani
+            b = self.m.bulos.get(bid)
+            if not b or b.estado != "libre":
+                continue
+            vel = math.hypot(b.vx, b.vy)
+            if vel < 1:
+                continue
+            ux, uy = -b.vx / vel, -b.vy / vel
+            sx, sy = self.a_pantalla(b.x, b.y)
+            for k in range(3):
+                off = (k - 1) * 9
+                x0, y0 = sx + uy * off + ux * 18, sy - ux * off + uy * 18
+                largo = 34 * (1 - t / 0.5)
+                pygame.draw.line(pant, (236, 244, 255), (x0, y0), (x0 + ux * largo, y0 + uy * largo), 3)
+
     def _luz_del_dia(self, pant):
         ronda = self.m.ronda
         if ronda == 2:
@@ -756,19 +996,20 @@ class Render:
         elif ronda >= 3:
             s = self.oscuro
             s.fill((14, 18, 52, 128))
-            luces = [(x, y, 70) for x, y in self.m.mapa.luces]
+            # (x, y, radio, fuerza): los faroles y el jugador aclaran la noche sin borrarla
+            luces = [(x, y, 70, 0.62) for x, y in self.m.mapa.luces]
             j = self.m.jugador
-            luces.append((j.x, j.y - 10, 110))
-            luces += [(e.x, e.y, 40) for e in self.m.estrellas]
-            luces += [(a.x, a.y - 30, 50) for a in self.m.antenas]
-            luces += [(x, y + 6, 26) for (x, y), on in zip(self.m.mapa.ventanas_luz, self.ventanas) if on]
+            luces.append((j.x, j.y - 10, 100, 0.7))
+            luces += [(e.x, e.y, 40, 1.0) for e in self.m.estrellas]
+            luces += [(a.x, a.y - 30, 50, 1.0) for a in self.m.antenas]
+            luces += [(x, y + 6, 26, 0.75) for (x, y), on in zip(self.m.mapa.ventanas_luz, self.ventanas) if on]
             for c in self.m.trafico.carros:          # los faros alumbran adelante del carro
-                luces.append((*self._faros(c)[1], 30))
-            for x, y, r in luces:
+                luces.append((*self._faros(c)[1], 30, 0.8))
+            for x, y, r, fuerza in luces:
                 if not self.visible(x, y, r * ESC):
                     continue
                 sx, sy = self.a_pantalla(x, y)
-                img = sprites.luz(r * ESC // 2)
+                img = sprites.luz(r * ESC // 2, fuerza)
                 s.blit(img, (sx - img.get_width() // 2, sy - img.get_height() // 2), special_flags=pygame.BLEND_RGBA_SUB)
             pant.blit(s, (0, 0))
 
@@ -784,8 +1025,8 @@ class Render:
                 pant.blit(vidrio, (int(sx), int(sy)))
                 g = resplandor(30, (110, 80, 20))
                 pant.blit(g, (int(sx) + 24 - 30, int(sy) + 24 - 30), special_flags=pygame.BLEND_RGB_ADD)
-        bombillo = resplandor(20, (230, 190, 90))
-        charco = resplandor(80, (56, 42, 12))          # la luz cálida que cae al piso
+        bombillo = resplandor(18, (200, 164, 78))
+        charco = resplandor(80, (46, 34, 9))           # la luz cálida que cae al piso
         for x, y in self.m.mapa.luces:
             if not self.visible(x, y - 30, 120):
                 continue

@@ -92,6 +92,81 @@ class TestBarrioVivo(unittest.TestCase):
         self.assertTrue(noche.de_noche and noche.luciernagas)
         self.assertFalse(self.amb.de_noche or self.amb.luciernagas)
 
+    def test_la_hierba_alta_se_abre_y_suelta_hojitas(self):
+        hierba = self.amb.hierba
+        self.assertGreater(len(hierba.matas), 20)
+        tx, ty = sorted(hierba.matas)[0]
+        x, y = tx * 16 + 8, ty * 16 + 12
+        hierba.actualizar(1 / 60, [("yo", x - 40, y)])          # todavía afuera
+        self.assertFalse(hierba.hojitas)
+        hierba.actualizar(1 / 60, [("yo", x, y)])               # entra
+        self.assertTrue(hierba.matas[(tx, ty)]["dentro"])
+        self.assertTrue(hierba.hojitas)
+        n = len(hierba.hojitas)
+        hierba.actualizar(1 / 60, [("yo", x + 1, y)])           # sigue adentro: no suelta más
+        self.assertEqual(len(hierba.hojitas), n)
+        hierba.actualizar(1 / 60, [("yo", x - 40, y)])          # sale: tiembla un rato y se calma
+        self.assertFalse(hierba.matas[(tx, ty)]["dentro"])
+        self.assertGreater(hierba.matas[(tx, ty)]["agitada"], 0)
+        for _ in range(90):
+            hierba.actualizar(1 / 60, [])
+        self.assertEqual(hierba.matas[(tx, ty)]["agitada"], 0)
+        self.assertFalse(hierba.hojitas)
+        # nunca está en un camino ni encima de un objeto
+        for tx, ty in hierba.matas:
+            self.assertEqual(self.m.mapa.suelo[ty][tx], "g")
+            self.assertIsNone(self.m.mapa.capa[ty][tx])
+
+
+class TestSuelo(unittest.TestCase):
+    def test_suelo_con_texturas_y_laguna_redondeada(self):
+        from cazabulos.mapa import Mapa
+        m = Mapa()
+        # el pasto ya no es un tile repetido de tres colores: tiene varios verdes, hojitas y florecitas
+        pasto = [(tx, ty) for ty in range(26, 45) for tx in range(1, 41) if m.suelo[ty][tx] == "g"][:30]
+        colores = set()
+        for tx, ty in pasto:
+            tile = m.superficie.subsurface((tx * 16, ty * 16, 16, 16))
+            colores |= {tuple(tile.get_at((x, y)))[:3] for x in range(16) for y in range(16)}
+        self.assertGreater(len(colores), 8)
+        # la laguna tiene agua, orilla de piedras y queda dentro de sus tiles (que son sólidos)
+        e = m.estanque
+        self.assertIsNotNone(e)
+        self.assertTrue(e["agua"].any() and e["piedra"].any())
+        r = m.agua[0]
+        for x, y in (r.topleft, r.bottomright, r.center):
+            self.assertEqual(m.suelo[y // 16][x // 16], "w")
+
+    def test_sin_numpy_se_dibuja_como_antes(self):
+        import cazabulos.mapa as mapa_mod
+        guardado = mapa_mod.texturas
+        mapa_mod.texturas = None
+        try:
+            m = mapa_mod.Mapa()
+            self.assertIsNone(m.estanque)
+            amb = Ambiente(m, ronda=1)
+            self.assertEqual(amb.agua_cuadros, [])
+            amb.actualizar(1 / 60, Mundo(4, "caro", duracion=90), pygame.Rect(0, 0, 10 ** 5, 10 ** 5))
+        finally:
+            mapa_mod.texturas = guardado
+
+
+class TestBrillo(unittest.TestCase):
+    def test_el_brillo_se_apaga_si_el_computador_va_lento(self):
+        from cazabulos.render import Render
+        pant = pygame.Surface((ANCHO, ALTO))
+        r = Render(Mundo(3, "beto", duracion=90), None, {})
+        self.assertTrue(r.bloom)
+        r.t = 5.0
+        r.lentos = 25.0                                         # muchos cuadros lentos, pero no seguidos
+        r.dibujar(pant)
+        r.dibujar(pant)
+        self.assertTrue(r.bloom)                                # un tirón suelto no lo apaga
+        r.lentos = 45.0                                         # lento de verdad, un buen rato
+        r.dibujar(pant)
+        self.assertFalse(r.bloom)
+        self.assertFalse(Render(Mundo(3, "beto", duracion=90), None, {"demo": True}).bloom)
+
 
 class TestNoCambiaElJuego(unittest.TestCase):
     def test_los_graficos_no_cambian_el_juego(self):
@@ -144,3 +219,50 @@ class TestMemoria(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestPoderes(unittest.TestCase):
+    def _usar(self, clave):
+        from cazabulos.render import Render
+        m = Mundo(5, clave, duracion=90)
+        m.antenas.clear()
+        m.t_antena = 1e9
+        m.guion.clear()
+        for v in m.vecinos.values():
+            v.espera = 1e9
+        j = m.jugador
+        j.x, j.y = 27 * 16, 15.5 * 16
+        for dx, dy in ((-60, -30), (50, -40), (70, 30)):
+            m.nuevo_bulo(j.x + dx, j.y + dy)
+        cerca = sorted(m.vecinos.values(), key=lambda v: (v.x - j.x) ** 2 + (v.y - j.y) ** 2)[:3]
+        for k, v in enumerate(cerca):
+            v.x, v.y = j.x + (-90, 50, 95)[k], j.y + (20, -50, 25)[k]
+        r = Render(m, None, {})
+        r.actualizar(1 / 60)
+        j.carga = 100
+        m.actualizar(1 / 60, {"poder": True})
+        r.actualizar(1 / 60)
+        r.al_usar = {"poderes": [p["clave"] for p in r.poderes], "viajes": len(r.viajes), "empujados": len(r.empujados)}
+        pant = pygame.Surface((ANCHO, ALTO))
+        for _ in range(30):                         # se dibuja sin fallar mientras dura
+            m.actualizar(1 / 60, {})
+            r.actualizar(1 / 60)
+            r.dibujar(pant)
+        return m, r
+
+    def test_cada_poder_se_ve_distinto(self):
+        m, r = self._usar("ana")
+        self.assertEqual(r.al_usar["poderes"], ["ana"])
+        self.assertTrue(any(b.congelado > 0 for b in m.bulos.values()))
+        m, r = self._usar("beto")
+        self.assertEqual(r.al_usar["poderes"], ["beto"])
+        self.assertGreaterEqual(r.al_usar["viajes"], 3)                 # un corazón por cada vecino protegido
+        self.assertTrue(r.burbujas)                                     # y al llegar, la burbuja dorada
+        m, r = self._usar("caro")
+        self.assertEqual(r.al_usar["poderes"], ["caro"])
+        m, r = self._usar("dani")
+        self.assertEqual(r.al_usar["poderes"], ["dani"])
+        self.assertGreaterEqual(r.al_usar["empujados"], 1)              # estela en los Bulos que empujó
+        for _ in range(90):                         # al terminar no queda nada colgado
+            r.actualizar(1 / 60)
+        self.assertFalse(r.poderes or r.viajes or r.burbujas or r.empujados)

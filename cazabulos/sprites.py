@@ -257,12 +257,12 @@ def silueta(img, color):
     return _guardar(clave, hacer)
 
 
-def luz(radio):
-    """Círculo de luz suave (para la noche)."""
+def luz(radio, fuerza=1.0):
+    """Círculo de luz suave (para la noche). Con fuerza < 1 aclara la noche sin borrarla del todo."""
     def hacer():
         s = pygame.Surface((radio * 2, radio * 2), pygame.SRCALPHA)
         for r in range(radio, 0, -2):
-            a = int(255 * (1 - r / radio) ** 0.7)
+            a = int(255 * fuerza * (1 - r / radio) ** (0.7 if fuerza >= 1 else 1.1))
             pygame.draw.circle(s, (a, a, a, a), (radio, radio), r)
         return s
-    return _guardar(("luz", radio), hacer)
+    return _guardar(("luz", radio, fuerza), hacer)

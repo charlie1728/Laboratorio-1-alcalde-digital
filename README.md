@@ -29,7 +29,7 @@ Antes de cada turno, la cuenta regresiva explica el juego en tres dibujos: **atr
 - **Antena del Bot:** suelta Bulos sin parar. Golpéala varias veces para apagarla (después pone otra en otro lugar).
 - **Eventos al azar:** peleas entre vecinos (si no las calmas a tiempo se rompe la amistad), el **Bulo viral** con 10 segundos para detenerlo, rumores sobre los candidatos, noticias verdaderas, campañas de convivencia, grupos de Bulos nuevos y vecinos que reportan por su cuenta.
 
-**El barrio está vivo.** Todo tiene un borde oscuro para que se distinga del fondo (personajes, vecinos, carros, árboles, edificios y objetos). Los árboles se mecen con el viento, la fuente de la plaza salpica, en la laguna nada una pata con sus patitos entre nenúfares, las palomas de la plaza salen volando si pasas cerca, hay mariposas, flores, hojas que caen, banderas que ondean en la alcaldía, sombras de nubes y humito detrás de los carros. De noche se prenden las ventanas, los faroles y los faros, y aparecen luciérnagas en el parque. Nada de esto cambia el juego: con la misma semilla el turno sale igual.
+**El barrio está vivo.** Todo tiene un borde oscuro para que se distinga del fondo (personajes, vecinos, carros, árboles, edificios y objetos). El pasto tiene varios verdes, matitas y florecitas, y sus orillas son redondeadas e irregulares donde toca los caminos y la arena (con bordillo de piedra junto a los andenes). En los prados hay **hierba alta como la de Pokémon**: se mece en ola, se abre y suelta hojitas cuando alguien entra, y tapa los pies de quien camina adentro. Caminos, plazas y asfalto tienen grietas, piedritas y musgo; los edificios, relieve y sombra del alero; y todo proyecta sombras suaves. Los árboles se mecen con el viento (y su sombra también), la fuente de la plaza salpica, la laguna tiene orillas de piedra redondeadas, espuma que corre por el borde y destellos, y en ella nada una pata con sus patitos (con su reflejo) entre nenúfares que hacen ondas, las palomas de la plaza salen volando si pasas cerca, hay mariposas, flores, hojas que caen, banderas que ondean en la alcaldía, sombras de nubes y humito detrás de los carros. De día flota polen; de noche se prenden las ventanas, los faroles (con polvito flotando en su luz) y los faros, las sombras se alargan lejos del farol más cercano y aparecen luciérnagas. Un brillo suave (bloom) hace resplandecer lo más claro; si el computador va lento, se apaga solo para que el juego siga fluido. Nada de esto cambia el juego: con la misma semilla el turno sale igual.
 
 ## Personajes (fuerza pareja, cada uno ayuda distinto)
 
@@ -41,6 +41,13 @@ Antes de cada turno, la cuenta regresiva explica el juego en tres dibujos: **atr
 | **Beto** (rosa) | Influencer | corazones | Cuando cura a alguien, la cura les llega también a sus amigos. Sus estrellas llegan dos niveles en la red | **En vivo:** protege a todos los vecinos de la pantalla |
 | **Caro** (verde) | Ciudadana | su red | Corre más rápido, su red es más ancha y calma una pelea de un golpe | **Red gigante:** atrapa de un golpe todos los Bulos cercanos |
 | **Dani** (azul) | Candidato | volantes | A quien cura no le vuelven a entrar Bulos por un buen rato. Compite en la elección | **Discurso:** cura a los vecinos cercanos y empuja a los Bulos |
+
+Cada poder se ve distinto al usarlo:
+
+- **Ana:** escarcha con picos de hielo, y los Bulos quedan celestes con un copito encima.
+- **Beto:** ondas de transmisión en vivo, y corazones que vuelan hasta cada vecino y le ponen una burbuja dorada.
+- **Caro:** una red gigante que se abre y se cierra.
+- **Dani:** ondas de megáfono, y los Bulos salen disparados.
 
 La piel y el color de pelo se pueden cambiar al elegir. Con jugadores automáticos (20 partidas de 2 minutos por personaje) los cuatro sacan puntajes parecidos: jugando como un niño (reacciona tarde y a veces se distrae) quedan a menos de 5 % entre sí; jugando perfecto, Ana saca hasta 17 % más que Beto.
 
@@ -89,7 +96,7 @@ Otros comandos: `python -m cazabulos.acceso_directo --escritorio` pone el acceso
 
 Para jugar en línea, los computadores deben estar en la misma red. La primera vez, Windows puede preguntar si deja que Python use la red: hay que dar **Permitir** en el computador que crea la sala.
 
-Pruebas (68):
+Pruebas (73):
 
 ```bash
 python -m unittest discover -s cazabulos/pruebas -t .
@@ -98,6 +105,6 @@ python -m unittest discover -s cazabulos/pruebas -t .
 ## Créditos
 
 - Gráficos del barrio y de los vecinos: [Kenney](https://kenney.nl) (*RPG Urban Pack* y *Roguelike Modern City*, licencia CC0). Las licencias están en `cazabulos/assets/kenney/`.
-- Protagonistas, Bulos, estrellas, antena, palomas, patos, mariposas, banderas e ícono: pixel art propio del equipo, hecho en código (`cazabulos/personajes.py`, `cazabulos/sprites.py`, `cazabulos/ambiente.py`).
+- Protagonistas, Bulos, estrellas, antena, palomas, patos, mariposas, banderas e ícono: pixel art propio del equipo, hecho en código (`cazabulos/personajes.py`, `cazabulos/sprites.py`, `cazabulos/ambiente.py`, `cazabulos/hierba.py`). Las texturas del pasto, los caminos, la laguna, las sombras y el relieve de los edificios también se generan en código, encima de los tiles de Kenney (`cazabulos/texturas.py`, con numpy).
 - Fuentes: Fredoka y Nunito (licencia SIL OFL).
 - Sonidos y música: sintetizados en el juego con numpy (`cazabulos/sonido.py`).

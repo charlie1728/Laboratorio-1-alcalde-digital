@@ -6,6 +6,11 @@
 - Palomas en la plaza (si pasas cerca salen volando), mariposas en el parque, hojas que caen.
 - Banderas que ondean en la alcaldía, sombras de nubes que cruzan la ciudad.
 - Polvo cuando corres, estela de los Bulos y destellos de las estrellas.
+- Hierba alta que se mece y se abre cuando alguien camina adentro (ver hierba.py); las flores se
+  apartan cuando pasas.
+- Agua con espuma que corre por la orilla, destellos que se mueven, reflejo de los patos y ondas
+  alrededor de los nenúfares.
+- Motas de luz: polen flotando de día y polvo en la luz de los faroles de noche.
 - De noche: luciérnagas en el parque.
 
 Usa su propio azar: no toca el de la partida, así la misma semilla sigue dando el mismo barrio.
@@ -18,8 +23,16 @@ from collections import deque
 import pygame
 
 from .config import ALTO, ANCHO, ESC, TILE
+from .hierba import HierbaAlta
 from .mapa import H, W
 from .recursos import borde, escalar
+
+try:
+    import numpy as np
+
+    from .texturas import encoger
+except ImportError:                        # sin numpy el agua no lleva espuma animada
+    np = None
 
 # ----------------------------------------------------------------- dibujitos (pixel art hecho en código)
 _cache = {}
@@ -160,6 +173,38 @@ def _destello(tam, color):
     return _guardar(("destello", tam, color), hacer)
 
 
+def reflejo(img):
+    """La imagen de cabeza y transparente: su reflejo en el agua."""
+    def hacer():
+        r = pygame.transform.flip(img, False, True)
+        r.set_alpha(70)
+        return r
+    return _guardar(("reflejo", id(img)), hacer)
+
+
+def sombra_suave(ancho, alto, alfa=90):
+    """Mancha de sombra con el borde difuminado (en pixeles de pantalla)."""
+    def hacer():
+        pad = 8
+        s = pygame.Surface((ancho + 2 * pad, alto + 2 * pad), pygame.SRCALPHA)
+        pygame.draw.ellipse(s, (0, 0, 0, alfa), (pad, pad, ancho, alto))
+        chico = pygame.transform.smoothscale(s, (max(1, s.get_width() // 4), max(1, s.get_height() // 4)))
+        return pygame.transform.smoothscale(chico, s.get_size())
+    return _guardar(("sombra_suave", ancho, alto, alfa), hacer)
+
+
+def sombra_larga(largo, ancho, angulo, alfa=85):
+    """Sombra alargada y difuminada que apunta en 'angulo' (grados, 0 = derecha, 90 = arriba).
+    Devuelve (imagen, desplazamiento del centro respecto a los pies)."""
+    def hacer():
+        base = sombra_suave(largo, ancho, alfa)
+        img = pygame.transform.rotate(base, angulo)
+        rad = math.radians(angulo)
+        d = max(0, largo / 2 - ancho / 2)
+        return img, (math.cos(rad) * d, -math.sin(rad) * d)
+    return _guardar(("sombra_larga", largo, ancho, angulo, alfa), hacer)
+
+
 def resplandor(r, color):
     """Luz que se SUMA a lo que hay debajo (luciérnagas, faroles, ventanas de noche)."""
     def hacer():
@@ -184,6 +229,8 @@ class Ambiente:
         self.de_noche = ronda >= 3
         self.rng = random.Random(11)
         self.t = 0.0
+        self.hierba = HierbaAlta(mapa)
+        self.caminantes = []            # quiénes pueden pisar flores y hierba en este cuadro
         self.flores = self._sembrar()
         lago = mapa.agua[0]
         self.lago = lago
@@ -191,6 +238,8 @@ class Ambiente:
         self.nenufares = [(lago.x + 18, lago.y + 14, True), (lago.x + 30, lago.y + 22, False),
                           (lago.right - 26, lago.bottom - 18, True), (lago.right - 40, lago.bottom - 12, False),
                           (lago.x + 14, lago.bottom - 16, False)]
+        self.t_nenufar = [self.rng.uniform(0.5, 4.0) for _ in self.nenufares]
+        self.agua_cuadros = self._cuadros_agua()
         self.ondas = []                 # [x, y, t, dur, radio máximo]
         self.gotas = []                 # [x, y en el piso, alto, vx, vy, vz]
         self.t_gota = 0.0
@@ -209,7 +258,7 @@ class Ambiente:
         self.t_rastro = 0.0
         self.t_destello = 0.0
         self.t_humo = 0.0
-        self.arboles =[(x + 8, yb - 22) for img, x, yb, tipo in mapa.props if tipo == "arbol"]
+        self.arboles = [(x + 8, yb - 22) for img, x, yb, tipo in mapa.props if tipo == "arbol"]
         # dos banderas en las esquinas del techo de la alcaldía (el letrero queda en el centro)
         self.banderas = [(20 * TILE + 6, 5 * TILE + 2), (34 * TILE + 4, 5 * TILE + 2)]
         ancho, alto = W * TILE, H * TILE
@@ -225,6 +274,8 @@ class Ambiente:
             for tx in range(W):
                 if m.suelo[ty][tx] != "g" or m.solido[ty][tx] or m.capa[ty][tx] is not None:
                     continue
+                if (tx, ty) in self.hierba.matas:          # ahí ya hay hierba alta
+                    continue
                 prob = 0.5 if parque.collidepoint(tx, ty) else 0.22
                 if self.rng.random() > prob:
                     continue
@@ -236,6 +287,31 @@ class Ambiente:
                 else:
                     res.append(("mata", x, y, None, self.rng.uniform(0, 6.3)))
         return res
+
+    def _cuadros_agua(self):
+        """Cuadros de la animación del agua (en pixeles nativos): espuma que corre por la orilla y
+        rayitas de luz que se mueven en lo hondo. Se calculan una vez."""
+        e = self.mapa.estanque
+        if not e or np is None:
+            return []
+        agua, hondo = e["agua"], e["hondo"]
+        hh, ww = agua.shape
+        yy, xx = np.mgrid[0:hh, 0:ww].astype(np.float32)
+        cy, cx = yy[agua].mean(), xx[agua].mean()
+        ang = np.arctan2(yy - cy, (xx - cx) * 0.7)
+        banda = agua & ~encoger(agua, 4) & encoger(agua, 1)
+        hondo_ok = agua & (hondo > 0.3)
+        cuadros = []
+        for k in range(24):
+            f = k / 24 * math.tau
+            rgba = np.zeros((hh, ww, 4), np.uint8)
+            v = np.sin(xx * 0.33 + yy * 0.17 + f) + np.sin(-xx * 0.2 + yy * 0.35 + 2 * f) + np.sin(xx * 0.12 - yy * 0.11 - f)
+            rgba[hondo_ok & (np.abs(v - 1.1) < 0.1)] = (204, 246, 252, 90)
+            espuma = banda & (np.sin(ang * 18 + 2 * f) + 0.6 * np.sin(ang * 7 - f) > 0.95)
+            rgba[espuma] = (238, 252, 252, 210)
+            img = pygame.image.frombytes(rgba.tobytes(), (ww, hh), "RGBA")
+            cuadros.append(img.convert_alpha() if pygame.display.get_surface() else img)
+        return cuadros
 
     def _brillo(self):
         r = self.lago
@@ -269,9 +345,14 @@ class Ambiente:
         return m
 
     # ------------------------------------------------------------- tiempo
-    def actualizar(self, dt, mundo, vista):
-        """vista: rectángulo visible en pixeles nativos (lo que no se ve casi no gasta)."""
+    def actualizar(self, dt, mundo, vista, otros=()):
+        """vista: rectángulo visible en pixeles nativos (lo que no se ve casi no gasta).
+        otros: [(nombre, x, y)] de los rivales en línea (también pisan la hierba)."""
         self.t += dt
+        j = mundo.jugador
+        self.caminantes = [("yo", j.x, j.y)] + [(n, v.x, v.y) for n, v in mundo.vecinos.items()
+                                                if vista.collidepoint(v.x, v.y)] + list(otros)
+        self.hierba.actualizar(dt, self.caminantes)
         for b in self.brillos:
             b[0] += b[4] * dt * 2.2
             if b[0] > self.lago.right - 8:
@@ -282,6 +363,12 @@ class Ambiente:
         lago_visible = vista.colliderect(self.lago)
         self._fuente(dt, vista)
         self._pata(dt, lago_visible)
+        for i, (x, y, _) in enumerate(self.nenufares):    # el agua se mueve alrededor de los nenúfares
+            self.t_nenufar[i] -= dt
+            if self.t_nenufar[i] <= 0:
+                self.t_nenufar[i] = self.rng.uniform(2.5, 4.5)
+                if lago_visible:
+                    self.ondas.append([x, y + 1, 0.0, 1.5, 6])
         if lago_visible:
             self.t_pez -= dt
             if self.t_pez <= 0:        # un pez se asoma: ondas que se abren en el agua
@@ -479,14 +566,21 @@ class Ambiente:
         vis = render.visible
         if vis(self.lago.centerx, self.lago.centery, 260):
             self._dibujar_lago(pant, ap)
-        # flores y matas que se mecen con el viento
+        # flores y matas que se mecen con el viento y se apartan cuando alguien pasa
         viento = self.t * 2.1
+        pies = {}
+        for _, px_, py_ in self.caminantes:
+            pies.setdefault((int(px_ // TILE), int(py_ // TILE)), []).append((px_, py_))
         for tipo, x, y, color, fase in self.flores:
             if not vis(x, y, 12):
                 continue
             sx, sy = ap(x, y)
             sx, sy = int(sx), int(sy)
             vaiven = round(math.sin(viento + fase + x * 0.02) * 1.6)
+            for px_, py_ in pies.get((x // TILE, y // TILE), ()):
+                if abs(px_ - x) < 8 and abs(py_ - y) < 6:
+                    vaiven = 2 * ESC if x >= px_ else -2 * ESC       # se agacha hacia el otro lado
+                    sy += ESC
             if tipo == "mata":
                 pant.fill(TALLO, (sx - ESC, sy - ESC, ESC, ESC))
                 pant.fill(TALLO, (sx + ESC, sy - ESC, ESC, ESC))
@@ -498,6 +592,7 @@ class Ambiente:
                 pant.fill(color, (cx - ESC, cy, 3 * ESC, ESC))
                 pant.fill(color, (cx, cy - ESC, ESC, 3 * ESC))
                 pant.fill((255, 226, 90) if color != (255, 214, 70) else (220, 120, 40), (cx, cy, ESC, ESC))
+        self.hierba.dibujar(pant, render)
         # banderas de la alcaldía
         cuadro = int(self.t * 9) % 8
         for x, y in self.banderas:
@@ -533,6 +628,11 @@ class Ambiente:
             pant.blit(img, (int(sx) - r, int(sy) - r))
 
     def _dibujar_lago(self, pant, ap):
+        e = self.mapa.estanque
+        if self.agua_cuadros and e:
+            capa = self.agua_cuadros[int(self.t * 10) % len(self.agua_cuadros)]
+            sx, sy = ap(e["x"], e["y"])
+            pant.blit(pygame.transform.scale(capa, (capa.get_width() * ESC, capa.get_height() * ESC)), (int(sx), int(sy)))
         for x, y, largo, fase, vel in self.brillos:
             luz = math.sin(self.t * vel + fase)
             if luz < 0.15:
@@ -567,6 +667,7 @@ class Ambiente:
         bob = round(math.sin(self.t * 3 + fase * 1.7) * 1.2)
         w, h = img.get_size()
         sx, sy = int(sx) - w // 2, int(sy) - h + bob
+        pant.blit(reflejo(img), (sx, sy + h - 2 * ESC - bob))                            # su reflejo
         pygame.draw.ellipse(pant, (150, 214, 226), (sx + 2, sy + h - 7, w - 4, 8), 3)     # el agua alrededor
         pant.blit(img, (sx, sy))
 
@@ -601,6 +702,16 @@ class Ambiente:
             ancho = 2 if math.sin(vida * 5 + fase) > 0 else 1
             pant.fill((34, 26, 44), (int(sx) - 1, int(sy) - 1, ancho * ESC + 2, ESC + 2))
             pant.fill(color, (int(sx), int(sy), ancho * ESC, ESC))
+        self.hierba.dibujar_hojitas(pant, render)
+        if not self.de_noche:                      # polen que flota con la luz del día
+            for k in range(18):
+                brillo = math.sin(self.t * (1.3 + k % 4 * 0.3) + k * 2.1)
+                if brillo < 0.2:
+                    continue
+                x = (k * 211 + self.t * (9 + k % 5 * 3) - render.cam[0] * 0.35) % (ANCHO + 40) - 20
+                y = (k * 127 + math.sin(self.t * 0.6 + k) * 30 - render.cam[1] * 0.35) % (ALTO + 40) - 20
+                tam = 3 if brillo > 0.75 else 2
+                pant.fill((255, 248, 206), (int(x), int(y), tam, tam))
         for x, y, t, dur in self.destellos:
             f = t / dur
             tam = 2 if 0.25 < f < 0.7 else 1
@@ -609,9 +720,22 @@ class Ambiente:
             pant.blit(img, (int(sx) - img.get_width() // 2, int(sy) - img.get_height() // 2))
 
     def dibujar_noche(self, pant, render):
-        """Después de oscurecer: luciérnagas que se prenden y se apagan."""
+        """Después de oscurecer: polvo que flota en la luz de los faroles y luciérnagas."""
         if not self.de_noche:
             return
+        for i, (lx, ly) in enumerate(self.mapa.luces):
+            if not render.visible(lx, ly - 20, 60):
+                continue
+            for k in range(6):
+                fase = i * 1.7 + k * 2.3
+                x = lx + math.sin(self.t * 0.45 + fase) * 13 + math.sin(self.t * 1.3 + fase * 2) * 3
+                y = ly - 26 + ((self.t * (3 + k % 3) + k * 7.0) % 30)
+                luz = math.sin(self.t * 2.6 + fase * 3)
+                if luz < -0.3:
+                    continue
+                sx, sy = render.a_pantalla(x, y)
+                g = resplandor(5, (150, 130, 70) if luz > 0.4 else (90, 78, 42))
+                pant.blit(g, (int(sx) - 5, int(sy) - 5), special_flags=pygame.BLEND_RGB_ADD)
         for m in self.luciernagas:
             if not render.visible(m["x"], m["y"], 20):
                 continue

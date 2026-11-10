@@ -11,6 +11,11 @@ import pygame
 from .config import TILE
 from .recursos import CONTORNO, C, U
 
+try:                                   # con numpy el suelo lleva texturas, bordes orgánicos y sombras suaves
+    from . import texturas
+except ImportError:                    # sin numpy se dibuja como antes
+    texturas = None
+
 W, H = 64, 46
 
 # Avenida (horizontal) y carrera (vertical)
@@ -104,6 +109,7 @@ class Mapa:
         # para las animaciones del barrio (en pixeles nativos)
         self.agua = [pygame.Rect(7 * TILE, 32 * TILE, 8 * TILE, 5 * TILE)]      # la laguna, sin el borde
         self.fuente = (28 * TILE, 11 * TILE + 8)                                 # punta de la estatua (chorro)
+        self.estanque = None                     # forma de la laguna (para la espuma y los reflejos)
         self.superficie = self._dibujar_suelo()
 
     # ------------------------------------------------------------- utilidades de construcción
@@ -287,7 +293,9 @@ class Mapa:
 
     # ------------------------------------------------------------- dibujo del suelo
     def _tile_suelo(self, x, y, rng):
-        c = self.suelo[y][x]
+        return self._tile_de(self.suelo[y][x], x, y, rng)
+
+    def _tile_de(self, c, x, y, rng):
         if c == "g":
             return 888 if rng.random() < 0.7 else 889
         if c == "a":
@@ -310,10 +318,18 @@ class Mapa:
         for y in range(H):
             for x in range(W):
                 s.blit(C(self._tile_suelo(x, y, rng)), (x * TILE, y * TILE))
-        self._pasto(s, rng)
-        # laguna con borde de piedra (9 partes) y un borde oscuro alrededor
-        self._nueve(s, 6, 31, 15, 37, ((174, 175, 176), (211, 212, 213), (248, 249, 250)))
-        pygame.draw.rect(s, CONTORNO, pygame.Rect(6 * TILE - 1, 31 * TILE - 1, 10 * TILE + 2, 7 * TILE - 1), 1)
+        if texturas:
+            debajo, debajo_cod = self._debajo(rng)
+            self.estanque = texturas.suelo(self, s, debajo, debajo_cod)
+            if self.estanque:
+                e = self.estanque
+                ys, xs = e["agua"].nonzero()
+                self.agua = [pygame.Rect(e["x"] + xs.min(), e["y"] + ys.min(), int(xs.max() - xs.min()) + 1, int(ys.max() - ys.min()) + 1).inflate(-10, -10)]
+        else:
+            self._pasto(s, rng)
+            # laguna con borde de piedra (9 partes) y un borde oscuro alrededor
+            self._nueve(s, 6, 31, 15, 37, ((174, 175, 176), (211, 212, 213), (248, 249, 250)))
+            pygame.draw.rect(s, CONTORNO, pygame.Rect(6 * TILE - 1, 31 * TILE - 1, 10 * TILE + 2, 7 * TILE - 1), 1)
         # marcas de la calle (pintadas en pixel)
         blanco, amarillo = (236, 236, 236), (255, 204, 60)
         for x in range(0, W * TILE, 12):
@@ -349,30 +365,65 @@ class Mapa:
                             s.fill((180, 184, 196), (px, py, 2, TILE))
                         else:
                             s.fill((180, 184, 196), (px + TILE - 2, py, 2, TILE))
-        # sombras en el piso: edificios (hacia abajo a la derecha) y lo que sobresale (árboles, postes, buses)
-        sombras = pygame.Surface((W * TILE, H * TILE), pygame.SRCALPHA)
-        for x, y, w, h, *_ in self.edificios:
-            sombras.fill((0, 0, 0, 70), ((x + w) * TILE, y * TILE + 4, 4, h * TILE))
-            sombras.fill((0, 0, 0, 55), (x * TILE + 4, (y + h) * TILE, w * TILE, 3))
-        for img, px, yb, tipo in self.props:
-            ancho = {"arbol": 12, "poste": 8, "bus": 30, "objeto": 12}[tipo]
-            alto = 6 if tipo == "bus" else 4
-            pygame.draw.ellipse(sombras, (0, 0, 0, 75), (px + (img.get_width() - ancho) // 2 + 2, yb - alto + 1,
-                                                         ancho, alto))
-        s.blit(sombras, (0, 0))
         # edificios y objetos planos (bancas, canecas, materas, puestos, la fuente) en capas aparte para
-        # ponerles a todos un borde oscuro y una sombrita
+        # ponerles a todos un borde oscuro y sombra
         edif = pygame.Surface((W * TILE, H * TILE), pygame.SRCALPHA)
         for x, y, w, h, color, fachada, puerta, ventanas in self.edificios:
             self._edificio(edif, x, y, w, h, color, fachada, puerta, ventanas)
-        self._con_borde(s, edif, sombra=False)
         planos = pygame.Surface((W * TILE, H * TILE), pygame.SRCALPHA)
         for y in range(H):
             for x in range(W):
                 if self.capa[y][x] is not None:
                     planos.blit(tile_cosa(self.capa[y][x]), (x * TILE, y * TILE))
-        self._con_borde(s, planos, sombra=True)
+        if texturas:
+            # sombras suaves hacia abajo a la derecha y oscuro alrededor de la base de todo; los
+            # árboles hacen su sombra en vivo (se mueve con el viento), aquí solo el pie del tronco
+            extra = pygame.Surface((W * TILE, H * TILE), pygame.SRCALPHA)
+            for img, px, yb, tipo in self.props:
+                cx = px + img.get_width() // 2
+                if tipo == "arbol":
+                    pygame.draw.ellipse(extra, (0, 0, 0, 90), (cx - 4, yb - 4, 9, 4))
+                elif tipo == "poste":
+                    pygame.draw.line(extra, (0, 0, 0, 80), (cx, yb - 2), (cx + 15, yb + 7), 3)
+                    pygame.draw.ellipse(extra, (0, 0, 0, 80), (cx + 10, yb + 4, 12, 5))
+                    pygame.draw.ellipse(extra, (0, 0, 0, 100), (cx - 3, yb - 4, 7, 3))
+                elif tipo == "bus":
+                    pygame.draw.ellipse(extra, (0, 0, 0, 110), (px + 3, yb - 8, img.get_width() + 2, 9))
+                else:
+                    pygame.draw.ellipse(extra, (0, 0, 0, 100), (cx - 5, yb - 4, 14, 6))
+            texturas.sombras(s, [(edif, (5, 4), 0.42, 2, 0.22, 3), (planos, (2, 3), 0.4, 1, 0.18, 2)], extra)
+            texturas.relieve_edificios(edif, self.edificios)
+        else:
+            sombras = pygame.Surface((W * TILE, H * TILE), pygame.SRCALPHA)
+            for x, y, w, h, *_ in self.edificios:
+                sombras.fill((0, 0, 0, 70), ((x + w) * TILE, y * TILE + 4, 4, h * TILE))
+                sombras.fill((0, 0, 0, 55), (x * TILE + 4, (y + h) * TILE, w * TILE, 3))
+            for img, px, yb, tipo in self.props:
+                ancho = {"arbol": 12, "poste": 8, "bus": 30, "objeto": 12}[tipo]
+                alto = 6 if tipo == "bus" else 4
+                pygame.draw.ellipse(sombras, (0, 0, 0, 75), (px + (img.get_width() - ancho) // 2 + 2, yb - alto + 1,
+                                                             ancho, alto))
+            s.blit(sombras, (0, 0))
+        self._con_borde(s, edif, sombra=False)
+        self._con_borde(s, planos, sombra=not texturas)
         return s
+
+    def _debajo(self, rng):
+        """Para cada tile de pasto que toca un camino o la arena, el suelo de ese vecino: se ve donde
+        el borde del pasto se redondea."""
+        s = pygame.Surface((W * TILE, H * TILE), pygame.SRCALPHA)
+        cod = [["g"] * W for _ in range(H)]
+        for y in range(H):
+            for x in range(W):
+                if self.suelo[y][x] != "g":
+                    continue
+                for dx, dy in ((0, -1), (0, 1), (-1, 0), (1, 0), (-1, -1), (1, -1), (-1, 1), (1, 1)):
+                    nx, ny = x + dx, y + dy
+                    if 0 <= nx < W and 0 <= ny < H and self.suelo[ny][nx] in ("b", "s"):
+                        cod[y][x] = self.suelo[ny][nx]
+                        s.blit(C(self._tile_de(cod[y][x], x, y, rng)), (x * TILE, y * TILE))
+                        break
+        return s, cod
 
     @staticmethod
     def _con_borde(destino, capa, sombra):

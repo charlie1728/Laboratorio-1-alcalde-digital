@@ -157,6 +157,21 @@ La primera versión jugable tenía demasiadas cosas a la vez: noticias que habí
   - Todo tiene un borde oscuro de un pixel: personajes, vecinos, carros, árboles, edificios y objetos. Así se distinguen del fondo de un vistazo.
   - Los árboles y arbustos que tenían justo el verde del pasto se veían huecos: se pintaron de verde pino.
   - El barrio se mueve solo (agua, fuente, palomas, patos, mariposas, banderas, nubes, noche con luces). Nada de eso cambia el juego: usa su propio azar y una prueba comprueba que, con la misma semilla, el turno sale igual dibujando o sin dibujar.
+- **Aspecto más profesional (estilo Stardew Valley o los Pokémon nuevos en 2D):**
+  - Pasto con texturas, bordes orgánicos hacia los caminos y bordillo de piedra hacia los andenes.
+  - Hierba alta que se mece y reacciona al caminar.
+  - Laguna de orillas naturales con espuma, destellos y reflejos.
+  - Grietas, piedritas y musgo en los pisos; relieve en los edificios.
+  - Sombras suaves y oclusión ambiental.
+  - Brillo (bloom) y motas de luz.
+  - Todo se genera en código al cargar el mapa (no se descargaron paquetes de otros autores, para que combine con Kenney y no haya problemas de licencias).
+  - Al probarlo, las luces de noche quedaron demasiado fuertes: se bajaron para que la noche se siga sintiendo como noche.
+  - El brillo se apaga solo si el computador no alcanza a dibujar fluido.
+- **Cada poder se ve distinto:** al probarlo, el de Ana y el de Beto se veían iguales (un anillo grande). Ahora:
+  - Ana: escarcha y copos en los Bulos congelados.
+  - Beto: transmisión en vivo y corazones que llevan una burbuja dorada a cada vecino protegido.
+  - Caro: una red que se abre y se cierra.
+  - Dani: ondas de megáfono y estelas en los Bulos que empuja.
 
 ## 7. Respuestas para la sustentación
 
@@ -184,7 +199,7 @@ La primera versión jugable tenía demasiadas cosas a la vez: noticias que habí
 
 ## 8. Pruebas
 
-`python -m unittest discover -s cazabulos/pruebas -t .` corre 68 pruebas.
+`python -m unittest discover -s cazabulos/pruebas -t .` corre 73 pruebas.
 
 - **Estructuras:** BFS por niveles y con filtro, componentes, Dijkstra, subárboles, recorridos, AVL y el árbol de decisiones (sus caminos, las cuatro acciones del enunciado y eliminar ramas).
 - **Juego:**
@@ -196,7 +211,7 @@ La primera versión jugable tenía demasiadas cosas a la vez: noticias que habí
   - El periódico de Ana atraviesa, las peleas se calman lanzando, peleas que rompen hilos y viral por BFS.
   - Estrellas de reputación y mensaje final que va con ellas. Jugando solo se pasa directo a la elección.
 - **Mapa:** colisiones con edificios, grafo de la ciudad caminable y carros siempre en su carril sin chocar.
-- **Gráficos:** todo con borde, árboles y arbustos que se distinguen del pasto, palomas que salen volando y se posan en un lugar libre, fuente y laguna que se mueven, luciérnagas solo de noche, dibujar no cambia el turno y las imágenes no se acumulan en memoria cuadro tras cuadro.
+- **Gráficos:** todo con borde, árboles y arbustos que se distinguen del pasto, palomas que salen volando y se posan en un lugar libre, fuente y laguna que se mueven, luciérnagas solo de noche, dibujar no cambia el turno, las imágenes no se acumulan en memoria cuadro tras cuadro, la hierba alta se abre y suelta hojitas al entrar, el suelo con texturas y la laguna redondeada (y sin numpy se dibuja como antes) el brillo que se apaga solo si el computador va lento y que cada poder arranca su propio dibujo y le llega a quien le hizo efecto.
 - **Partida y red:** turnos y rondas, elección y servidor con dos clientes.
 - **Control USB y feria:**
   - Botones que cambian según la pantalla y palanca con margen para que no tiemble.
