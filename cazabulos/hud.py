@@ -158,11 +158,12 @@ class Hud:
         ic = escalar(borde(sprites.herramienta(j.clave)), 2)
         pant.blit(ic, ic.get_rect(midleft=(x, y + 5)))
         x0 = x + ic.get_width() + 6
+        paso = max(6, min(12, (298 - x0) // MUNICION_MAX))      # que quepan todas en la tarjeta
         poco = n <= 2 and int(self.t * 6) % 2
         if n == 0 and int(self.t * 4) % 2:
-            pygame.draw.rect(pant, (255, 90, 90), (x0 - 4, y - 3, MUNICION_MAX * 12 + 4, 16), 2, border_radius=5)
+            pygame.draw.rect(pant, (255, 90, 90), (x0 - 4, y - 3, MUNICION_MAX * paso + 4, 16), 2, border_radius=5)
         for k in range(MUNICION_MAX):
-            caja = pygame.Rect(x0 + k * 12, y, 9, 10)
+            caja = pygame.Rect(x0 + k * paso, y, paso - 3, 10)
             lleno = k < n
             pygame.draw.rect(pant, ((255, 120, 120) if poco else color) if lleno else (60, 52, 96), caja, border_radius=3)
 

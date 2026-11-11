@@ -103,8 +103,8 @@ class Ayuda(Escena):
             y = max(y + 44, parrafo(pant, d, (c.x + 200, y + 2), 20, c.w - 260, (240, 240, 250)) + 14)
         r = panel(pant, (c.x + 40, c.y + 420, c.w - 80, 112), (60, 40, 110), 230, borde=(255, 205, 50))
         texto(pant, "Datos verificados y misiones", (r.x + 20, r.y + 12), 22, (255, 230, 150))
-        parrafo(pant, "Lo que lanzas son datos verificados (las barritas de tu tarjeta) y se gastan. Los recargas con las "
-                      "MISIONES: revisa un rumor en su fuente y publica el desmentido en el Kiosco, reporta la cuenta del Bot, "
+        parrafo(pant, "Lo que lanzas son datos verificados (las barritas de tu tarjeta) y se gastan. Cada MISIÓN los "
+                      "recarga todos: revisa un rumor en su fuente y publica el desmentido en el Kiosco, reporta la cuenta del Bot, "
                       "da un taller o una charla. Las estrellas también dan datos.",
                 (r.x + 20, r.y + 44), 18, r.w - 40, (240, 240, 250))
         texto(pant, "¿Con control USB?  Cruceta: caminar  ·  A: lanzar  ·  B o X: poder  ·  Y: estado  ·  Start: pausa",

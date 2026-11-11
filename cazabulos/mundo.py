@@ -71,9 +71,11 @@ COLOR_MISION = {"verificar": (255, 218, 84), "reportar": (255, 120, 120), "talle
 
 # Los datos verificados son lo que lanzas: no son infinitos. Se recargan con las misiones (sobre todo),
 # con las estrellas y, muy despacio, solos.
-MUNICION_MAX = 12
-RECARGA_SOLA = 6.0        # segundos por cada dato que vuelve solo
+MUNICION_MAX = 15
+RECARGA_SOLA = 5.0        # segundos por cada dato que vuelve solo
 BOT_BLOQUEADO = 20.0      # segundos que se callan las antenas tras reportar la cuenta
+RECARGA_MISION = MUNICION_MAX     # toda misión cumplida recarga todos los datos
+ENFRIAR = {"ana": 0.26, "beto": 0.34}       # segundos entre lanzamientos (los demás 0.28)
 
 
 ROLES = {
@@ -587,7 +589,7 @@ class Mundo:
     def _lanzar(self):
         """Lanza la herramienta del personaje. Cada uno lanza distinto (ver ROLES)."""
         j = self.jugador
-        j.enfriar = {"ana": 0.22, "beto": 0.34}.get(j.clave, 0.28)
+        j.enfriar = ENFRIAR.get(j.clave, 0.28)
         j.lanzo = 0.18
         ox, oy = j.x + j.vec[0] * 6, j.y - 12 + j.vec[1] * 4
         vx, vy = j.vec
@@ -1374,7 +1376,7 @@ class Mundo:
         elif e.tipo == "reportar":
             # la cuenta falsa queda reportada: sus antenas se callan un rato
             self._hoja(["falsa", "denunciar"], x, y - 20)
-            j.municion = min(MUNICION_MAX, j.municion + 8)
+            j.municion = min(MUNICION_MAX, j.municion + RECARGA_MISION)
             self.bot_bloqueado = BOT_BLOQUEADO
             for a in self.antenas:
                 self.emitir("chispas", a.x, a.y - 30, (255, 120, 120))
@@ -1382,7 +1384,7 @@ class Mundo:
             self.aviso("¡CUENTA REPORTADA!", (255, 150, 150))
         elif e.tipo == "taller":
             # aprenden a verificar los que más amigos tienen (los que más riegan): quedan protegidos
-            j.municion = min(MUNICION_MAX, j.municion + 8)
+            j.municion = min(MUNICION_MAX, j.municion + RECARGA_MISION)
             conectados = sorted(self.vecinos.values(), key=lambda v: (-self.social.grado(v.nombre), v.nombre))[:4]
             for w in conectados:
                 if w.bulo is not None and w.bulo in self.bulos:
@@ -1395,7 +1397,7 @@ class Mundo:
             self.aviso("¡APRENDIERON A VERIFICAR!", (150, 210, 255))
         else:
             # charla de convivencia: se calman las peleas y nacen amistades nuevas en la red social
-            j.municion = min(MUNICION_MAX, j.municion + 8)
+            j.municion = min(MUNICION_MAX, j.municion + RECARGA_MISION)
             for p in self.peleas:
                 if p.get("activa") and not p.get("fin"):
                     self._calmar(p)

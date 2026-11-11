@@ -67,7 +67,8 @@ El juego está completo y jugable (ver README y `docs/ENTREGA_FINAL.md`): mundo,
     - taller (protege a los de mayor grado);
     - charla (aristas nuevas y peleas calmadas).
     En el árbol de decisiones hay dos ramas nuevas: `falsa → verificar → desmentida` y `falsa → denunciar → denunciada`.
-19. **Datos verificados:** munición de 12 (`MUNICION_MAX`). Se recargan con las misiones (todos o 6), las estrellas (+3) y solos, uno cada 4 s. Con 0 datos, la guía apunta a la misión.
+19. **Datos verificados:** munición de 15 (`MUNICION_MAX`). Toda misión la recarga completa, las estrellas dan 2 y vuelve sola uno cada 5 s. Con 3 o menos, la guía apunta a la misión. Ana lanza cada 0,26 s (antes 0,22: con datos limitados era la que más gastaba). La antena reaparece a los 12 s (Gemini la había bajado a 10) y un rumor vencido suelta 1 Bulo.
+    - Equilibrio elegido después de medir 5 configuraciones con jugadores automáticos (20 partidas por personaje, 3 estilos): a menos de 10 % entre personajes y 1 o 2 vecinos menos que con munición infinita.
 20. HUD:
     - "Estado del barrio" oculto por defecto (`Hud.ver_estado`, Tab / Y);
     - avisos, pista y misión en una columna a la izquierda;

@@ -174,7 +174,7 @@ La primera versión jugable tenía demasiadas cosas a la vez: noticias que habí
   - Dani: ondas de megáfono y estelas en los Bulos que empuja.
 
 - **Siempre hay algo que hacer: misiones y datos limitados.** Jugándolo, había ratos de solo esperar a que salieran Bulos. Ahora:
-  - Lo que lanzas son **datos verificados** y no son infinitos (12; se recargan muy despacio solos).
+  - Lo que lanzas son **datos verificados** y no son infinitos (15; vuelven solos uno cada 5 s, las estrellas dan 2 y cada misión los recarga todos).
   - Para recargarlos hay que cumplir **misiones** en lugares del barrio, una a la vez, con su tiempo y sus barritas de progreso.
   - Cada misión es parte de lo que pide el enunciado y usa las estructuras:
     - **verificar un rumor** en su fuente y publicar el desmentido en el Kiosco: rama nueva del árbol de decisiones, y el desmentido se propaga con BFS por el grafo social;

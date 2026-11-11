@@ -28,9 +28,9 @@ Antes de cada turno, la cuenta regresiva explica el juego en tres dibujos: **atr
 - **Bulo con corona:** es la raíz de una cadena. Si lo atrapas, caen todas sus copias de una vez.
 - **Estrellas (noticias verdaderas):** con solo tocarlas se comparten: la verdad le llega al vecino más cercano y a sus amigos, los cura y los protege un rato (brillan dorado).
 - **Antena del Bot:** suelta Bulos sin parar. Golpéala varias veces para apagarla (después pone otra en otro lugar).
-- **Datos verificados (lo que lanzas):** no son infinitos. Tienes 12 (las barritas de tu tarjeta); cada lanzamiento gasta uno. Se recargan sobre todo con las **misiones**, también con las estrellas (+3) y, muy despacio, solos (uno cada 4 segundos). Si te quedas sin datos, la línea guía te lleva a la misión.
+- **Datos verificados (lo que lanzas):** no son infinitos. Tienes 15 (las barritas de tu tarjeta); cada lanzamiento gasta uno. Cada **misión** cumplida los recarga todos; las estrellas dan 2 y, despacio, vuelven solos (uno cada 5 segundos). Cuando te quedan 3 o menos, la línea guía te lleva a la misión.
 - **Misiones contra la desinformación** (una a la vez; hay que ir al lugar marcado y quedarse en el círculo hasta llenar las barritas):
-  - **Verificar un rumor** de los que pide el enunciado («¿Cierran el colegio?», «¿El alcalde roba?», «¿Cierran los parques?»...): revisas la fuente en ese lugar y llevas la prueba al Kiosco de noticias. Ahí se publica el desmentido, que viaja por la red social (BFS de 2 niveles desde el vecino con más amigos) curando y protegiendo; recargas todos tus datos. Si nadie lo verifica a tiempo, **el rumor se riega**: salen Bulos en ese lugar.
+  - **Verificar un rumor** de los que pide el enunciado («¿Cierran el colegio?», «¿El alcalde roba?», «¿Cierran los parques?»...): revisas la fuente en ese lugar y llevas la prueba al Kiosco de noticias. Ahí se publica el desmentido, que viaja por la red social (BFS de 2 niveles desde el vecino con más amigos) curando y protegiendo; recargas todos tus datos. Si nadie lo verifica a tiempo, **el rumor se riega**: sale un Bulo en ese lugar.
   - **Reportar la cuenta del Bot** en la Alcaldía: sus antenas se callan 20 segundos.
   - **Taller en el Colegio:** los 4 vecinos con más amigos aprenden a verificar y quedan protegidos un buen rato.
   - **Charla de convivencia en la Plaza:** se calman las peleas y nacen amistades nuevas en la red social.
@@ -56,7 +56,7 @@ Cada poder se ve distinto al usarlo:
 - **Caro:** una red gigante que se abre y se cierra.
 - **Dani:** ondas de megáfono, y los Bulos salen disparados.
 
-La piel y el color de pelo se pueden cambiar al elegir. Con jugadores automáticos (20 partidas de 2 minutos por personaje) los cuatro sacan puntajes parecidos: jugando como un niño (reacciona tarde y a veces se distrae) quedan a menos de 5 % entre sí; jugando perfecto, Ana saca hasta 17 % más que Beto.
+La piel y el color de pelo se pueden cambiar al elegir. Con jugadores automáticos (20 partidas de 2 minutos por personaje) los cuatro sacan puntajes parecidos: jugando como un niño (reacciona tarde y a veces se distrae) con los datos limitados y las misiones quedan a menos de 10 % entre sí (2 % jugando perfecto, 9 % jugando como un niño y 4 % si se deja ESPACIO presionado).
 
 ## Modos
 
