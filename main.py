@@ -1,6 +1,6 @@
-"""Alcalde Digital.
+"""Cazabulos · Alcalde Digital.
 Ejecutar:  python main.py           (partida aleatoria)
-           python main.py 42        (semilla fija: la partida se repite igual)
+           python main.py 42        (semilla fija: los barrios salen siempre igual)
 En Windows también se puede abrir con doble clic en jugar.bat.
 """
 import subprocess
@@ -11,9 +11,22 @@ from pathlib import Path
 
 def _esperar():
     # Con doble clic la consola se cerraría antes de poder leer el mensaje.
+    if sys.stdin is None:          # abierto con pythonw (sin consola): no hay nada que esperar
+        return
     try:
         input("\nPresiona Enter para cerrar...")
-    except (EOFError, KeyboardInterrupt):
+    except (EOFError, KeyboardInterrupt, RuntimeError):
+        pass
+
+
+def _aviso_sin_consola(mensaje):
+    """Con el acceso directo (pythonw) no hay consola: el error se muestra en una ventanita."""
+    if sys.stdout is not None or not sys.platform.startswith("win"):
+        return
+    try:
+        import ctypes
+        ctypes.windll.user32.MessageBoxW(0, mensaje, "Cazabulos", 0x10)
+    except (AttributeError, OSError):
         pass
 
 
@@ -70,17 +83,25 @@ if __name__ == "__main__":
         otro = _otro_python()
         if otro:
             sys.exit(subprocess.call([otro, str(Path(__file__).resolve())] + sys.argv[1:]))
+        if sys.stdin is None:
+            _aviso_sin_consola("Falta Pygame. Abre el juego con jugar.bat para instalarlo.")
+            sys.exit(1)
         if not _instalar_pygame():
             _esperar()
             sys.exit(1)
     try:
-        from alcalde.ui.app import App
+        import numpy  # noqa: F401
+    except ImportError:
+        print("Aviso: sin numpy el juego no tiene sonido. Para instalarlo: python -m pip install numpy")
+    try:
+        from cazabulos.app import App
         semilla = int(sys.argv[1]) if len(sys.argv) > 1 else None
         App(semilla=semilla).ejecutar()
     except Exception:
-        registro = Path(__file__).resolve().parent / "alcalde_error.log"
+        registro = Path(__file__).resolve().parent / "cazabulos_error.log"
         registro.write_text(traceback.format_exc(), encoding="utf-8")
         traceback.print_exc()
         print(f"\nEl juego se cerró por un error. Quedó guardado en {registro}")
+        _aviso_sin_consola(f"El juego se cerró por un error.\nQuedó guardado en:\n{registro}")
         _esperar()
         sys.exit(1)

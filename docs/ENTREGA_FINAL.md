@@ -1,281 +1,248 @@
-# Entrega final: producto integrado
+# Entrega final · Cazabulos (Alcalde Digital)
 
-**Alcalde Digital.** La entrega final pide el producto completo: árboles, grafos, interfaz gráfica, componente aleatorio, componente inclusivo, sistema de ayuda, elementos motivadores, modo multijugador, comunicación cliente-servidor y funcionamiento estable. Esta página resume dónde está cada cosa. Los árboles se justifican en [ENTREGA_1.md](ENTREGA_1.md) y los grafos en [ENTREGA_2.md](ENTREGA_2.md).
+Cómo cumple el juego cada punto del enunciado, y las respuestas a las preguntas de la sustentación.
 
-![Pantalla de inicio](img/v2/menu.png)
+![Selección de personaje](img/cazabulos/seleccion.png)
 
-| Requisito | Dónde está |
+## 1. La idea
+
+Caminas con tu personaje por un barrio de Ciudad Nova (un mapa de 64 x 46 tiles, unas 3 pantallas, con cámara que te sigue). Los **Bulos** (publicaciones falsas) salen de la antena del Bot y vuelan hacia los vecinos; si llegan, se les suben a la cabeza y el vecino se vuelve **morado**. Un vecino morado, si nadie lo cura, le pasa el Bulo a un amigo por su hilo de la red social. Tú atrapas los Bulos, curas a los morados lanzándoles tu herramienta, compartes las **estrellas** (noticias verdaderas), calmas peleas y apagas antenas. Gana quien salve a más vecinos.
+
+El aprendizaje sale de las mecánicas, no de preguntas:
+- quien se creyó un rumor se puede **verificar** (curar) antes de que lo riegue;
+- **compartir lo verdadero** protege a la gente y a sus amigos;
+- cortar el **origen** de una cadena la detiene entera;
+- las personas **más conectadas** riegan más rápido, para bien o para mal;
+- las peleas sin calmar **rompen la comunidad**.
+
+## 2. Requisitos del enunciado
+
+| Punto del enunciado | Dónde está en el juego |
 |---|---|
-| Árboles | Árbol de mutaciones (`estructuras/arbol_mutaciones.py`) y Archivo de hechos AVL (`estructuras/archivo_avl.py`) |
-| Grafos | Red social dirigida y mapa ponderado (`estructuras/grafo.py`, `modelo/red_social.py`, `modelo/mapa.py`) |
-| Interfaz gráfica | `alcalde/ui/`: menú, selección de personajes, juego con tres vistas, noche de elecciones y resultados |
-| Componente aleatorio | 10 tipos de evento cada noche, mutaciones y propagación con probabilidades (`modelo/partida.py`) |
-| Habilidad y tiempo | Publicación viral contra reloj (controlado por el servidor en red). En el mismo computador, además, un reloj por publicación (20 s por defecto) que pasa el turno solo, pausa manual con `P` y pausa opcional entre días con botón «Iniciar día». Cada jugador administra 12 minutos por turno entre caminar, verificar, decidir y conversar |
-| Estado de la ciudad y puntuación | 6 indicadores, salud de la ciudad, puntos, reputación y 10 logros por jugador |
-| Elección del alcalde | Votación por zonas según lo que cree cada vecino (`modelo/eleccion.py`, `ui/pantalla_eleccion.py`) |
-| Componente inclusivo | Panel de accesibilidad con 8 opciones, paleta para daltonismo y formas por estado, personalización de personajes |
-| Sistema de ayuda | Ayuda con 8 secciones, guía de Civi en el primer turno y vista previa de cada botón |
-| Elementos motivadores | Personajes que reaccionan, sonidos y música, confeti, logros, puntos flotantes, noche y elección animadas |
-| Multijugador cliente-servidor | Sockets TCP con un servidor que guarda la partida (`alcalde/red/`) |
-| Funcionamiento estable | 46 pruebas automáticas, partidas completas con clics y una prueba de estrés de 20.000 acciones al azar |
+| 2 a 4 jugadores con roles distintos | Ana (Periodista), Beto (Influencer), Caro (Ciudadana), Dani (Candidato). Cada uno lanza algo distinto y tiene una ventaja y un poder propios (`cazabulos/mundo.py`, `ROLES`). Ninguno es más fuerte: con el mismo jugador automático (20 partidas de 2 minutos por personaje) los cuatro quedan a menos de 10 % de distancia en puntos. |
+| Decidir qué hacer con cada publicación (compartir, verificar, ignorar, reportar) | Son las acciones del juego y las ramas del árbol de decisiones: atrapar un Bulo en el aire es **reportarlo**; curar a quien se lo creyó es **verificar**; tocar una estrella es **compartirla**; dejar pasar una estrella que tuviste en frente es **ignorarla**. Además, las **misiones** son ramas del árbol: *verificar en la fuente y desmentir* (rumores del enunciado como «¿Cierran el colegio?») y *denunciar la cuenta falsa* del Bot. |
+| Periodista detecta noticias falsas | Ana ve en el minimapa todos los Bulos sueltos (los demás no) y su periódico atraviesa varios Bulos de un tiro. Su poder congela a los Bulos de la pantalla. |
+| Influencer con mayor impacto | Cuando Beto cura a alguien, la cura les llega también a los amigos de ese vecino (BFS de un nivel). Las estrellas que comparte llegan dos niveles en la red (las de los demás, uno). |
+| Candidato construye confianza y enfrenta rumores | A quien cura Dani no le vuelven a entrar Bulos por un buen rato, gana más puntos por cada vecino curado y por cada rumor sobre un candidato que atrapa, su Discurso cura a los vecinos cercanos y, si alguien juega con Dani, Dani aparece en la elección. |
+| Ciudadano que cuida la convivencia | Caro corre más rápido, su red es más ancha y calma una pelea de un solo golpe (los demás necesitan dos). |
+| Árboles y grafos con función real | Ver la sección 3. |
+| Propagación por el grafo social | Cada vecino morado le pasa el Bulo al amigo en quien más confía (la arista de mayor peso), como una bolita que viaja por el hilo. En los últimos 3,5 segundos se ve una línea punteada hacia ese amigo. El viral se riega por BFS (hasta 2 niveles y como máximo 5 vecinos, en el orden del recorrido). La verdad de las estrellas también se riega por BFS. |
+| Quién recibe, cuántos, qué tan rápido, si es verdad, qué consecuencias | **Quién:** el BFS da quiénes y en qué orden (y el amigo de más confianza en cada reenvío). **Cuántos:** el árbol de decisiones cuenta cuántas veces se regó y el aviso dice el tamaño de cada cadena cortada. **Qué tan rápido:** los vecinos con más amigos reenvían antes (entre 7,5 y 14 segundos según su grado). **Si es verdad:** las publicaciones falsas son Bulos morados y las verdaderas son estrellas doradas, y las dos viajan por el mismo grafo. **Consecuencias:** las hojas del árbol cambian los indicadores, los puntos y la elección. |
+| Componente aleatorio | Eventos: aparece una noticia falsa (un grupo de Bulos), Bulo viral, rumor sobre un candidato, discusión entre vecinos, noticias verdaderas, campaña de convivencia y un vecino que reporta. Cambian en cada partida (semilla), pero dentro de una ronda son los mismos para todos los jugadores. |
+| Habilidad y decisión con tiempo límite | El **Bulo viral** aparece con 10 segundos en pantalla y hay que golpearlo 3 veces; si no, se riega por BFS. También cada vecino morado da 3,5 segundos de aviso antes de pasar el Bulo, y cada pelea tiene un reloj antes de romper la amistad: el jugador decide a qué atender primero. |
+| Estado de la ciudad | 6 indicadores en vivo: información verificada, confianza, convivencia, bienestar digital, desinformación y conflictos (`Mundo.indicadores`). |
+| Puntuación individual y resultado general | Puntos por jugador, bono por vecinos a salvo y estrellas de reputación (3 con 14 o más vecinos a salvo, 2 con 9 o más). La ciudad tiene sus indicadores y la elección. |
+| Logros, recompensas y retroalimentación | 14 logros guardados (`cazabulos/guardado.py`), combos, puntos que saltan, avisos cortos (¡CADENA DE 3!), un mensaje final que va con las estrellas y el árbol de decisiones del turno. |
+| Elección del alcalde | `calcular_eleccion` en `cazabulos/partida.py`. La regla es clara para los niños: si la desinformación promedio de todos los turnos llega a 50 (la mitad del barrio se creyó los Bulos), gana Emilio Bot. Si no, gana el candidato honesto con más votos; esos votos salen de la confianza, la convivencia, el bienestar y los rumores frenados o creídos sobre cada uno. |
+| Multijugador cliente-servidor con sockets | `cazabulos/red/`: servidor TCP con hilos y mensajes JSON. Sincroniza la sala, los jugadores y sus personajes, las rondas (semilla y duración), las posiciones y puntajes en vivo, los avisos, los resultados de cada ronda y los finales. |
+| Interfaz gráfica | Todo en pygame: ciudad, personaje, publicaciones (Bulos y estrellas), opciones, estado, puntuación, indicadores y resultados. |
+| Inclusividad | Ver la sección 5. |
+| Sistema de ayuda | Pantalla AYUDA de 8 páginas: objetivo, cómo se juega, personajes, cómo ganar, indicadores, grafos, árboles y multijugador. Durante la partida orientan: la cuenta regresiva con tres dibujos, flechas con dibujos hacia lo que no se ve, la línea de Dijkstra hacia lo más urgente y una pista corta la primera vez que alguien se vuelve morado. |
+| Elementos motivadores | Música y efectos, animaciones, partículas, temblor de cámara, confeti, podio, logros, récords, combos, estrellas de reputación y mensajes. Un barrio vivo: árboles que se mecen, fuente, laguna con patos, palomas que salen volando, mariposas, banderas, nubes y una noche con ventanas, faroles y luciérnagas. |
 
----
+## 3. Las estructuras de datos
 
-## 1. Rediseño visual
+### Grafo social (`cazabulos/estructuras/grafo.py`, `cazabulos/ciudad.py`)
 
-En la entrega 1 la profesora comentó que el juego funcionaba bien, pero que **no había personajes** y que la interfaz era **común y opaca**. Esto fue lo que cambió.
+- **Qué representa:** 18 vecinos (vértices) y 29 amistades (aristas no dirigidas con peso de confianza 1 a 3). Rosa es "la del grupo de chat" y tiene 7 amigos.
+- **Para qué sirve:**
+  - **Propagación de los Bulos:** cada vecino morado se lo pasa al amigo de mayor peso (el que más confía).
+  - **Propagación de la verdad:** al tocar una estrella, un **BFS** desde el vecino más cercano lleva la verdad a sus amigos (1 nivel; con Beto, 2).
+  - **Viral:** se riega con **BFS** limitado a 2 niveles y con un filtro (los vecinos protegidos no lo reciben ni lo pasan).
+  - **Objetivo de los Bulos:** buscan al vecino de mayor **grado**.
+  - **Velocidad:** el tiempo para reenviar depende del grado (los más conectados reenvían antes).
+  - **Comunidades:** **DFS / componentes**.
+- **Se ve en el juego:** los hilos por donde viaja un Bulo son morados; la verdad se ve crecer en dorado nivel por nivel; las amistades nuevas brillan en verde. Al final de cada turno, la tecla TAB muestra la red del barrio en anillos del BFS desde el vecino más conectado: quién quedó con Bulo, quién protegido, las amistades rotas (rojo) y las nuevas (verde), y cuántas comunidades quedaron (DFS). La ayuda dibuja el grafo igual, con cada anillo de un color.
+- **Cambia durante la partida:**
+  - Si una pelea no se calma, la amistad se rompe (**eliminar arista**) y por ahí ya no pasa nada, ni Bulos ni verdad.
+  - Si se calma, la confianza sube (el peso aumenta).
+  - La campaña de convivencia crea amistades nuevas (**agregar arista**).
 
-### 1.1 Personajes
+### Grafo de la ciudad (`cazabulos/mapa.py` `NODOS`/`ARISTAS`, `cazabulos/ciudad.py`)
 
-![Selección de personajes](img/v2/seleccion.png)
+- **Qué representa:** 28 lugares y esquinas (Colegio, Plaza, Alcaldía, Mercado, Parque, Kiosco, Terminal…) unidos por tramos de calle con peso = distancia. Cada tramo se comprueba contra las colisiones del mapa: no se usa uno que atraviese un edificio.
+- **Para qué sirve:**
+  - **Dijkstra** da la ruta más corta para la línea guía del jugador hacia lo más urgente que no se ve: el viral, una pelea, el vecino morado más cercano o la antena. La ruta se ve en el piso y en el minimapa.
+  - Los vecinos la usan para ir de una zona a otra.
 
-- **Todos los personajes están ilustrados** (`ui/personajes.py`). Se generan como dibujos vectoriales con:
-  - 6 tonos de piel, 9 peinados, 7 colores de pelo, 8 colores de ropa y 6 detalles (gafas, barba, bigote, aretes, gorra);
-  - vestuario según el rol: el ciudadano lleva saco con capota; el periodista, chaleco, cámara y carné; el influencer, chaqueta y celular; el candidato, traje y banda de campaña;
-  - expresiones: normal, feliz, preocupado, enojado, sorprendido y confundido, además del parpadeo.
-- **Los jugadores arman su personaje** antes de empezar, con un botón de varita mágica.
-- **Los 20 ciudadanos de la red tienen cara propia**: salen en el celular, en la red social, en el árbol del rumor y en el mapa. Cuando un vecino cree algo falso, su cara se ve confundida.
-- **Los 4 candidatos** tienen afiches de campaña con lema.
-- **Civi, la lechuza de Civitas**, es la mascota que guía al jugador.
-- **Las cuentas bot** se dibujan como robots para que se reconozcan.
-- **El personaje del jugador** aparece de cuerpo entero en su panel y reacciona a lo que hace (feliz, preocupado o sorprendido, con una frase). En el mapa camina por las calles.
+### Árbol de mutaciones (`cazabulos/estructuras/arbol_mutaciones.py`)
 
-### 1.2 Estilo
+1. **Problema:** saber de dónde salió cada copia de un rumor y poder cortar la cadena desde su origen.
+2. **Por qué un árbol:** cada Bulo tiene exactamente un padre (el que lo originó) y puede tener muchos hijos. Es una jerarquía sin ciclos.
+3. **Variante:** árbol general (n-ario) con lista de hijos y referencia al padre. Hay un bosque de raíces: cada antena o evento crea una raíz.
+4. **Insertar y eliminar:**
+   - Insertar: cuando un Bulo salta a otro vecino, el nuevo Bulo se inserta como hijo.
+   - Eliminar: al atrapar un Bulo se elimina **todo su subárbol**. Por eso la raíz (con corona) tumba toda la cadena y cura a todos los de esa cadena.
+5. **Recorridos:** preorden para la animación de la cadena que cae; también postorden, por niveles, altura, tamaño y camino a la raíz.
 
-La dirección visual es **«pegatina de campaña en una ciudad caribeña a pleno sol»**: paneles blancos con contorno de tinta y sombra dura, como las calcomanías de una campaña, sobre una Ciudad Nova soleada con edificios ilustrados (la Alcaldía con la bandera de Colombia, el colegio, la plaza de mercado, el estadio, la terminal con su buseta). Las fuentes son Fredoka (títulos y botones) y Nunito (texto). Los iconos son de Lucide.
-
-### 1.3 Intuitivo
-
-![El celular de Civitas con la publicación y sus botones](img/v2/verificacion.png)
-
-- **Un turno simple, en dos pasos.** 1) Si quieres, caminas a otra zona del mapa: te llega una publicación de allí. 2) Decides qué hacer con la publicación del celular. Puedes verificarla (cuesta 3 puntos) y luego decides qué hacer con ella. Al decidir, todos ven si era verdadera o falsa: quien se acuerda se ahorra las verificaciones de los próximos turnos. El panel del jugador muestra los dos pasos con casillas.
-- **Vista previa de la consecuencia.** Al pasar el mouse por un botón se ve qué hace: «Se la mandas a tus 6 seguidores. Gana si es verdadera» o «Este hecho no está en el Archivo: ve al Hospital para verificarlo». Si un botón está apagado, se explica por qué.
-- **El resultado se explica.** Después de decidir, el celular dice si acertaste, cuántos puntos ganaste o perdiste y cuál es el hecho real, para que todos lo recuerden.
-- **Al verificar se ve la diferencia exacta** entre la publicación y el hecho oficial, con un sello de Falsa, Verdadera o Sin datos. Por ejemplo: *Cifra inflada. Dice: «durante 30 días». Oficial: «durante 3 días».*
-- **Todo pasa en el mapa.** Las publicaciones viajan de cara en cara por la ciudad, también en la ola de cada noche. Las pestañas Red social y Árbol del rumor muestran las estructuras con más detalle.
-- **Guía de Civi** en el primer turno: 8 pasos que señalan cada parte de la pantalla. Se puede saltar.
-
----
-
-## 2. Arquitectura
-
-```
-main.py ─ App (ui/app.py) ─ pantallas: menú › selección o red › juego › elección › resultados
-                                   │
-                         PantallaJuego (ui/pantalla_juego.py)
-                         celular · mapa · red social · árbol · paneles · ventanas
-                                   │  le pide las jugadas a…
-                        ┌──────────┴───────────┐
-               ControladorLocal         ControladorRed ── socket ──► Servidor (red/servidor.py)
-               (todos en un PC)         (cada quien en su PC)             │
-                        └──────────┬───────────┘                          │
-                                   ▼                                      ▼
-                         Partida (modelo/partida.py)  ◄──────── la misma clase, en el servidor
-                         árbol de mutaciones · AVL · red social · mapa · elección
-```
-
-- **`alcalde/estructuras/`**: el árbol n-ario, el AVL y el grafo. No conocen el juego.
-- **`alcalde/modelo/`**: la lógica, sin interfaz: la partida, la red social, el mapa, la elección y la serialización. Se puede probar sola.
-- **`alcalde/red/`**: el protocolo, el servidor y el cliente.
-- **`alcalde/controlador.py`**: la interfaz nunca modifica la partida directamente; le pide la jugada a un controlador. En local se aplica al instante; en red se envía al servidor y la interfaz se actualiza cuando llega el estado nuevo. Gracias a esto, **la misma pantalla de juego sirve para los dos modos**.
-- **`alcalde/ui/`**: todo lo gráfico en Pygame.
-
----
-
-## 3. Multijugador cliente-servidor
-
-![Sala de espera de una partida en red](img/v2/lobby.png)
-
-### 3.1 Cómo se juega en red
-
-1. Un computador elige **Jugar en red › Crear partida**. Ese computador abre el servidor (puerto 5050) y también juega. La pantalla muestra su dirección, por ejemplo `192.168.1.20`.
-2. Los demás, conectados a la misma red wifi, eligen **Unirse** y escriben esa dirección.
-3. Cada quien arma su personaje. El anfitrión elige la duración y pulsa **Comenzar partida**.
-
-También se puede correr un servidor dedicado sin ventana:
-
-```bash
-python servidor.py --puerto 5050
-```
-
-Windows puede preguntar si se permite el acceso por el firewall; hay que permitirlo en redes privadas.
-
-### 3.2 Arquitectura del servidor
+### Árbol de decisiones de cada publicación (`cazabulos/estructuras/arbol_decision.py`)
 
 ```
-                     SERVIDOR (red/servidor.py)
-        hilo «aceptar»  ──►  un hilo «lector» por cliente
-                                    │  (mensaje)
-                                    ▼
-                          cola de mensajes (queue.Queue)
-                                    │
-                                    ▼
-                      hilo «juego»: único que toca la Partida
-                      valida turno ─► aplica jugada ─► envía el estado a todos
-          ┌──────────────┬──────────┴───┬──────────────┐
-      CLIENTE 1      CLIENTE 2      CLIENTE 3      CLIENTE 4
-      Ciudadano      Periodista     Influencer     Candidato
+                  PUBLICACIÓN
+                 /           \
+           falsa (Bulo)     verdadera (estrella)
+           /        \           /         \
+   La atrapas    Alguien     La compartes  La dejas pasar
+   (REPORTAR)   se la cree   (COMPARTIR)   (IGNORAR)
+                 /      \
+          Lo curas     Se la pasa
+         (VERIFICAR)   a un amigo
 ```
 
-- **Un solo hilo modifica la partida.** Los hilos lectores solo ponen mensajes en una cola, así que nunca hay dos jugadas aplicándose a la vez. No hacen falta candados sobre el modelo.
-- **El servidor es la autoridad.** Valida que quien envía la jugada tenga el turno (o sea quien decide la publicación viral). Las jugadas fuera de turno se rechazan con un aviso. La partida, el azar y el reloj de lo viral viven solo en el servidor.
-- **El reloj de lo viral es del servidor.** Cuando aparece una publicación viral, el servidor fija un plazo: 10 segundos, 20 si decide el ciudadano y 10 más si ese jugador activó «Más tiempo». Si se vence, la resuelve sin respuesta. Los clientes muestran la cuenta regresiva con el tiempo que les envía.
-- **Desconexiones.** En la sala de espera se libera el puesto. En la partida, el jugador queda marcado sin conexión y, si es su turno, se le pasa a los 20 segundos.
+1. **Problema:** toda publicación termina de una forma, y cada final tiene consecuencias distintas en los indicadores. Las reglas quedan en un solo lugar.
+2. **Por qué un árbol:** son decisiones encadenadas que se abren en opciones y terminan en un resultado (hoja), igual que el ejemplo del enunciado.
+3. **Variante:** árbol general con aristas etiquetadas; las hojas guardan el efecto (puntos e indicadores).
+4. **Insertar y eliminar:** `insertar(padre, etiqueta, nodo)` agrega una rama y `eliminar(clave)` quita la rama completa.
+5. **Recorridos:**
+   - `recorrer(etiquetas)` baja desde la raíz siguiendo lo que pasó y cuenta las visitas.
+   - Preorden para dibujarlo al final del turno con los números.
+   - Por niveles y camino a una hoja.
+6. **Cómo se usa en el juego:**
+   - Cada Bulo atrapado en el aire baja por *falsa → atrapar*.
+   - Cada vecino curado baja por *falsa → llega → curar*.
+   - Cada reenvío que llega baja por *falsa → llega → pasar*.
+   - Cada estrella tocada baja por *verdadera → compartir*.
+   - Cada estrella que estuvo en la pantalla del jugador y desapareció baja por *verdadera → ignorar*.
 
-### 3.3 Protocolo
+### AVL (`cazabulos/estructuras/avl.py`)
 
-Cada mensaje es **un objeto JSON en una línea** (UTF-8) sobre TCP (`red/protocolo.py`).
+La tabla de récords: inserción y eliminación balanceadas, recorrido en orden inverso para el top 10, y se elimina el menor cuando hay más de 200.
 
-| Cliente › servidor | Para qué |
-|---|---|
-| `hola`, `perfil` | Entrar a la sala y cambiar nombre, rol, apariencia y la opción de más tiempo |
-| `iniciar` | Comenzar la partida (solo el anfitrión, con 2 a 4 jugadores) |
-| `accion` | Verificar, compartir, reportar, ignorar, especial o borrar (`caso`, `nodo`, `clave`) |
-| `mover`, `conversar`, `siguiente`, `fin_turno` | Caminar a una zona, conversar con los vecinos, pasar a la segunda publicación del turno, terminar el turno |
-| `viral` | Respuesta a la publicación viral |
+## 4. Arquitectura en línea
 
-| Servidor › cliente | Para qué |
-|---|---|
-| `bienvenida` | Identificador de la conexión |
-| `lobby` | Jugadores conectados y quién es el anfitrión |
-| `estado` | Estado completo de la partida, qué jugador eres (`tu`), tiempo viral restante y desconectados |
-| `aviso` | Errores y avisos («Espera tu turno», «Se desconectó…») |
+```
+            SERVIDOR (cazabulos/red/servidor.py)
+     sala · rondas · semillas · marcador · resultados
+        /              |               \
+   CLIENTE 1        CLIENTE 2        CLIENTE 3 ...
+   (Ana)            (Beto)           (Caro)
+```
 
-### 3.4 Qué se sincroniza y cómo se serializan las estructuras
+- **Mensajes (JSON, uno por línea, TCP):**
+  - Del cliente al servidor: `hola`, `elegir`, `empezar`, `estado`, `resultado`, `listo`.
+  - Del servidor a los clientes: `sala`, `ronda`, `marcador` (6 veces por segundo), `aviso`, `fin_ronda`, `fin`.
+- **Cómo se juega:** cada cliente simula su propio barrio con la semilla que le da el servidor, así nadie depende de la conexión de otro para jugar. El servidor junta los resultados de todos para la tabla y la elección.
+- **Cómo se abre la sala:** el que crea la sala corre el servidor dentro del juego. También existe `python -m cazabulos.red.servidor` para un servidor dedicado.
 
-El servidor envía el **estado completo** después de cada jugada (`modelo/serializacion.py`). Pesa entre 20 y 65 KB, nada para una red local. Incluye la partida, los jugadores, las publicaciones, las relaciones, los eventos, las puntuaciones, los turnos y la información compartida. El cliente reconstruye con eso una Partida «espejo» con las mismas estructuras, y la interfaz la dibuja igual que en local.
+## 5. Inclusividad
 
-- **Árbol de mutaciones**: se envía en **preorden** con el id del padre de cada nodo. Como en preorden cada padre llega antes que sus hijos, se reconstruye **insertando en ese mismo orden**.
-- **Archivo AVL**: se envía su **preorden**. Reinsertarlo en un AVL dispararía rotaciones, porque todo el subárbol izquierdo llega antes que el derecho, y la forma cambiaría. Por eso `ArchivoHechosAVL.desde_preorden` lo reconstruye **sin rotar**, tomando cada clave como raíz de su rango (lo, hi), como en un BST. Así el cliente ve exactamente el mismo árbol, con sus alturas y factores de balance. La prueba `test_avl_desde_preorden_conserva_la_forma` lo comprueba.
-- **Grafos**: lista de vértices (con los datos de cada ciudadano) y lista de aristas con sus pesos.
-- **Animaciones**: la partida guarda una lista numerada de eventos de animación (pulsos de la ola, rutas, aristas rotas, etc.). Cada cliente reproduce los que no ha visto, así que todos ven la propagación al mismo tiempo.
+- **Pocas palabras y muchos dibujos:**
+  - El juego se explica antes de cada turno con tres dibujos ("¡Atrápalos!", "¡Cura a los morados!", "Recoge las estrellas").
+  - Las flechas hacia lo que no se ve llevan un dibujo, no una palabra.
+  - Durante el juego solo aparecen avisos de una o dos palabras.
+  - Atiende a niños pequeños que todavía leen despacio y a quien se abruma con mucha información.
+- **Control USB:** se puede jugar sin teclado (cruceta, A, B/X y Start). Las ayudas en pantalla se cambian solas a los botones del control. Atiende a niños que no manejan bien un teclado.
+- **Modo tranquilo:** Bulos más lentos, reenvíos y peleas más largos. Atiende a niños pequeños y a quien está aprendiendo. "¡Jugar ya!" lo usa siempre.
+- **Alto contraste:** borde blanco grueso en Bulos y estrellas, controles siempre visibles y la marca "TÚ" sobre el jugador. Atiende a quien ve poco o se distrae.
+- **Subtítulos de sonidos (opción):** los sonidos importantes (pitos de carros, alarmas, golpes, contagios) aparecen escritos junto a donde ocurren. Atiende a quien no oye bien o juega sin volumen.
+- **Personalización:** se puede cambiar la piel (5 tonos) y el pelo (6 colores) de cada personaje para que cada niño se vea representado.
+- **Formas además de colores:**
+  - Los Bulos son gotas con antenas, las noticias son estrellas y los vecinos con Bulo llevan el Bulo encima de la cabeza (no solo se ponen morados).
+  - Así se distinguen aunque alguien no vea bien los colores.
+- **Regreso solo al inicio:** si nadie toca nada en 90 segundos, el juego vuelve a la pantalla de inicio. Así el siguiente niño de la fila de la feria siempre encuentra el juego listo.
 
-La prueba `tests/test_red.py` levanta un servidor real con 3 clientes por sockets, juega una partida completa, intenta jugadas fuera de turno y comprueba que todos terminan con el mismo estado y el mismo alcalde.
+## 6. Decisiones de diseño tomadas al probarlo
 
----
+La primera versión jugable tenía demasiadas cosas a la vez: noticias que había que mirar quieto antes de compartir, estrellas falsas disfrazadas, globos con lo que decía cada vecino, nombres y banners de texto. Al probarla, la queja fue clara: mucha información para tan poco tiempo y textos que tapaban el juego. Se cambió así:
 
-## 4. Elección del alcalde
+- **Una sola acción para todo:** lanzar. Se lanza a los Bulos, a los morados, a la antena, a las peleas y al viral.
+- **La estrella se comparte con solo tocarla.** La decisión de verificar pasó a ser curar a quien se creyó el rumor, que es más clara para un niño y deja las cuatro acciones del enunciado en el árbol.
+- **Sin textos encima del juego:** se quitaron los globos de diálogo, los nombres y los banners. Quedan avisos de una o dos palabras, flechas con dibujos y una sola pista.
+- **Solo se ven los hilos que importan en ese momento:** el que lleva un Bulo y el aviso de a quién se lo van a pasar. Antes se dibujaban todas las amistades y la pantalla se llenaba de líneas.
+- **Más tiempo:** turnos de 2 minutos (90 segundos en "¡Jugar ya!").
+- **Abre en una ventana grande que llena la pantalla, con su propio ícono** y sin consola; F11 la pasa a pantalla completa.
+- **Los paneles no tapan el juego:** en las orillas del mapa la cámara se corre un poco más allá del borde, y si un vecino morado, una estrella, la antena o el viral queda debajo de un panel, el panel se vuelve casi transparente.
+- **El personaje camina más rápido** (100 pixeles por segundo; antes 78 y luego 92): a veces los Bulos salían lejos y no se alcanzaba a llegar. Caro sigue siendo la más rápida.
+- **Gráficos más claros y un barrio vivo:**
+  - Todo tiene un borde oscuro de un pixel: personajes, vecinos, carros, árboles, edificios y objetos. Así se distinguen del fondo de un vistazo.
+  - Los árboles y arbustos que tenían justo el verde del pasto se veían huecos: se pintaron de verde pino.
+  - El barrio se mueve solo (agua, fuente, palomas, patos, mariposas, banderas, nubes, noche con luces). Nada de eso cambia el juego: usa su propio azar y una prueba comprueba que, con la misma semilla, el turno sale igual dibujando o sin dibujar.
+- **Aspecto más profesional (estilo Stardew Valley o los Pokémon nuevos en 2D):**
+  - Pasto con texturas, bordes orgánicos hacia los caminos y bordillo de piedra hacia los andenes.
+  - Hierba alta que se mece y reacciona al caminar.
+  - Laguna de orillas naturales con espuma, destellos y reflejos.
+  - Grietas, piedritas y musgo en los pisos; relieve en los edificios.
+  - Sombras suaves y oclusión ambiental.
+  - Brillo (bloom) y motas de luz.
+  - Todo se genera en código al cargar el mapa (no se descargaron paquetes de otros autores, para que combine con Kenney y no haya problemas de licencias).
+  - Al probarlo, las luces de noche quedaron demasiado fuertes: se bajaron para que la noche se siga sintiendo como noche.
+  - El brillo se apaga solo si el computador no alcanza a dibujar fluido.
+- **Cada poder se ve distinto:** al probarlo, el de Ana y el de Beto se veían iguales (un anillo grande). Ahora:
+  - Ana: escarcha y copos en los Bulos congelados.
+  - Beto: transmisión en vivo y corazones que llevan una burbuja dorada a cada vecino protegido.
+  - Caro: una red que se abre y se cierra.
+  - Dani: ondas de megáfono y estelas en los Bulos que empuja.
 
-![Noche de elecciones](img/v2/eleccion.png)
+- **Siempre hay algo que hacer: misiones y datos limitados.** Jugándolo, había ratos de solo esperar a que salieran Bulos. Ahora:
+  - Lo que lanzas son **datos verificados** y no son infinitos (15; vuelven solos uno cada 5 s, las estrellas dan 2 y cada misión los recarga todos).
+  - Para recargarlos hay que cumplir **misiones** en lugares del barrio, una a la vez, con su tiempo y sus barritas de progreso.
+  - Cada misión es parte de lo que pide el enunciado y usa las estructuras:
+    - **verificar un rumor** en su fuente y publicar el desmentido en el Kiosco: rama nueva del árbol de decisiones, y el desmentido se propaga con BFS por el grafo social;
+    - **reportar la cuenta del Bot** en la Alcaldía: rama del árbol; las antenas se callan;
+    - **taller en el Colegio:** protege a los vecinos de mayor grado del grafo;
+    - **charla de convivencia en la Plaza:** agrega aristas al grafo social y calma peleas.
+  - La línea guía llega a cada misión con Dijkstra sobre el grafo de la ciudad.
+  - Si un rumor no se verifica a tiempo, se riega: salen Bulos.
+- **Menos cosas tapando la vista:**
+  - el estado del barrio empieza oculto (Tab o Y en el control);
+  - los avisos, la pista y la misión salen en una columna a la izquierda, no en el centro de la pantalla;
+  - el nombre del poder ya no aparece en grande encima del jugador.
 
-Al terminar el último día, **cada zona del mapa vota** (`modelo/eleccion.py`):
+## 7. Respuestas para la sustentación
 
-1. **Puntaje de cada candidato en la zona** = apoyo general + apoyo ganado en la zona por la gira del candidato-jugador − castigo por rumores.
-2. **Castigo por rumores**: si los residentes de la zona creen una versión falsa contra un candidato, ese candidato pierde puntaje ahí. El castigo es proporcional a la fracción de vecinos engañados.
-3. **Participación**: sube con la convivencia y el bienestar, y baja con los conflictos y con la tensión de la zona.
-4. Los votos se reparten según el puntaje (al cuadrado, para que las diferencias pesen) entre los votantes de la zona.
-5. Si un jugador es **candidato**, su reputación, sus verificaciones y las personas que corrigió le suman apoyo. Esto cumple el enunciado: más confianza, reputación y verificación significan más votos.
-6. Se calcula también la **elección sin rumores**. Si el ganador cambia, la pantalla lo dice: «La desinformación cambió la elección: sin rumores habría ganado…». Si no, muestra cuántos votos le quitaron los rumores a cada candidato.
+- **¿Por qué un árbol?**
+  - Porque los rumores tienen origen y copias: cada copia tiene un solo padre. Cortar un subárbol es exactamente "detener la cadena desde su origen".
+  - Porque lo que pasa con una publicación se abre en ramas con un resultado al final.
+- **¿Por qué un grafo?** Porque las amistades no son una jerarquía: forman una red con ciclos, y la propagación depende de quién está conectado con quién. La ciudad también es una red de calles donde hay que encontrar rutas cortas.
+- **¿Cómo afectan al jugador?**
+  - Si un vecino muy conectado se vuelve morado, reenvía antes y a más gente.
+  - El jugador aprende a curar primero a los más conectados, a buscar la raíz con corona y a llevar la verdad a donde hay más amigos.
+- **¿Qué pasa cuando cambian la información o las relaciones?**
+  - Una pelea no calmada borra la arista: esos dos vecinos ya no se pasan nada, ni Bulos ni verdad.
+  - Una campaña de convivencia crea aristas nuevas.
+  - El BFS y la propagación usan siempre el grafo actual.
+  - Cuando un vecino se cura o se protege, deja de ser un camino para los Bulos.
+- **¿Cómo se comunica la información entre jugadores?** Por el servidor:
+  - posiciones (los fantasmas), puntajes en vivo y avisos ("Beto terminó su turno");
+  - resultados de cada ronda y resultados finales.
+- **¿Qué comportamiento se fomenta?**
+  - Ayudar a quien se creyó un rumor antes de que lo comparta.
+  - Compartir lo verdadero.
+  - Cortar las cadenas desde el origen.
+  - No dejar que una discusión rompa la comunidad.
+  - Saber que lo que comparte alguien con muchos seguidores llega más lejos, para bien o para mal.
 
-En la pantalla se cuentan las zonas una por una, las barras crecen y al final se anuncia quién gana, con fuegos artificiales. En simulaciones de 30 partidas, un candidato-jugador responsable gana casi siempre, uno que juega al azar gana alrededor del 60 % de las veces y uno irresponsable casi nunca. Sin candidato-jugador, el ganador varía entre partidas.
+## 8. Pruebas
 
----
+`python -m unittest discover -s cazabulos/pruebas -t .` corre 79 pruebas.
 
-## 5. Componente aleatorio
+- **Estructuras:** BFS por niveles y con filtro, componentes, Dijkstra, subárboles, recorridos, AVL y el árbol de decisiones (sus caminos, las cuatro acciones del enunciado y eliminar ramas).
+- **Juego:**
+  - Misma semilla, mismo barrio.
+  - Contagio por el grafo al amigo de más confianza, con aviso a quién se lo va a pasar.
+  - La raíz tumba la cadena.
+  - Curar lanzando al cuerpo del morado, atrapar en el aire (reportar) y reenvío que llega (regar).
+  - La estrella comparte la verdad por BFS (Beto llega a dos niveles). Solo cuenta como ignorada si estuvo en pantalla.
+  - El periódico de Ana atraviesa, las peleas se calman lanzando, peleas que rompen hilos y viral por BFS.
+  - Estrellas de reputación y mensaje final que va con ellas. Jugando solo se pasa directo a la elección.
+- **Mapa:** colisiones con edificios, grafo de la ciudad caminable y carros siempre en su carril sin chocar.
+- **Gráficos:** todo con borde, árboles y arbustos que se distinguen del pasto, palomas que salen volando y se posan en un lugar libre, fuente y laguna que se mueven, luciérnagas solo de noche, dibujar no cambia el turno, las imágenes no se acumulan en memoria cuadro tras cuadro, la hierba alta se abre y suelta hojitas al entrar, el suelo con texturas y la laguna redondeada (y sin numpy se dibuja como antes) el brillo que se apaga solo si el computador va lento y que cada poder arranca su propio dibujo y le llega a quien le hizo efecto.
+- **Partida y red:** turnos y rondas, elección y servidor con dos clientes.
+- **Control USB y feria:**
+  - Botones que cambian según la pantalla y palanca con margen para que no tiemble.
+  - Cruceta que mueve al jugador.
+  - Puntero del mouse que no selecciona botones solo y "Salir" que pregunta antes de cerrar.
+  - Las opciones viejas pasan a ventana grande; en las esquinas del mapa los paneles no tapan al jugador; un panel se aclara si tapa algo importante.
+  - Regreso solo al inicio sin interrumpir un turno ni el modo en línea.
+  - Rescate que vuelve al inicio si una pantalla falla.
 
-Cada noche ocurre **un evento al azar**. El resultado varía entre partidas, salvo si se usa una semilla fija (`python main.py 42`).
-
-| Evento | Qué hace | Estructura que toca |
-|---|---|---|
-| Noticia falsa | Nueva historia con dos distorsiones | Árbol nuevo; primera ola por la red |
-| Rumor sobre un candidato | Historia con atribución falsa | Árbol nuevo; castiga al candidato en la elección |
-| Noticia verdadera | Historia fiel al hecho | Árbol nuevo |
-| Publicación viral | La publicación de un superpropagador, contra reloj | Grado de salida (centralidad) |
-| Discusión | Dos vecinos dejan de seguirse y la tensión se contagia | Eliminar arista; BFS en el mapa; componentes (burbujas) |
-| Campaña de convivencia | Baja la tensión cerca y reconcilia amistades | BFS en el mapa; agregar aristas |
-| Un ciudadano reporta | Civitas retira un reenvío falso | Podar el árbol |
-| Un hecho vence | Sale del Archivo | Eliminar en el AVL |
-| Cuenta bot | Aparece un bot con 8 seguidores que publica un rumor | Agregar vértice; si lo reportan, se elimina |
-| Vecino nuevo | Alguien se muda y se une a Civitas | Agregar vértice y aristas |
-
-Además son aleatorios quién cree y quién reenvía en cada ola, qué distorsión aparece al mutar y cómo se genera la red social. Pero **la habilidad importa**: en 30 partidas simuladas, jugar de forma responsable deja la ciudad con salud ~90, jugar al azar con ~63 y jugar de forma irresponsable con ~16.
-
----
-
-## 6. Componente inclusivo
-
-![Panel de accesibilidad](img/v2/accesibilidad.png)
-
-| Característica | Dificultad que atiende |
-|---|---|
-| **Colores aptos para daltonismo** (paleta Okabe-Ito, siempre activa) y **una forma por estado** (círculo, cuadrado, triángulo, rombo) | Daltonismo: el estado de una publicación o de un vecino nunca depende solo del color |
-| **Alto contraste** (tecla C): fondo negro, texto blanco, bordes amarillos; el texto sobre fondos claros pasa a negro | Baja visión; pantallas con reflejo o proyectores |
-| **Texto grande** en publicaciones y ayudas | Baja visión; lectura a distancia en la feria |
-| **Más tiempo en lo viral** (+10 s, también en red) | Lectura lenta, dislexia o dificultades motoras |
-| **Subtítulos de sonidos**: cada sonido importante aparece escrito («Sonido: alarma de publicación viral») | Personas sordas o con hipoacusia, o juego sin parlantes |
-| **Reducir movimiento**: quita sacudidas, confeti y animaciones de fondo | Sensibilidad al movimiento, epilepsia fotosensible o distracción |
-| **Personalización de personajes**: tono de piel, peinado, ropa y detalles | Representación: cada quien puede verse en su personaje |
-| **Atajos de teclado** para las acciones del turno (1 a 5, Enter, Tab, H, C, M, F11, Esc) | Menos precisión con el mouse; jugar más rápido |
-
-Las opciones se guardan en el computador (`~/.alcalde_digital.json`).
-
-![Modo de alto contraste](img/v2/alto_contraste.png)
-
----
-
-## 7. Sistema de ayuda
-
-- **Ayuda** (botón «?» o tecla H) con 8 secciones: Objetivo, Cómo se juega, Botones, Personajes, Cómo ganar, Indicadores, Árboles y grafos, y En red. Cubre todo lo que pide el enunciado: objetivo, reglas, funciones de los botones, funciones de cada personaje, forma de ganar y significado de los indicadores.
-- **Guía de Civi** en el primer turno, paso a paso.
-- **Indicaciones durante la partida**: vista previa de cada botón, motivo cuando un botón está apagado, avisos de cada acción, la pregunta antes de compartir sin verificar, el resumen de cada noche y el globo de diálogo del personaje.
-- **Descripción de cada indicador** al pasar el mouse por él.
-
-![Ayuda: árboles y grafos](img/v2/ayuda_estructuras.png)
-
----
-
-## 8. Elementos motivadores
-
-Ninguno es solo decoración. Cada uno le dice algo al jugador:
-
-- **El personaje reacciona**: sonríe si la acción ayudó a la ciudad, se preocupa si le hizo daño y celebra un logro.
-- **Puntos flotantes** (+10, −7) sobre quien jugó y **cambios de cada indicador** que aparecen y se desvanecen.
-- **Sonidos sintetizados** (`tools/generar_audio.py`, sin grabaciones de terceros): acierto, error, sello al verificar, alarma viral, noche, conteo de votos, fanfarria. Hay música de fondo tropical suave.
-- **Confeti** al lograr algo y **fuegos artificiales** en la elección. La pantalla se sacude cuando algo sale mal.
-- **10 logros**: Primer chequeo, Paciente cero, Poda limpia, Sangre fría, Voz de la verdad, Cortafuegos, Vecino ejemplar, Caza-bots, Investigador y Mano limpia. Además está la Alcaldía de Ciudad Nova, para el candidato que gana.
-- **La noche**: la pantalla se oscurece, las publicaciones viajan por la red y luego amanece con el resumen del día.
-- **Cambios visuales con sentido**: nubes de tormenta sobre las zonas con tensión, caras confundidas en quienes creen algo falso, la salud de la ciudad con una cara.
-- **Podio final** y «Lo que pasó en la campaña», con un mensaje para la vida real.
+## 9. Capturas
 
 | | |
 |---|---|
-| ![Publicación viral](img/v2/viral.png) | ![Amanece después de la ola](img/v2/noche.png) |
-| ![Rastrear origen: mutó aquí](img/v2/arbol_rastreo.png) | ![Resultados](img/v2/resumen.png) |
-
----
-
-## 9. Funcionamiento estable
-
-- **46 pruebas automáticas** (`python -m unittest discover -s tests -v`), en un par de segundos:
-  - 14 de los árboles y de la partida (entrega 1);
-  - 28 de los grafos, su integración con los árboles, la serialización y el presupuesto de minutos (turno de 2 publicaciones, caminar con minutos, presencia en la zona);
-  - 4 de cliente-servidor con sockets reales.
-- **Partidas completas con clics reales**: un guion juega de principio a fin con 4 jugadores, en local y en red (dos procesos del juego conectados al servidor). Pasa por la selección, la guía, las verificaciones, la publicación viral, las noches, la elección y los resultados.
-- **Prueba de estrés**: 20.000 clics, teclas y movimientos al azar en todas las pantallas, con 4 semillas, sin ningún error. Esta prueba encontró y permitió corregir un caso en que una animación del mapa podía cerrar el juego.
-- **Rendimiento**: cada cuadro se dibuja en unos 5 ms (el juego va a 60 cuadros por segundo). Las ilustraciones se dibujan una vez y se guardan en caché.
-
----
-
-## 10. Para la sustentación
-
-**¿Por qué un árbol?** Cada reenvío sale de exactamente una publicación anterior y ninguna es su propio ancestro. Eso es un árbol. El subárbol de una publicación es todo lo que depende de ella, así que reportar es podar. Subir por el camino a la raíz encuentra el reenvío exacto donde apareció cada mentira. El AVL guarda los hechos oficiales con búsqueda, inserción y eliminación en O(log n) y en orden alfabético.
-
-**¿Por qué un grafo?** Las relaciones entre personas tienen ciclos y varios contactos por persona, y seguir a alguien no es simétrico. Las calles de una ciudad forman una red con distancias. Ninguna de las dos cosas es una jerarquía.
-
-**¿Qué problema resuelve cada estructura?** El árbol de mutaciones guarda *qué pasó* con una historia. La red social decide *a quién le puede llegar* y *quién la cree*. El AVL permite *verificar*. El mapa le da *lugar* a la ciudad: dónde estás, a dónde llegas, dónde pasó cada hecho y quién vota dónde.
-
-**¿Cómo afectan las decisiones del jugador?** Compartir inserta en el árbol y entrega por la red a tus seguidores. Reportar poda y avisa a quienes lo recibieron por esa rama. Alertar, amplificar y desmentir usan vecinos, BFS y el camino de máxima confianza. Moverse usa Dijkstra.
-
-**¿Qué ocurre cuando cambia la información o las relaciones?** Si una discusión elimina una arista, la historia deja de pasar por ahí; si la red se parte en componentes, se forma una burbuja que los desmentidos de afuera no alcanzan. Si se expone al paciente cero, sus aristas pierden confianza y sus próximos rumores llegan menos lejos. Si se suspende un bot, sus seguidores dejan de recibir lo que publicaba.
-
-**¿Cómo se comunica la información entre los jugadores?** Por sockets TCP con mensajes JSON. El servidor guarda la partida, valida los turnos y envía a todos el estado completo después de cada jugada. Los árboles y los grafos viajan serializados; ver la sección 3.4.
-
-**¿Qué comportamiento busca fomentar?** Verificar antes de compartir. Entender que una noticia puede ser cierta en su origen y deformarse en el camino. Saber que reportar lo verdadero también hace daño y que borrar no deshace lo que ya circuló. Ver que hablar con la gente cara a cara también desmiente, y que la desinformación puede cambiar el resultado de una elección.
-
----
-
-## Recursos de terceros
-
-- Fuentes **Fredoka** y **Nunito**, con licencia SIL Open Font License 1.1 (`assets/fuentes/OFL-*.txt`).
-- Iconos **Lucide**, con licencia ISC (`assets/iconos/LICENSE-lucide.txt`).
-- Personajes, edificios, mascota, sonidos y música: hechos para este proyecto. Las ilustraciones salen del código de `ui/personajes.py` y `ui/edificios.py`; el audio, de `tools/generar_audio.py`.
+| ![Menú](img/cazabulos/titulo.png) | ![La cuenta regresiva explica el juego en tres dibujos](img/cazabulos/cuenta.png) |
+| ![La plaza: el Bulo con corona y los vecinos morados](img/cazabulos/plaza.png) | ![La verdad de una estrella viaja por la red (BFS)](img/cazabulos/estrella.png) |
+| ![Una pelea: dos golpes para calmarla](img/cazabulos/pelea.png) | ![El Bulo viral de noche, con 10 segundos](img/cazabulos/viral_noche.png) |
+| ![Resultado con el árbol de decisiones](img/cazabulos/resultado.png) | ![Elección del alcalde](img/cazabulos/eleccion.png) |
+| ![Ayuda: el grafo social en anillos del BFS](img/cazabulos/ayuda_grafos.png) | ![Ayuda: los dos árboles](img/cazabulos/ayuda_arboles.png) |
+| ![En línea: la sala](img/cazabulos/en_linea.png) | ![En línea: rivales como fantasmas y marcador en vivo](img/cazabulos/en_linea_juego.png) |
